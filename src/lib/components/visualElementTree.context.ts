@@ -11,29 +11,46 @@ const VISUAL_ELEMENT_TREE_CONTEXT_KEY = Symbol('svelte-motion:visual-element-par
  * parent link is what makes variant propagation and projection ancestry work.
  * This context is the Svelte equivalent.
  *
- * @param visualElement Current component's VisualElement, or `null` to clear.
+ * The context holds a getter rather than the node, because a component can
+ * create its node after its children have initialised: an `m` whose
+ * `<LazyMotion>` bundle arrives after mount (upstream
+ * `motion/utils/use-visual-element.ts:60-87` creates the node the first render
+ * a renderer exists). Children call the getter when they create their own node.
+ *
+ * @param visualElement Returns this component's VisualElement, or `null`
+ *   while it has none (no features yet, or SSR).
  * @returns Nothing.
  *
  * @example
  * ```ts
- * setVisualElementParent(visualElement)
+ * let visualElement = $state.raw<VisualElement | null>(null)
+ * setVisualElementParent(() => visualElement)
  * ```
  */
-export const setVisualElementParent = (visualElement: VisualElement | null): void => {
-    setContext<VisualElement | null>(VISUAL_ELEMENT_TREE_CONTEXT_KEY, visualElement)
+export const setVisualElementParent = (visualElement: () => VisualElement | null): void => {
+    setContext<() => VisualElement | null>(VISUAL_ELEMENT_TREE_CONTEXT_KEY, visualElement)
 }
 
 /**
  * Read the nearest ancestor motion-dom VisualElement.
  *
- * @returns The parent VisualElement, or `undefined` when no motion ancestor
- * published one (e.g. a top-level motion element, or SSR).
+ * Returns a getter, read when the caller creates its own node, so it sees a
+ * parent node that was created after the caller initialised (see
+ * {@link setVisualElementParent}).
+ *
+ * @returns A getter for the parent VisualElement. It returns `undefined` when
+ *   no motion ancestor published one, or the ancestor has no node (a top-level
+ *   motion element, a featureless `m` parent, or SSR).
  *
  * @example
  * ```ts
- * const parent = getVisualElementParent()
+ * const readParent = getVisualElementParent()
+ * const parent = readParent()
  * ```
  */
-export const getVisualElementParent = (): VisualElement | undefined => {
-    return getContext<VisualElement | null>(VISUAL_ELEMENT_TREE_CONTEXT_KEY) ?? undefined
+export const getVisualElementParent = (): (() => VisualElement | undefined) => {
+    const read = getContext<(() => VisualElement | null) | undefined>(
+        VISUAL_ELEMENT_TREE_CONTEXT_KEY
+    )
+    return () => read?.() ?? undefined
 }

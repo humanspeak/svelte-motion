@@ -5,10 +5,11 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Box, Hand, ListOrdered, Package } from '@lucide/svelte'
+    import { Box, Hand, Hourglass, ListOrdered, Package } from '@lucide/svelte'
     import { demoCodeSample } from '$lib/demo-loaders'
     import { getBreadcrumbContext } from '$lib/components/contexts/Breadcrumb/Breadcrumb.context'
     import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+    import LazyMotionAsyncFeatures from '$lib/examples/lazy-motion/demos/AsyncFeatures.svelte'
     import LazyMotionDefault from '$lib/examples/lazy-motion/demos/Default.svelte'
     import LazyMotionFeatureBundles from '$lib/examples/lazy-motion/demos/FeatureBundles.svelte'
     import LazyMotionReorder from '$lib/examples/lazy-motion/demos/LazyReorder.svelte'
@@ -71,6 +72,18 @@
             notes: reorderNotes,
             barCells: [{ k: 'entry', v: '@humanspeak/svelte-motion/m' }],
             sourceUrl: `${SOURCE_URL}lazy-motion/demos/LazyReorder.svelte`
+        },
+        {
+            figId: 'FIG-004',
+            tag: 'ASYNC',
+            title: { prefix: 'wait for ', accent: 'the bundle', end: '.' },
+            description:
+                'An `m` with no LazyMotion features renders its `initial` and does nothing else, as in Motion. Give LazyMotion an async loader and its `m` components animate in from `initial` once the bundle arrives.',
+            snippet: asyncSection,
+            codeSnippet: asyncCode,
+            notes: asyncNotes,
+            barCells: [{ k: 'features', v: '() => import(...)' }],
+            sourceUrl: `${SOURCE_URL}lazy-motion/demos/AsyncFeatures.svelte`
         }
     ]
 </script>
@@ -173,6 +186,40 @@
                 'lazy-motion/demos/LazyReorder.svelte',
                 'lazy-motion-reorder',
                 'LazyReorder.svelte'
+            )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet asyncSection()}
+    <LazyMotionAsyncFeatures />
+{/snippet}
+{#snippet asyncNotes()}
+    <ul>
+        <li>
+            <Box />
+            <span>
+                The bare <code>m.div</code> has no <code>LazyMotion</code> above it, so it has no
+                animation runtime: it stays at its <code>initial</code> and ignores hover.
+            </span>
+        </li>
+        <li>
+            <Hourglass />
+            <span>
+                The async card renders <code>initial</code> while its loader is pending. Press "Load features"
+                and it animates in from there, then responds to hover.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet asyncCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample(
+                'lazy-motion/demos/AsyncFeatures.svelte',
+                'lazy-motion-async-features',
+                'AsyncFeatures.svelte'
             )
         ]}
         columns={1}

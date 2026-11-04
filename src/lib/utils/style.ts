@@ -2,12 +2,15 @@ import {
     buildHTMLStyles,
     cancelFrame,
     frame,
+    isForcedMotionValue,
     isMotionValue,
     type AnyResolvedKeyframe,
     type HTMLRenderState,
+    type MotionNodeOptions,
     type TransformTemplate as MotionTransformTemplate,
     type MotionValue
 } from 'motion-dom'
+import { untrack } from 'svelte'
 
 /**
  * Structural MotionValue shape accepted by object-form styles.
@@ -182,6 +185,105 @@ export const collectMotionStyleValues = (
     }
 
     return Object.keys(values).length ? values : undefined
+}
+
+/**
+ * The layout options that decide which style keys are "forced" motion values
+ * (motion-dom `isForcedMotionValue`): with `layout` or `layoutId`, the
+ * scale-corrected keys and `opacity` join the transform and `origin*` keys.
+ */
+export type ForcedStyleKeyOptions = {
+    /** The component's `layout` prop. */
+    layout?: MotionNodeOptions['layout']
+    /** The component's `layoutId` prop. */
+    layoutId?: MotionNodeOptions['layoutId']
+}
+
+/** Whether a style entry is rendered from the first-render visual state upstream. */
+const isFrozenStyleEntry = (key: string, value: unknown, options: ForcedStyleKeyOptions) =>
+    isMotionValue(value) || isForcedMotionValue(key, options)
+
+/**
+ * Capture the values of an object-form style that upstream renders from the
+ * constant first-render visual state.
+ *
+ * Upstream Motion (14.7.1) copies only raw, non-forced style values on every
+ * render (`render/html/use-props.ts:9-49`, `copyRawValuesOnly`). MotionValues
+ * and forced keys (transform keys such as `x` / `scale`, `origin*`, and with
+ * `layout` / `layoutId` the scale-corrected keys and `opacity`; motion-dom
+ * `isForcedMotionValue`) come from the visual state made once at the first
+ * render (`motion/utils/use-visual-state.ts:134-142`). Without a VisualElement
+ * nothing re-reads them. This takes that snapshot: each MotionValue's current
+ * value (read under `untrack`, so the caller does not subscribe) and each
+ * forced raw value.
+ *
+ * @param style The component's `style` prop.
+ * @param options The component's `layout` / `layoutId` props.
+ * @returns The captured values by style key, or `undefined` when nothing is
+ *   captured (string or missing styles, or no MotionValue or forced key).
+ * @example
+ * ```ts
+ * const x = motionValue(10)
+ * captureMotionStyleValues({ x, width: '5px', scale: 2 })
+ * // => { x: 10, scale: 2 }
+ * ```
+ */
+export const captureMotionStyleValues = (
+    style: unknown,
+    options: ForcedStyleKeyOptions = {}
+): Record<string, string | number> | undefined => {
+    if (!isMotionStyleObject(style)) return undefined
+
+    const captured: Record<string, string | number> = {}
+    for (const [key, value] of Object.entries(style)) {
+        if (!isFrozenStyleEntry(key, value, options)) continue
+        const latest: unknown = isMotionValue(value) ? untrack((): unknown => value.get()) : value
+        if (typeof latest === 'string' || typeof latest === 'number') captured[key] = latest
+    }
+
+    return Object.keys(captured).length ? captured : undefined
+}
+
+/**
+ * Replace the MotionValues and forced keys of an object-form style with the
+ * values captured by {@link captureMotionStyleValues}.
+ *
+ * Mirrors what upstream renders for an element without a VisualElement: raw,
+ * non-forced values pass through and stay reactive (upstream re-copies them
+ * every render), while MotionValues and forced keys keep their first-render
+ * values. An entry with no captured value is dropped, as upstream's visual
+ * state has no such key.
+ *
+ * @param style The component's `style` prop.
+ * @param captured The values captured at the first render.
+ * @param options The component's `layout` / `layoutId` props.
+ * @returns A frozen copy of an object-form style; any other `style` unchanged.
+ * @example
+ * ```ts
+ * const x = motionValue(10)
+ * const captured = captureMotionStyleValues({ x })
+ * x.set(50)
+ * freezeMotionStyle({ x, width: '20px' }, captured)
+ * // => { x: 10, width: '20px' }
+ * ```
+ */
+export const freezeMotionStyle = <S>(
+    style: S,
+    captured: Record<string, string | number> | undefined,
+    options: ForcedStyleKeyOptions = {}
+): S => {
+    if (!isMotionStyleObject(style)) return style
+
+    const frozen: MotionStyle = {}
+    for (const [key, value] of Object.entries(style)) {
+        if (!isFrozenStyleEntry(key, value, options)) {
+            frozen[key] = value
+        } else if (captured?.[key] !== undefined) {
+            frozen[key] = captured[key]
+        }
+    }
+
+    return frozen as S
 }
 
 /**

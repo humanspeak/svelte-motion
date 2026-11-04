@@ -1,6 +1,5 @@
 <script lang="ts">
     import { setLazyMotionContext } from '$lib/components/lazyMotion.context'
-    import { domMin } from '$lib/features/domMin'
     import {
         isLazyFeatureBundle,
         normalizeLazyFeatureBundle,
@@ -27,8 +26,11 @@
 
     let { children, features, strict = false }: Props = $props()
 
-    let loadedFeatures = $state<FeatureBundle>(
-        untrack(() => (isLazyFeatureBundle(features) ? domMin : features))
+    // Upstream `LazyMotion` publishes no renderer until an async bundle
+    // resolves (Motion 14.7.1 `components/LazyMotion/index.tsx:52-66`), so a
+    // pending `m` has no VisualElement.
+    let loadedFeatures = $state<FeatureBundle | undefined>(
+        untrack(() => (isLazyFeatureBundle(features) ? undefined : features))
     )
     let isLoaded = $state(untrack(() => !isLazyFeatureBundle(features)))
 
@@ -51,7 +53,7 @@
             return
         }
 
-        loadedFeatures = domMin
+        loadedFeatures = undefined
         isLoaded = false
         features()
             .then((bundle) => {
@@ -60,8 +62,11 @@
                 isLoaded = true
             })
             .catch(() => {
+                // A rejected loader publishes nothing, as upstream: its
+                // `features().then(...)` has no `.catch`
+                // (`LazyMotion/index.tsx:60`), so `m` stays featureless.
                 if (currentLoadId !== loadId) return
-                loadedFeatures = domMin
+                loadedFeatures = undefined
                 isLoaded = false
             })
 

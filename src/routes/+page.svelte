@@ -85,6 +85,30 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m') + searchParams}
+                    >
+                        LazyMotion — m without features
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-presence') + searchParams}
+                    >
+                        LazyMotion — featureless m in AnimatePresence
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/lazy-motion/featureless-m-props') + searchParams}
+                    >
+                        LazyMotion — featureless m tabindex, style and pathLength
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/enter-animation') + searchParams}
                     >
                         Enter Animation
@@ -1218,6 +1242,39 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/presence-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — an exiting element crossfades into the new one
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/exit-complete-once') + searchParams}
+                    >
+                        layoutId + AnimatePresence — onExitComplete fires once per exit (#3233)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/lightbox-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — lightbox closes back into its gallery item
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/nested-crossfade') + searchParams}
+                    >
+                        layoutId + AnimatePresence — nested shared children of an exiting direct
+                        child
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -1318,6 +1375,14 @@
                         href={resolve('/tests/layout/overdamped-spring') + searchParams}
                     >
                         Slow overdamped spring layout animation (#1207)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/reflow-mid-animation') + searchParams}
+                    >
+                        layout — a reflow mid animation keeps sliding from the painted box
                     </a>
                 </li>
             </ul>

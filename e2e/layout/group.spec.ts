@@ -49,10 +49,13 @@ test.describe('layout/group', () => {
         // last unmount position on the bridged-key code path.
         await page.getByTestId('strip-a-tab-2').click()
 
+        // Plan 012 A3: an exiting underline is held while it crossfades into
+        // the new one, as upstream holds it, and the two share a test id: read
+        // the newest one in document order (`.last()`), as the #1935 cases do.
         // Wait for A's underline to settle on tab 2.
         await expect
             .poll(async () => {
-                const underline = await page.getByTestId('strip-a-underline').boundingBox()
+                const underline = await page.getByTestId('strip-a-underline').last().boundingBox()
                 const tab = await page.getByTestId('strip-a-tab-2').boundingBox()
                 if (!underline || !tab) return false
                 return Math.abs(underline.x - tab.x) < 4
@@ -70,7 +73,7 @@ test.describe('layout/group', () => {
         // briefly exceed the cross-strip gap.
         let maxOffsetFromB = 0
         for (let i = 0; i < 12; i++) {
-            const underline = await page.getByTestId('strip-b-underline').boundingBox()
+            const underline = await page.getByTestId('strip-b-underline').last().boundingBox()
             if (underline) {
                 const offset = Math.abs(underline.x - bBox.x)
                 if (offset > maxOffsetFromB) maxOffsetFromB = offset
@@ -86,7 +89,7 @@ test.describe('layout/group', () => {
         // And confirm B's underline ultimately lands on B's tab 1.
         await expect
             .poll(async () => {
-                const underline = await page.getByTestId('strip-b-underline').boundingBox()
+                const underline = await page.getByTestId('strip-b-underline').last().boundingBox()
                 const tab = await page.getByTestId('strip-b-tab-1').boundingBox()
                 if (!underline || !tab) return false
                 return Math.abs(underline.x - tab.x) < 4

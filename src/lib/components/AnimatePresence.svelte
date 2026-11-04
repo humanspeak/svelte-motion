@@ -209,7 +209,9 @@
     )
 </script>
 
-<div class="animate-presence-container">
+<!-- `data-propagate` (plan 012): an exiting ancestor's clone walk passes its
+     exit to this boundary's children only when it propagates. -->
+<div class="animate-presence-container" data-propagate={propagate || undefined}>
     {#if child}
         <PresenceChild present={ownedPresent}>
             {@render child()}

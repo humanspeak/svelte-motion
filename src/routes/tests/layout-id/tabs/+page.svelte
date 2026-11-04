@@ -70,6 +70,12 @@
 
     const click = (id: string) => document.getElementById(id)?.click()
 
+    const variants = [
+        { label: 'without layout (default)', query: '' },
+        { label: 'with layout', query: 'layout=true' }
+    ]
+    const current = layout ? 'with layout' : 'without layout (default)'
+
     const steps: TesterStep[] = [
         {
             text: 'Select tab "b".',
@@ -84,7 +90,7 @@
             action: { label: 'Select a', run: () => click('select-a') }
         },
         {
-            text: 'Open the "with layout" variant from the link in the panel and repeat both steps.',
+            text: 'Switch to "with layout" with the link next to the chip and repeat both steps.',
             expected: 'Same: it slides both ways and the chip reads SLID ✓.'
         }
     ]
@@ -143,6 +149,15 @@
                       ? 'SAMPLING'
                       : 'WAITING'}
         </span>
+        <span class="variants">
+            {#each variants as v (v.label)}
+                {#if v.label === current}
+                    <strong>{v.label}</strong>
+                {:else}
+                    <a href="?{v.query}">{v.label}</a>
+                {/if}
+            {/each}
+        </span>
     {/snippet}
     {#snippet checks()}
         <p>
@@ -155,10 +170,6 @@
             Since Motion 14.7.1 (#1411), that move works like an unmount and remount: the new holder
             animates from the old one. Before, the element kept its old shared-layout stack, so the
             highlight snapped.
-        </p>
-        <p>
-            Variant: <a href="?layout=true">with <code>layout</code></a> ·
-            <a href="?">without</a>
         </p>
     {/snippet}
 </TesterPanel>
@@ -182,5 +193,16 @@
     .verdict.na {
         background: #f1f5f9;
         color: #475569;
+    }
+    .variants {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+    .variants a {
+        color: #2563eb;
+        text-decoration: underline;
     }
 </style>

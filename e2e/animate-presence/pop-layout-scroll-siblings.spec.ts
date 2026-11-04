@@ -17,10 +17,13 @@ import { expect, test, type Page } from '@playwright/test'
  * is the first row with at least 20 pixels within ±24 per channel of its
  * colour, its bottom the last such row, and its left edge the first column
  * with at least 20 such pixels. A colour counts as found when at least 10
- * rows match, pink (the exit clone, drawn above the others) only as its
- * whole 60px box, and green (which the clone can cover) only when at least
- * 20 rows show. Green is tracked by its bottom edge: the pink exit clone
- * sits above it in the stacking order and slides over its top.
+ * rows match, pink only as its whole 60px box, and green only when at least
+ * 20 rows show. Green is tracked by its bottom edge. Pink (the exit clone)
+ * is drawn above the others only while it isn't held: a held `layout` clone
+ * keeps the element's own stacking (plan 012 ruling 5, as upstream's
+ * `PopChild.tsx:167-168` @ v14.7.1 inserts no z-index), so green, later in
+ * the document and transformed while it animates, draws over it, as on the
+ * owned path (`withoutCoveredGreen`).
  *
  * The screencast drops frames for about 200ms when an exit completes (the
  * clone and placeholder leave the DOM), with `?nolayout` too, while the page
@@ -69,11 +72,25 @@ interface Hit {
     pinkTop?: number
     pinkHit?: boolean
     /**
+     * Whether green is what hit-tests at pink's centre. An exit clone takes
+     * no pointer events, so on the clone path this, not `pinkHit`, tells
+     * that green covers it (plan 012 ruling 5).
+     */
+    pinkUnderGreen?: boolean
+    /**
      * The orange `?footer` band's bottom (plan 015b): items FLIPping up from
      * their old slots are drawn over a footer that moved up under them, so
      * only its bottom edge shows where its box is.
      */
     orange?: number
+    /**
+     * The item after green (`sib-4`, grey): its top in the scroller's
+     * content (viewport top minus the scroller's top plus its `scrollTop`),
+     * so a scroll clamp doesn't read as a move (plan 012 A6).
+     */
+    fourth?: number
+    /** `#scroller`'s `scrollTop`, when the page has one (plan 012 A6). */
+    scrollTop?: number
 }
 interface Recording {
     frames: Frame[]
@@ -150,6 +167,13 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
         const greenX = column('sib-3')
         const zeroX = column('sib-0')
         const orangeX = column('footer')
+        const fourthX = column('sib-4')
+        const scroller = document.getElementById('scroller')
+        const fourthTop = () => {
+            const top = scan(fourthX, 'sib-4', false)
+            if (top === undefined || !scroller) return undefined
+            return top - scroller.getBoundingClientRect().top + scroller.scrollTop
+        }
         const greenRect = document.getElementById('sib-3')?.getBoundingClientRect()
         const greenY = greenRect ? greenRect.top + greenRect.height / 2 : undefined
         const scanRow = (y: number | undefined, id: string) => {
@@ -186,7 +210,11 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                 rect.left + rect.width / 2,
                 rect.top + rect.height / 2
             )
-            return { pinkTop: rect.top, pinkHit: hit === pink }
+            return {
+                pinkTop: rect.top,
+                pinkHit: hit === pink,
+                pinkUnderGreen: !!hit?.closest('#sib-3')
+            }
         }
         const sample = () => {
             if (!w.hitting) return
@@ -197,7 +225,9 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                 greenLeft: scanRow(greenY, 'sib-3'),
                 zero: scan(zeroX, 'sib-0', false),
                 ...pinkCentre(),
-                orange: scan(orangeX, 'footer', true)
+                orange: scan(orangeX, 'footer', true),
+                fourth: fourthTop(),
+                scrollTop: scroller?.scrollTop
             })
             requestAnimationFrame(sample)
         }
@@ -254,9 +284,11 @@ async function record(page: Page, action: () => Promise<unknown>, ms: number): P
                     // to sit within the tolerance.
                     if (top < 0 || rows.filter((count) => count >= 20).length < 10) continue
                     const bottom = rows.length - 1 - [...rows].reverse().findIndex((c) => c >= 20)
-                    // Pink is the exit clone, on top of everything: anything
-                    // but its whole 60px box is its fade crossing the
-                    // tolerance over different backgrounds.
+                    // Pink, when it is drawn above everything (an exit clone
+                    // that isn't held): anything but its whole 60px box is
+                    // its fade crossing the tolerance over different
+                    // backgrounds. A held clone or the real element can be
+                    // covered by green, and then isn't found at all.
                     if (name === 'pink' && Math.abs((bottom + 1 - top) / scale - 60) > 3) continue
                     // Green sits under the clone: a sliver left showing above
                     // the clone isn't its band (the hit test tracks it there).
@@ -318,7 +350,7 @@ function maxStep(frames: Frame[], colour: Colour): number {
     return step
 }
 
-type HitEdge = 'blue' | 'green' | 'zero' | 'orange'
+type HitEdge = 'blue' | 'green' | 'zero' | 'orange' | 'fourth'
 
 /** The largest move of a hit-tested edge between two rendered frames. */
 function maxHitStep(hits: Hit[], colour: HitEdge): number {
@@ -398,9 +430,10 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
             900
         )
         annotate(recording)
-        const { frames } = recording
-        // The clone slides over green, so each check takes the frames that
-        // show the colours it compares; the first frame shows all three.
+        // The held clone keeps the element's stacking, so green draws over
+        // it where they meet, as on the owned path (plan 012 ruling 5,
+        // `PopChild.tsx:167-168` @ v14.7.1): those green readings are gaps.
+        const { frames, hits } = withoutCoveredGreen(recording)
         const start = framesWith(frames, ['blue', 'pink', 'green'])[0].bands
         const all = framesWith(frames, ['blue', 'pink'])
         expect(all.length).toBeGreaterThanOrEqual(10)
@@ -414,10 +447,10 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
                 expect(Math.abs(bands.green.bottom - start.green!.bottom)).toBeLessThanOrEqual(2)
             }
         }
-        for (const colour of ['blue', 'pink', 'green'] as const) {
-            expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
+        for (const colour of ['blue', 'pink'] as const) {
+            expect(maxStep(recording.frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
         }
-        const { hits } = recording
+        expect(maxStep(frames, 'green'), 'green step').toBeLessThanOrEqual(35)
         for (const colour of ['blue', 'green'] as const) {
             expect(maxHitStep(hits, colour), `${colour} hit-tested step`).toBeLessThanOrEqual(35)
         }
@@ -427,13 +460,30 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         expect(hit).toBe('sib-1')
     })
 
+    /**
+     * The held clone keeps the element's stacking (plan 012 ruling 5,
+     * `PopChild.tsx:167-168` @ v14.7.1): green, later in the document and
+     * animating up into pink's slot, draws over it, as on the owned path
+     * (plan 015b A2.3). The clone takes no pointer events, so green covering
+     * its centre is read from what hit-tests there.
+     */
     test('?layoutScroll, popLayout: the clamp is a one-frame content jump', async ({ page }) => {
         await open(page, '&layoutScroll')
         await scrollBottom(page)
         await page.waitForTimeout(200)
-        const recording = await record(page, () => remove(page), 600)
+        let poppedAt = 0
+        const recording = await record(
+            page,
+            async () => {
+                poppedAt = await page.evaluate(() => {
+                    document.querySelector<HTMLElement>('[data-testid="remove"]')!.click()
+                    return performance.now()
+                })
+            },
+            600
+        )
         annotate(recording)
-        const { frames } = recording
+        const { frames, hits } = recording
         const blueSteps = steps(frames, 'blue').filter(({ step }) => Math.abs(step) > 2)
         const pinkSteps = steps(frames, 'pink').filter(({ step }) => Math.abs(step) > 2)
         expect(blueSteps).toHaveLength(1)
@@ -442,15 +492,95 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         expect(Math.abs(pinkSteps[0].step - 70)).toBeLessThanOrEqual(2)
         expect(pinkSteps[0].index).toBe(blueSteps[0].index)
         const all = framesWith(frames, ['blue', 'pink'])
-        expect(all.length).toBeGreaterThanOrEqual(10)
         const gap = all[0].bands.pink!.top - all[0].bands.blue!.top
         for (const { bands } of all) {
             expect(Math.abs(bands.pink!.top - bands.blue!.top - gap)).toBeLessThanOrEqual(2)
+        }
+        for (const colour of ['blue', 'pink'] as const) {
+            expect(maxStep(frames, colour), `${colour} step`).toBeLessThanOrEqual(35)
+        }
+        // After the clamp's one-frame jump, pink holds still and shows until
+        // green first covers its centre, no sooner than 140ms in.
+        const after = hits.filter(({ t, pinkTop }) => t > poppedAt && pinkTop !== undefined)
+        expect(after.length).toBeGreaterThanOrEqual(10)
+        const settledTop = after.at(-1)!.pinkTop!
+        const coveredAt = after.findIndex(({ pinkUnderGreen }) => pinkUnderGreen)
+        const shown = coveredAt < 0 ? after : after.slice(0, coveredAt)
+        expect(shown.length, 'frames showing pink').toBeGreaterThanOrEqual(5)
+        for (const { pinkTop } of after.slice(1)) {
+            expect(Math.abs(pinkTop! - settledTop), 'pink holds still').toBeLessThanOrEqual(1)
+        }
+        if (coveredAt >= 0) {
+            expect(after[coveredAt].t - poppedAt, 'green covers pink').toBeGreaterThanOrEqual(140)
+            for (const hit of after.slice(coveredAt)) expect(hit.pinkUnderGreen).toBe(true)
         }
         const transform = await page.evaluate(
             () => getComputedStyle(document.getElementById('sib-1')!).transform
         )
         expect(transform).toBe('none')
+    })
+
+    /**
+     * Plan 012 A6: the clone hand-off makes no scroll-anchoring adjustment.
+     * Upstream keeps the real element, so the clamp leaves the scroller at
+     * 550 and the item after green slides up from its old slot (framer-motion
+     * 14.7.1, relative to the scroller: 330 → 253 → 260 with the clamp). Ours
+     * swapped in the clone and the browser re-anchored the scroller by +70px
+     * (550 → 620); a phantom commit then snapped that item to its new slot.
+     */
+    test('?layoutScroll, popLayout: no scroll re-anchor, the item after green slides', async ({
+        page
+    }) => {
+        await open(page, '&layoutScroll')
+        await scrollBottom(page)
+        await page.waitForTimeout(200)
+        let poppedAt = 0
+        const recording = await record(
+            page,
+            async () => {
+                poppedAt = await page.evaluate(() => {
+                    document.querySelector<HTMLElement>('[data-testid="remove"]')!.click()
+                    return performance.now()
+                })
+            },
+            600
+        )
+        annotate(recording)
+        const { hits } = recording
+        test.info().annotations.push({
+            type: 'hit-tested frames (ms: scrollTop/sib-4 content top)',
+            description: hits
+                .map(
+                    ({ t, scrollTop, fourth }) =>
+                        `${(t - poppedAt).toFixed(0)}: ${scrollTop ?? '-'}/${fourth?.toFixed(0) ?? '-'}`
+                )
+                .join(' ')
+        })
+        const before = hits.filter(({ t }) => t < poppedAt)
+        const after = hits.filter(({ t }) => t > poppedAt)
+        expect(before.at(-1)?.scrollTop).toBe(620)
+        expect(after.length).toBeGreaterThanOrEqual(20)
+        // The clamp lands on the first frame after the click and stays: the
+        // scroller is never re-anchored back to 620.
+        const clamped = after.findIndex(({ scrollTop }) => scrollTop === 550)
+        expect(clamped, 'clamped to 550').toBeGreaterThanOrEqual(0)
+        expect(after[clamped].t - poppedAt, 'clamp frame').toBeLessThanOrEqual(50)
+        for (const { scrollTop } of after.slice(clamped)) expect(scrollTop).toBe(550)
+        // In content coordinates the item starts in its old slot (880) and
+        // slides to its new one (810), never stepping to it in one frame.
+        // Drawn from its old slot it sits below the clamped scroller's
+        // bottom edge (upstream's 330 of 320), so it is first hit-tested a
+        // few frames in, still well short of the new slot.
+        const fourth = after.flatMap(({ fourth }) => (fourth === undefined ? [] : [fourth]))
+        expect(fourth.length).toBeGreaterThanOrEqual(20)
+        expect(Math.abs(before.at(-1)!.fourth! - 880), 'sib-4 old slot').toBeLessThanOrEqual(2)
+        expect(fourth[0], 'sib-4 first seen short of its new slot').toBeGreaterThanOrEqual(850)
+        expect(Math.abs(fourth.at(-1)! - 810), 'sib-4 new slot').toBeLessThanOrEqual(3)
+        expect(maxHitStep(hits, 'fourth'), 'sib-4 hit-tested step').toBeLessThanOrEqual(35)
+        // …along its own layout spring, which overshoots the new slot
+        // (upstream's 253 against 260, content 803), not a restart from
+        // where a phantom commit left it.
+        expect(Math.min(...fourth), 'sib-4 overshoots its new slot').toBeLessThanOrEqual(806)
     })
 
     test('sync completion in the scrolled container: no jump', async ({ page }) => {
@@ -498,12 +628,16 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
         const { frames } = recording
-        // The clone slides over green: each colour needs its own 10 frames.
-        // Green's left edge comes from the hit test: the screencast only sees
-        // a sliver of it beside the clone, where its corner radius moves the
-        // first full column.
+        // Each colour needs its own 10 frames. The held clone and blue
+        // overlap as blue moves under it (plan 012 ruling 5: no z-index lift,
+        // as on the owned path), so blue's left edge is read where at least
+        // 40px of it shows. Green's left edge comes from the hit test: the
+        // screencast only sees a sliver of it beside the clone, where its
+        // corner radius moves the first full column.
         const lefts = {
-            blue: frames.flatMap(({ bands }) => (bands.blue ? [bands.blue.left] : [])),
+            blue: frames.flatMap(({ bands }) =>
+                bands.blue && bands.blue.bottom - bands.blue.top >= 40 ? [bands.blue.left] : []
+            ),
             pink: frames.flatMap(({ bands }) => (bands.pink ? [bands.pink.left] : [])),
             green: recording.hits.flatMap(({ greenLeft }) =>
                 greenLeft === undefined ? [] : [greenLeft]
@@ -521,7 +655,10 @@ test.describe('layout siblings around exits in scroll containers (clone path)', 
         await page.waitForTimeout(200)
         const recording = await record(page, () => remove(page), 900)
         annotate(recording)
-        expectNoJump(recording, ['blue', 'green'])
+        // The held clone keeps its stacking, so green draws over it (plan
+        // 012 ruling 5; `withoutCoveredGreen`, 015b A4).
+        expectNoJump(recording, ['blue'])
+        expectNoJump(withoutCoveredGreen(recording), ['green'])
     })
 
     test('?nolayout, clamp: the pink clone steps with the content in one frame', async ({

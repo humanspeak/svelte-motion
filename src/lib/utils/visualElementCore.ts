@@ -781,6 +781,18 @@ export interface CreateMotionVisualElementOptions {
      * correction. plan 002 turns seeding on together with rendering.
      */
     seedLatestValues?: boolean
+    /**
+     * An explicit seed for `latestValues`. When given it is used instead of
+     * {@link makeLatestValues}, and `seedLatestValues` is ignored.
+     *
+     * For a node created after its component's first render (an `m` whose
+     * LazyMotion bundle arrives late). Upstream seeds every node from the
+     * constant first-render `visualState` (`motion/utils/use-visual-state.ts:134-142`,
+     * `useConstant(make)`), and the VisualElement constructor resets each style
+     * MotionValue to that seed (`motion-dom` `render/VisualElement.ts:437-446`).
+     * Pass the values captured at the first render to match.
+     */
+    latestValues?: ResolvedValues
 }
 
 /**
@@ -814,13 +826,16 @@ export const createMotionVisualElement = (
         isSVG = false,
         blockInitialAnimation,
         context = {},
-        seedLatestValues = true
+        seedLatestValues = true,
+        latestValues: seed
     } = options
 
     const scrape = isSVG ? scrapeSVGMotionValuesFromProps : scrapeHTMLMotionValuesFromProps
-    const latestValues = seedLatestValues
-        ? makeLatestValues(props, context, presenceContext, scrape)
-        : {}
+    const latestValues = seed
+        ? { ...seed }
+        : seedLatestValues
+          ? makeLatestValues(props, context, presenceContext, scrape)
+          : {}
     const shared = {
         parent: parent ?? undefined,
         props,

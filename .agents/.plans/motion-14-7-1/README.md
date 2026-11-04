@@ -57,6 +57,8 @@ any port work and the gate. Tests that cannot go red on 14.6.0 are kept as guard
 - **Wave 5, between 015b and 015c** (lane `layoutid`, after 015b merges; it merges `feat/motion-14.7.1`
   into the lane first): 012. The `siblings` lane's 015c starts only after 012 has merged. Order:
   015a → 015b → 012 → 015c.
+- **Wave 5, lane `lazy`**: 016 (after 011's report; parallel with 015b). 017 (stub until 012 merges; then written in
+  full and executed in the `lazy` lane after merging `feat/motion-14.7.1`).
 
 ## Status
 
@@ -172,6 +174,12 @@ Status values: TODO | IN PROGRESS | PHASE A RED | DONE | BLOCKED (reason) | REJE
 - **015c → 012**: 012 adds a presence effect pair after 006's switch pair and leaves R2 alone; 015c edits R2 and
   must keep it declared before 012's pair (`willUpdate()` is idempotent once dirty, so R2's cached snapshot
   wins).
+- **016 → 011**: builds the spike's prototype A1. Overlaps 015b and 012 in `_MotionContainer.svelte` only (016's
+  "Merge hazards" table says what the second plan to land must do).
+- **017 → 012, 016**: owned-presence featureless `m`; edits `PresenceChild.svelte`, `presenceExitRegistry.ts`,
+  `usePresence.ts`.
+- **Release gate:** 016 must not ship without 017. Until 017 lands, a featureless `m` with `exit` under
+  `<AnimatePresence present>` waits for `safeToRemove`. The 2.7.0 PR needs both merged.
 - **015a → 006 (A1), 007, 008**: it rebases the `onScreenSnapshot()` that 006 A1 reads, edits
   `_MotionContainer.svelte` and the adapter after 006/007's changes, and builds on 008's `presence.ts` helpers
   and spec.
