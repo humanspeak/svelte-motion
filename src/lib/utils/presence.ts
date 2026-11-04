@@ -1,14 +1,26 @@
 import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { mergeTransitions } from '$lib/utils/animation'
+import { layoutParentOf, markExiting, type ExitMarker } from '$lib/utils/layout'
 import { holdLayoutIdHandoffs } from '$lib/utils/layoutId'
 import { pwLog } from '$lib/utils/log'
+import { MotionDomProjectionAdapter, type ExitLayoutHold } from '$lib/utils/motionDomProjection'
+import {
+    captureScrollSnapshot,
+    holdsFixedDescendants,
+    measureScreenScale,
+    measureScrollDelta,
+    translateRectByScrollDelta,
+    type ScrollSnapshot
+} from '$lib/utils/scrollBasis'
 import { animate, type AnimationOptions, type DOMKeyframesDefinition } from 'motion'
 import {
     cancelFrame,
     frame,
     microtask,
     readTransformValue,
+    transformPropOrder,
     transformProps,
+    visualElementStore,
     type PresenceContextProps
 } from 'motion-dom'
 import { getContext, setContext, tick } from 'svelte'
@@ -76,6 +88,16 @@ type PresenceChild = {
      */
     insertionParent?: HTMLElement
     /**
+     * The element's nearest `LayoutGroup` node group (plan 015b): its exit
+     * clone's completion re-renders that group.
+     */
+    layoutGroup?: object
+    /**
+     * Plan 012: hands the element's projection node to its exit clone, so
+     * the clone is held until the shared layout animation releases it.
+     */
+    layoutHandOff?: PresenceLayoutHandOff
+    /**
      * The element's next sibling captured while it was still connected.
      * Svelte detaches keyed nodes before `unregisterChild` runs, so the exit
      * placeholder can't anchor on the element itself — it anchors on this
@@ -89,6 +111,12 @@ type PresenceChild = {
     lastAnimatedOpacity?: string
     /** Last captured mid-animation transform (from rAF polling). */
     lastAnimatedTransform?: string
+    /**
+     * The element's running animations at the last animating frame (plan 012
+     * A2): a detached element reports none, so a held clone takes them over
+     * from here.
+     */
+    lastAnimations?: Animation[]
 }
 
 /**
@@ -107,6 +135,12 @@ type LayoutStyleSnapshot = Pick<
     | 'gridColumnEnd'
     | 'gridRowStart'
     | 'gridRowEnd'
+    | 'width'
+    | 'height'
+    | 'top'
+    | 'right'
+    | 'bottom'
+    | 'left'
 >
 
 /**
@@ -130,7 +164,15 @@ const snapshotLayoutStyle = (style: CSSStyleDeclaration): LayoutStyleSnapshot =>
     gridColumnStart: style.gridColumnStart,
     gridColumnEnd: style.gridColumnEnd,
     gridRowStart: style.gridRowStart,
-    gridRowEnd: style.gridRowEnd
+    gridRowEnd: style.gridRowEnd,
+    // Plan 012: the used, untransformed size and insets, for held clones and
+    // placeholders (no transform or integer rounding, unlike a rect).
+    width: style.width,
+    height: style.height,
+    top: style.top,
+    right: style.right,
+    bottom: style.bottom,
+    left: style.left
 })
 
 /**
@@ -397,12 +439,6 @@ export type PopLayoutSnapshot = {
     point: [number, number]
 }
 
-type ScrollSnapshot = {
-    element: HTMLElement
-    scrollLeft: number
-    scrollTop: number
-}
-
 /**
  * Anchor used to preserve horizontal positioning in `mode="popLayout"`.
  */
@@ -453,6 +489,162 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
     return Number.isFinite(parsed) ? parsed : fallback()
 }
 
+/** Elements {@link suppressScrollAnchoring} holds, with their own inline value. */
+const anchoringSuppressions = new WeakMap<HTMLElement, { count: number; inline: string }>()
+
+/**
+ * Keep the browser from scroll-anchoring around an exit clone hand-off
+ * (plan 012 A6): `overflow-anchor: none` on `element` until the second
+ * animation frame, so the first frame's layout after the swap makes no
+ * adjustment. Overlapping calls share one hold; the element's own inline
+ * value comes back when the last one ends, unless the app wrote its own
+ * value in the meantime.
+ *
+ * Upstream keeps the real element in place, so its clamp of a scrolled
+ * container is the only scroll change an exit makes. The clone path removes
+ * the element and inserts its clone, and the frame after a `popLayout` pop
+ * the browser re-anchors the container to where its content sat before the
+ * clamp, once the siblings' layout transforms extend the overflow again
+ * (550 → 620 in `tests/animate-presence/pop-layout-scroll-siblings`
+ * `?layoutScroll`). Suppressing anchoring on the clone's layout parent for
+ * that frame leaves the clamp as upstream's; a compensating scroll write
+ * would fight the browser and any scroll in progress.
+ *
+ * @param element The clone's layout parent (it generates a box).
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * parent.insertBefore(clone, slot)
+ * suppressScrollAnchoring(layoutParentOf(parent, true))
+ * ```
+ */
+export const suppressScrollAnchoring = (element: HTMLElement): void => {
+    const held = anchoringSuppressions.get(element)
+    if (held) {
+        held.count += 1
+    } else {
+        anchoringSuppressions.set(element, { count: 1, inline: element.style.overflowAnchor })
+        element.style.overflowAnchor = 'none'
+    }
+    const release = () => {
+        const hold = anchoringSuppressions.get(element)
+        if (!hold || --hold.count > 0) return
+        anchoringSuppressions.delete(element)
+        // A value the app wrote during the hold is its own; keep it.
+        if (element.style.overflowAnchor === 'none') element.style.overflowAnchor = hold.inline
+    }
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => requestAnimationFrame(release))
+    } else {
+        setTimeout(release, 32)
+    }
+}
+
+/**
+ * Remove what a nested `AnimatePresence` had in flight from a fresh exit
+ * clone (plan 012, N3): copies of its own exit clones and placeholders, which
+ * tear down with the subtree, and copied `data-layout-size-animation` marks
+ * (the size animation runs on the detached original, and a copied mark would
+ * hide the clone from part D, plan 015b E11).
+ *
+ * @param clone The exit clone, straight from `cloneNode(true)`.
+ * @returns Nothing.
+ */
+const stripNestedExitArtifacts = (clone: HTMLElement): void => {
+    for (const artifact of clone.querySelectorAll('[data-clone], [data-presence-placeholder]')) {
+        artifact.remove()
+    }
+    clone.removeAttribute('data-layout-size-animation')
+    for (const marked of clone.querySelectorAll('[data-layout-size-animation]')) {
+        marked.removeAttribute('data-layout-size-animation')
+    }
+}
+
+/**
+ * The horizontal and vertical padding plus border of a computed style, for a
+ * `content-box` element's border box.
+ *
+ * @param style A computed-style snapshot.
+ * @returns `[horizontal, vertical]` px.
+ */
+const borderAndPadding = (style: ComputedStyleSnapshot): [number, number] => {
+    const px = (prop: string) => parseFloat(style[prop] ?? '') || 0
+    return [
+        px('padding-left') +
+            px('padding-right') +
+            px('border-left-width') +
+            px('border-right-width'),
+        px('padding-top') +
+            px('padding-bottom') +
+            px('border-top-width') +
+            px('border-bottom-width')
+    ]
+}
+
+/** A camelCase style key as its CSS property (`marginLeft` → `margin-left`). */
+const toCssProperty = (key: string): string =>
+    key.startsWith('--') ? key : key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)
+
+/**
+ * A computed `margin` shorthand as `[top, right, bottom, left]` px, by the CSS
+ * 1-4 value rules.
+ *
+ * @param margin The computed shorthand, e.g. `'0px 0px 0px 10px'`.
+ * @returns The four sides; non-lengths read as 0.
+ */
+const expandMargin = (margin: string): [number, number, number, number] => {
+    const values = (margin || '0')
+        .trim()
+        .split(/\s+/)
+        .map((v) => parseFloat(v) || 0)
+    const [top, right = top, bottom = top, left = right] = values
+    return [top, right, bottom, left]
+}
+
+/**
+ * The box an absolutely positioned clone in `slot` is placed against (plan
+ * 012): from `slot` itself up, skipping `display: contents`, the first
+ * positioned element or containing block of fixed boxes, else the initial
+ * containing block. Reads only, in the caller's read pass.
+ *
+ * @param slot The clone's slot parent.
+ * @returns The block's viewport left/top, its border, scroll and on-screen scale.
+ */
+const measureContainingBlock = (slot: HTMLElement) => {
+    const doc = slot.ownerDocument
+    const view = doc.defaultView ?? window
+    for (
+        let node: HTMLElement | null = slot;
+        node && node !== doc.documentElement;
+        node = node.parentElement
+    ) {
+        const style = view.getComputedStyle(node)
+        if (style.display === 'contents') continue
+        if (style.position !== 'static' || holdsFixedDescendants(node)) {
+            const rect = node.getBoundingClientRect()
+            return {
+                left: rect.left,
+                top: rect.top,
+                clientLeft: node.clientLeft,
+                clientTop: node.clientTop,
+                scrollLeft: node.scrollLeft,
+                scrollTop: node.scrollTop,
+                scale: measurePopLayoutScale(node)
+            }
+        }
+    }
+    return {
+        left: -view.scrollX,
+        top: -view.scrollY,
+        clientLeft: 0,
+        clientTop: 0,
+        scrollLeft: 0,
+        scrollTop: 0,
+        scale: [1, 1] as [number, number]
+    }
+}
+
 /**
  * How much an element's transforms, and its ancestors', scale it on screen.
  * Port of upstream `PopChild` `measureScale` @ v14.7.1.
@@ -465,14 +657,8 @@ const readNumericStyle = (value: string, fallback: () => number): number => {
 // list 0px tall, so its y-scale reads as 1 and that item's correction is off
 // by the scale. Upstream has the same arithmetic (`PopChild.tsx` @ v14.7.1,
 // lines 41-44); kept for parity.
-export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] => {
-    const { width, height } = element?.getBoundingClientRect() || ({} as DOMRect)
-    // Upstream's arithmetic: an unmeasurable ratio (NaN) reads as unscaled.
-    return [
-        width / (element?.offsetWidth as number) || 1,
-        height / (element?.offsetHeight as number) || 1
-    ]
-}
+export const measurePopLayoutScale = (element?: HTMLElement | null): [number, number] =>
+    measureScreenScale(element)
 
 /**
  * The element's position in the space it scrolls in, as the projection
@@ -555,13 +741,6 @@ export const measurePopLayoutSnapshot = (
     }
 }
 
-const createsContainingBlockForFixed = (style: CSSStyleDeclaration): boolean =>
-    (!!style.transform && style.transform !== 'none') ||
-    (!!style.perspective && style.perspective !== 'none') ||
-    (!!style.filter && style.filter !== 'none') ||
-    /\b(paint|layout|strict|content)\b/.test(style.contain ?? '') ||
-    /\b(transform|perspective|filter)\b/.test(style.willChange ?? '')
-
 /**
  * Whether {@link measurePopLayoutPoint} stays put when anything scrolls, so
  * a cached point needs no scroll re-sample.
@@ -587,7 +766,7 @@ export const popLayoutPointFollowsScroll = (element: HTMLElement): boolean => {
         if (position === 'sticky') return false
         if (position !== 'fixed') continue
         for (let ancestor = parentOf(node); ancestor; ancestor = parentOf(ancestor)) {
-            if (createsContainingBlockForFixed(view.getComputedStyle(ancestor))) return false
+            if (holdsFixedDescendants(ancestor)) return false
         }
         return true
     }
@@ -638,6 +817,7 @@ export const createPopLayoutPointCache = () => {
     let resizeObserver: ResizeObserver | undefined
     let mutationObserver: MutationObserver | undefined
     let scrollTarget: Document | undefined
+    let resizeView: Window | undefined
     // About five seconds at 60fps: long enough for a spring layout animation
     // to settle. Maintenance note: an element whose transform keeps moving
     // (an infinite or very long animation) stops being followed here and
@@ -683,6 +863,8 @@ export const createPopLayoutPointCache = () => {
         mutationObserver = undefined
         scrollTarget?.removeEventListener('scroll', refresh, true)
         scrollTarget = undefined
+        resizeView?.removeEventListener('resize', refresh)
+        resizeView = undefined
         element = undefined
         point = undefined
     }
@@ -718,6 +900,11 @@ export const createPopLayoutPointCache = () => {
                 scrollTarget = next.ownerDocument
                 scrollTarget.addEventListener('scroll', refresh, { capture: true, passive: true })
             }
+            // A viewport resize can move the element (a fixed, bottom-anchored
+            // list) without resizing any observed box; upstream measures fresh
+            // after every resize (plan 012 A2).
+            resizeView = view
+            view.addEventListener('resize', refresh)
             // The element may still be settling (an enter or layout animation).
             refresh()
         },
@@ -850,64 +1037,295 @@ const resetTransforms = (element: HTMLElement): void => {
     s.OTransform = 'none'
 }
 
-const canElementScroll = (element: HTMLElement): boolean => {
-    const computed = getComputedStyle(element)
-    const overflow = `${computed.overflow}${computed.overflowX}${computed.overflowY}`
-    const canScroll =
-        element.scrollHeight > element.clientHeight + 1 ||
-        element.scrollWidth > element.clientWidth + 1
+/**
+ * Exits a clone walk started on a propagating boundary's children (plan
+ * 012), keyed by the child's original element. The nested boundary's own
+ * `unregisterChild` for that child finds no slot (its subtree went with the
+ * outer clone) and counts the exit from here, so its `onExitComplete` fires
+ * once the child has exited, as upstream's boundary stays mounted until then
+ * (`AnimatePresence/index.tsx:171-179`).
+ */
+const propagatedExits = new WeakMap<Element, Promise<unknown>>()
 
-    return canScroll && /(auto|scroll|overlay)/.test(overflow)
-}
+const isExitArtifact = (element: Element) =>
+    element.hasAttribute('data-clone') || element.hasAttribute('data-presence-placeholder')
 
-const captureScrollSnapshot = (element: HTMLElement): ScrollSnapshot[] => {
-    const snapshots: ScrollSnapshot[] = []
-    const doc = element.ownerDocument
-    let parent = element.parentElement
+type ExitAnimationState = { setActive(type: 'exit', isActive: boolean): Promise<unknown> }
 
-    while (parent && parent !== doc.body && parent !== doc.documentElement) {
-        if (canElementScroll(parent)) {
-            snapshots.push({
-                element: parent,
-                scrollLeft: parent.scrollLeft,
-                scrollTop: parent.scrollTop
-            })
-        }
+/** Whether a WAAPI animation animates `transform`. */
+const hasTransformKeyframes = (animation: Animation): boolean =>
+    !!(animation.effect as KeyframeEffect | null)
+        ?.getKeyframes()
+        .some((keyframe) => 'transform' in keyframe)
 
-        parent = parent.parentElement
-    }
-
-    const scrollingElement = doc.scrollingElement
-    if (snapshots.length === 0 && isHTMLElement(scrollingElement)) {
-        snapshots.push({
-            element: scrollingElement,
-            scrollLeft: scrollingElement.scrollLeft,
-            scrollTop: scrollingElement.scrollTop
-        })
-    }
-
-    return snapshots
-}
-
-const measureScrollDelta = (snapshots: ScrollSnapshot[]): { left: number; top: number } => {
-    return snapshots.reduce(
-        (delta, snapshot) => {
-            if (!snapshot.element.isConnected) return delta
-
-            return {
-                left: delta.left + snapshot.element.scrollLeft - snapshot.scrollLeft,
-                top: delta.top + snapshot.element.scrollTop - snapshot.scrollTop
-            }
-        },
-        { left: 0, top: 0 }
+/**
+ * Keep an exiting element's running animations going on its held clone (plan
+ * 012 A2), as upstream keeps animating the exiting element itself.
+ *
+ * Every running WAAPI animation on the element moves to the clone
+ * (`effect.target = clone`), which keeps its timing and its compositor
+ * thread. Motion keeps the same `Animation` objects, so its `stop()` and
+ * `cancel()` still reach them. Its accelerated transforms are tracked in a
+ * group keyed by the element, which never sees the clone, so when a moved
+ * transform animation ends, the tracks that were running on it are completed
+ * here: their motion values land on their final values and the
+ * VisualElement renders them on the clone.
+ *
+ * The hand-off's update pass measures the clone. Upstream moves accelerated
+ * transforms off the compositor before a measurement (`willUpdate`,
+ * create-projection-node.ts @ v14.7.1); the moved ones are detached for that
+ * read step instead, which keeps their timing, and put back before the
+ * frame renders, as `stripToBaseTransforms` does.
+ *
+ * A detached element reports no animations, so `animations` are the ones the
+ * motion element captured on its last animating frame.
+ *
+ * @param element The detached element, still the VisualElement's `current`.
+ * @param clone Its exit clone, connected.
+ * @param animations The element's animations at its last animating frame.
+ * @param sharedLayout The element has a `layoutId`: its node relegates, so
+ *     its accelerated transforms move to the main thread instead (plan 012 A3).
+ */
+const continueAnimationsOnClone = (
+    element: HTMLElement,
+    clone: HTMLElement,
+    animations: Animation[],
+    sharedLayout = false
+): void => {
+    const running = animations.filter(
+        (animation) =>
+            animation.playState === 'running' &&
+            (animation.effect as KeyframeEffect | null)?.target === element
     )
+    if (!running.length) return
+    if (sharedLayout && running.some(hasTransformKeyframes)) {
+        // A `layoutId` node relegates and follows the new lead, so the
+        // projection owns its transform: upstream's `willUpdate` moves the
+        // node's accelerated transforms to the main thread before it is
+        // measured (`demoteTransforms`, create-projection-node.ts:129-131,
+        // 744-750 @ v14.7.1), and they then render through the node. A new
+        // `onUpdate` does that here (`VisualElement.update`), while the
+        // VisualElement's `current` is still the element its group is keyed
+        // by; their motion values are synced from the compositor first.
+        const visualElement = visualElementStore.get(element) as
+            | {
+                  getProps(): Record<string, unknown>
+                  presenceContext: unknown
+                  update(props: unknown, presenceContext: unknown): void
+              }
+            | undefined
+        if (visualElement && !visualElement.getProps().onUpdate) {
+            const props = visualElement.getProps()
+            const context = visualElement.presenceContext
+            visualElement.update({ ...props, onUpdate: () => {} }, context)
+            visualElement.update(props, context)
+        }
+        for (const animation of running) {
+            if (hasTransformKeyframes(animation)) continue
+            const effect = animation.effect as KeyframeEffect
+            if (effect.target === element) effect.target = clone
+        }
+        return
+    }
+    const transforms: KeyframeEffect[] = []
+    for (const animation of running) {
+        const effect = animation.effect as KeyframeEffect
+        effect.target = clone
+        if (effect.getKeyframes().some((keyframe) => 'transform' in keyframe)) {
+            transforms.push(effect)
+        }
+    }
+    if (!transforms.length) return
+    microtask.setup(() => {
+        for (const effect of transforms) effect.target = null
+    })
+    microtask.preUpdate(() => {
+        for (const effect of transforms) effect.target = clone
+    })
+    type Track = {
+        complete(): void
+        time: number
+        duration: number
+        _animation?: { tick?: (timestamp: number) => unknown }
+    }
+    const visualElement = visualElementStore.get(element) as
+        { values: Map<string, unknown> } | undefined
+    if (!visualElement) return
+    type Value = {
+        animation?: Track
+        on(event: 'animationStart' | 'animationCancel', callback: () => void): () => void
+    }
+    const tracks: Array<[Value, Track]> = []
+    ;(visualElement.values as Map<string, Value>).forEach((value, key) => {
+        if (transformPropOrder.includes(key) && value.animation) {
+            tracks.push([value, value.animation])
+        }
+    })
+    const moved = running.filter((animation) =>
+        transforms.includes(animation.effect as KeyframeEffect)
+    )
+    let ended = false
+    // Motion stopping or replacing one of those tracks (a transform exit on
+    // the clone) can't reach the moved compositor animation through its
+    // group: cancel it then, so it never runs under the new one.
+    const offs: Array<() => void> = []
+    const release = () => {
+        if (ended) return
+        ended = true
+        for (const off of offs) off()
+        for (const animation of moved) animation.cancel()
+    }
+    for (const [value] of tracks) {
+        offs.push(value.on('animationStart', release), value.on('animationCancel', release))
+    }
+    for (const animation of moved) {
+        animation.finished
+            .then(() => {
+                if (ended) return
+                ended = true
+                for (const off of offs) off()
+                for (const [value, track] of tracks) {
+                    if (value.animation !== track) continue
+                    // Its group, which would have ticked it to the end, is
+                    // keyed by the element: tick it past its end here, which
+                    // writes its final value and finishes it.
+                    track.complete()
+                    track._animation?.tick?.(performance.now() + 1e7)
+                }
+                // What the orphaned group still holds on the clone (its
+                // static base) goes with it: the VisualElement renders now.
+                for (const other of moved) if (other !== animation) other.cancel()
+            })
+            .catch(() => {})
+    }
 }
 
-const translateRectByScrollDelta = (
-    rect: DOMRect,
-    delta: { left: number; top: number }
-): DOMRect => {
-    return new DOMRect(rect.left - delta.left, rect.top - delta.top, rect.width, rect.height)
+/**
+ * Move every nested motion node of an exiting child to its copy in the exit
+ * clone (plan 012), as upstream keeps every nested node mounted with its
+ * element until the exit completes (each nested `MeasureLayout` has its own
+ * `usePresence`, `MeasureLayout.tsx:246-260` @ v14.7.1).
+ *
+ * The original subtree and the clone are walked side by side (the clone's
+ * nested exit artifacts are already stripped, so they are skipped here too).
+ * In scope means no non-`propagate` `AnimatePresence` lies between the child
+ * and the node (`index.tsx:213-217`: only `propagate` passes an exit down).
+ *
+ * - `held` (the child itself is held): an in-scope node that measures layout
+ *   relegates and holds like the child; any other node is only re-pointed.
+ * - Every clone: a direct motion child of an in-scope `propagate` boundary
+ *   is re-pointed and runs its own exit (`exit.ts:58`), which the clone waits
+ *   for.
+ *
+ * @param original The detached child element.
+ * @param clone Its exit clone.
+ * @param held Whether the child itself was handed off.
+ * @param join Adds a hold (and, with `settles`, one flag it releases) or an
+ *     exit promise to the clone's completion.
+ */
+const rehomeDescendants = (
+    original: HTMLElement,
+    clone: HTMLElement,
+    held: boolean,
+    join: (entry: {
+        hold?: ExitLayoutHold
+        settles?: boolean
+        exit?: Promise<unknown>
+    }) => (() => void) | void
+): void => {
+    const visit = (from: Element, to: Element, inScope: boolean, underPropagate: boolean) => {
+        const fromChildren = Array.from(from.children).filter((el) => !isExitArtifact(el))
+        const toChildren = Array.from(to.children)
+        const count = Math.min(fromChildren.length, toChildren.length)
+        for (let i = 0; i < count; i++) {
+            const o = fromChildren[i]
+            const c = toChildren[i] as HTMLElement
+            let childInScope = inScope
+            let childUnderPropagate = underPropagate
+            if (o.classList.contains('animate-presence-container')) {
+                const propagates = o.hasAttribute('data-propagate')
+                childInScope = inScope && propagates
+                childUnderPropagate = childInScope
+            }
+            const visualElement = visualElementStore.get(o) as
+                (VisualElementLike & { animationState?: ExitAnimationState }) | undefined
+            if (visualElement && o instanceof HTMLElement) {
+                const propagating = underPropagate && inScope
+                const adapter = MotionDomProjectionAdapter.adapterFor(visualElement.projection)
+                if (held || propagating) {
+                    if (adapter?.isMounted) {
+                        const exiting = held && childInScope && adapter.measuresLayout
+                        let settle: (() => void) | void = undefined
+                        const hold = adapter.handOffToExitClone(c, () => settle?.(), { exiting })
+                        if (hold) settle = join({ hold, settles: exiting })
+                    } else if (visualElement.current === o) {
+                        visualElement.current = c
+                        visualElementStore.delete(o)
+                        visualElementStore.set(c, visualElement as never)
+                        join({
+                            hold: {
+                                cancel: () => visualElement.unmount(),
+                                finish: () => visualElement.unmount()
+                            }
+                        })
+                    }
+                }
+                if (propagating && visualElement.animationState) {
+                    const exit = visualElement.animationState.setActive('exit', true)
+                    propagatedExits.set(o, exit)
+                    join({ exit })
+                }
+                // Below a motion node, a boundary's children aren't its
+                // direct motion children any more.
+                visit(o, c, childInScope, false)
+                continue
+            }
+            visit(o, c, childInScope, childUnderPropagate)
+        }
+    }
+    visit(original, clone, true, false)
+}
+
+type VisualElementLike = {
+    current: unknown
+    projection?: object
+    unmount(): void
+}
+
+/**
+ * How a motion element hands its projection node to its exit clone (plan 012).
+ * Passed by the element as `registerChild`'s last argument.
+ *
+ * @example
+ * ```ts
+ * context.registerChild(key, element, exit, transition, resolveExit, group, {
+ *     canHandOff: () => adapter.isMounted && !adapter.isHandedOff,
+ *     ownedLayoutKeys: () => new Set(['width']),
+ *     handOff: (clone, release) => adapter.handOffToExitClone(clone, release)
+ * })
+ * ```
+ */
+export type PresenceLayoutHandOff = {
+    /**
+     * Whether the element's node can be handed off: it measures layout
+     * (upstream renders `MeasureLayout`), is mounted and isn't handed off
+     * yet. Read during the element's teardown.
+     */
+    canHandOff(): boolean
+    /**
+     * The layout keys (`top`, `width`, `marginLeft`, `padding`, …, camelCase)
+     * the element's VisualElement writes as `style` motion values. The clone
+     * leaves them to it.
+     */
+    ownedLayoutKeys(): ReadonlySet<string>
+    /**
+     * Re-point the node at `clone` and hold it.
+     *
+     * @param clone The exit clone, connected in the element's slot.
+     * @param release Called once when the node may be removed.
+     * @returns The hold, or `undefined` when nothing was handed off.
+     */
+    handOff(clone: HTMLElement, release: () => void): ExitLayoutHold | undefined
 }
 
 /**
@@ -961,7 +1379,9 @@ export type AnimatePresenceContext = {
         element: HTMLElement,
         exit?: MotionExit,
         mergedTransition?: MotionTransition,
-        resolveExit?: PresenceExitResolver
+        resolveExit?: PresenceExitResolver,
+        layoutGroup?: object,
+        layoutHandOff?: PresenceLayoutHandOff
     ) => void
     /**
      * Update the last known rect/style snapshot for a registered child.
@@ -979,8 +1399,21 @@ export type AnimatePresenceContext = {
         computedStyle: CSSStyleDeclaration,
         settled?: boolean
     ) => void
-    /** Update the last captured mid-animation style values for a child. */
-    updateChildAnimatedStyle: (key: string, opacity: string, transform: string) => void
+    /**
+     * Update the last captured mid-animation style values for a child.
+     *
+     * @param key The child's presence key.
+     * @param opacity Its computed opacity.
+     * @param transform Its computed transform.
+     * @param animations Its running animations (`getAnimations()`), which a
+     *   held exit clone takes over (plan 012).
+     */
+    updateChildAnimatedStyle: (
+        key: string,
+        opacity: string,
+        transform: string,
+        animations?: Animation[]
+    ) => void
     /** Unregister a child. If it has an exit, clone and animate it out. */
     unregisterChild: (key: string) => void
     /**
@@ -1333,6 +1766,37 @@ export const createAnimatePresenceContext = (context: {
         }
         return anchor
     }
+    /**
+     * Where `element` was when it was removed from `parent`: the next sibling
+     * its removal record saw, if still in `parent` (plan 012). Reads the
+     * structure observer's pending records; their only job, scheduling a
+     * snapshot refresh, is already done by the caller.
+     *
+     * @param element The detached child element.
+     * @param parent Its slot parent.
+     * @returns The node to insert before, or `null` when unknown.
+     */
+    const removalNextSibling = (element: Element, parent: Element): Node | null => {
+        const records = (structureObserver?.takeRecords() ?? []).filter(
+            (record) => record.target === parent && record.removedNodes.length > 0
+        )
+        // Svelte removes a branch node by node, so the element's next sibling
+        // may have gone in a later record: follow the chain to the first one
+        // still in place.
+        let node: Node | null = element
+        for (let guard = 0; node && node.parentNode !== parent && guard < 1000; guard++) {
+            const removing: Node = node
+            const record = records.find((r) => Array.from(r.removedNodes).includes(removing))
+            if (!record) return null
+            const removed = Array.from(record.removedNodes)
+            node =
+                removed.indexOf(removing) < removed.length - 1
+                    ? removed[removed.indexOf(removing) + 1]
+                    : record.nextSibling
+        }
+        return node && node !== element ? node : null
+    }
+
     // Track number of in-flight exit animations to invoke onExitComplete once
     let inFlightExits = 0
     // One layoutId handoff hold per in-flight exit (see layoutId.ts `holdLayoutIdHandoffs`).
@@ -1350,6 +1814,12 @@ export const createAnimatePresenceContext = (context: {
         frame?: number
         /** Re-entry or boundary disposal cancelled this exit. */
         cancelled: boolean
+        /** Plan 012: the holds on the clone (its node, and re-homed descendants'). */
+        holds: ExitLayoutHold[]
+        /** `startExit()` ran for this exit. */
+        started?: boolean
+        /** The completion tail ran. */
+        completed?: boolean
     }
     const activeExits = new Map<string, ActiveExit>()
 
@@ -1478,6 +1948,25 @@ export const createAnimatePresenceContext = (context: {
         }
     }
 
+    // Exits counted from an outer clone's propagated child (plan 012). The
+    // boundary outlives `dispose()` for them: upstream it stays mounted until
+    // its children have exited (`AnimatePresence/index.tsx:171-179`).
+    let pendingPropagatedExits = 0
+    /**
+     * `finishExit` for a propagated exit, which may settle after `dispose()`:
+     * the counter, `onExitComplete` and the layoutId hold stay alive for it.
+     */
+    const finishPropagatedExit = () => {
+        pendingPropagatedExits -= 1
+        if (!disposed) {
+            finishExit()
+            return
+        }
+        layoutIdHolds.pop()?.()
+        inFlightExits -= 1
+        if (inFlightExits === 0) scheduleExitComplete()
+    }
+
     // A scheduled `onExitComplete` that has not fired yet. Guards against a
     // second schedule for the same cycle (upstream's `pendingExitComplete` ref).
     let pendingExitComplete = false
@@ -1535,7 +2024,9 @@ export const createAnimatePresenceContext = (context: {
         element: HTMLElement,
         exit?: MotionExit,
         mergedTransition?: MotionTransition,
-        resolveExit?: PresenceExitResolver
+        resolveExit?: PresenceExitResolver,
+        layoutGroup?: object,
+        layoutHandOff?: PresenceLayoutHandOff
     ) => {
         if (disposed) return
         const wasExited = exitedKeys.has(key)
@@ -1585,6 +2076,8 @@ export const createAnimatePresenceContext = (context: {
             lastPopLayoutSnapshot:
                 mode === 'popLayout' ? measurePopLayoutSnapshot(element, initialStyle) : undefined,
             insertionParent: element.parentElement ?? undefined,
+            layoutGroup,
+            layoutHandOff,
             hasScrollableAncestor: initialScrollSnapshot.length > 0,
             lastScrollSnapshot: initialScrollSnapshot
         }
@@ -1637,11 +2130,17 @@ export const createAnimatePresenceContext = (context: {
      * Update the last captured mid-animation style values for a child.
      * Called from a rAF loop while WAAPI animations are running.
      */
-    const updateChildAnimatedStyle = (key: string, opacity: string, transform: string) => {
+    const updateChildAnimatedStyle = (
+        key: string,
+        opacity: string,
+        transform: string,
+        animations?: Animation[]
+    ) => {
         const child = children.get(key)
         if (child) {
             child.lastAnimatedOpacity = opacity
             child.lastAnimatedTransform = transform
+            if (animations) child.lastAnimations = animations
         }
     }
 
@@ -1680,12 +2179,27 @@ export const createAnimatePresenceContext = (context: {
         // Its siblings' structural matches change once it is gone.
         scheduleSnapshotRefresh()
 
-        if (!child.exit && !child.resolveExit) {
-            pwLog('[presence] unregisterChild - no exit animation, removing immediately')
+        // Plan 012: an element whose `MeasureLayout` would be rendered
+        // upstream (`layout`, `layoutId`, `drag`) keeps its projection node on
+        // the clone and is held until that node is released. Decided before
+        // any clone work, so a non-held child without an exit never flashes
+        // a clone.
+        const layoutHandOff = child.layoutHandOff
+        const held = !!layoutHandOff?.canHandOff()
+        const ownedKeys: ReadonlySet<string> = held
+            ? layoutHandOff!.ownedLayoutKeys()
+            : new Set<string>()
+
+        const removeAtOnce = () => {
             children.delete(key)
             // Anchors pointing at the removed child would sever the sibling
             // chain for a same-update multi-detach — re-anchor around it.
             refreshSiblingAnchors()
+        }
+
+        if (!held && !child.exit && !child.resolveExit) {
+            pwLog('[presence] unregisterChild - no exit animation, removing immediately')
+            removeAtOnce()
             return
         }
 
@@ -1694,8 +2208,31 @@ export const createAnimatePresenceContext = (context: {
                 '[presence] unregisterChild - stateful media cannot be cloned faithfully, removing immediately',
                 { key }
             )
-            children.delete(key)
-            refreshSiblingAnchors()
+            removeAtOnce()
+            return
+        }
+
+        // The element's own document, not the global one, so exits work when
+        // rendering into another window or iframe (motion cc77f7878).
+        const doc = child.element.ownerDocument
+        const insertionParent =
+            (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
+            (child.insertionParent?.isConnected ? child.insertionParent : null)
+        // Plan 012 (N4): with no connected slot (the boundary itself is being
+        // torn down) there is nowhere to put a clone; a clone on <body> would
+        // escape every clipping ancestor.
+        if (!insertionParent) {
+            pwLog('[presence] unregisterChild - no connected slot, removing immediately', { key })
+            removeAtOnce()
+            // Its exit runs on an outer clone's copy (a `propagate` boundary
+            // inside an exiting child): count it here, so this boundary's
+            // `onExitComplete` fires once it has exited.
+            const propagated = propagatedExits.get(child.element)
+            if (propagated) {
+                startExit()
+                pendingPropagatedExits += 1
+                propagated.catch(() => {}).finally(finishPropagatedExit)
+            }
             return
         }
 
@@ -1717,6 +2254,13 @@ export const createAnimatePresenceContext = (context: {
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
         }
+        // Plan 012: the untransformed size, from the recorded computed style
+        // (the rect is transformed: an exit interrupting a scale-up would
+        // shrink the slot). `auto` sizes fall back to the rect.
+        const size = {
+            width: readNumericStyle(computed.width, () => rect.width),
+            height: readNumericStyle(computed.height, () => rect.height)
+        }
 
         // sync/wait exits keep their layout slot until the exit finishes.
         // popLayout is the mode that explicitly pops exits out of flow so
@@ -1727,20 +2271,19 @@ export const createAnimatePresenceContext = (context: {
         // crossfading inside a fixed-size pill briefly balloon the pill.
         const isOutOfFlow = computed.position === 'absolute' || computed.position === 'fixed'
         let placeholder: HTMLElement | null = null
-        // The element's own document, not the global one, so exits work when
-        // rendering into another window or iframe (motion cc77f7878).
-        const doc = child.element.ownerDocument
-        const insertionParent =
-            (child.element.parentElement?.isConnected ? child.element.parentElement : null) ??
-            (child.insertionParent?.isConnected ? child.insertionParent : null)
-        if (shouldPreserveLayout && !isOutOfFlow && insertionParent) {
+        let slotRect: DOMRect | null = null
+        if (shouldPreserveLayout && !isOutOfFlow) {
             placeholder = doc.createElement(child.element.tagName.toLowerCase())
             placeholder.setAttribute('data-presence-placeholder', 'true')
             placeholder.style.display = computed.display === 'contents' ? 'block' : computed.display
-            placeholder.style.width = `${rect.width}px`
-            placeholder.style.height = `${rect.height}px`
+            // The element's border box, untransformed: the placeholder has no
+            // padding or border of its own.
+            const extra =
+                computed.boxSizing === 'border-box' ? [0, 0] : borderAndPadding(frozenStyle)
+            placeholder.style.width = `${size.width + extra[0]}px`
+            placeholder.style.height = `${size.height + extra[1]}px`
             placeholder.style.margin = computed.margin
-            placeholder.style.boxSizing = computed.boxSizing
+            placeholder.style.boxSizing = 'border-box'
             placeholder.style.position = 'static'
             placeholder.style.visibility = 'hidden'
             placeholder.style.pointerEvents = 'none'
@@ -1771,11 +2314,21 @@ export const createAnimatePresenceContext = (context: {
             // a child that FLIPed to a new slot after a sibling's exit still
             // carries its old position. The placeholder now occupies the
             // child's real slot — measure IT so the exit clone fades where
-            // the child currently is, not where it registered.
-            if (!elementIsLive) {
-                const slotRect = placeholder.getBoundingClientRect()
-                if (slotRect.width > 0 || slotRect.height > 0) {
-                    rect = slotRect
+            // the child currently is, not where it registered. A held clone
+            // is always placed from it (plan 012).
+            if (!elementIsLive || held) {
+                slotRect = placeholder.getBoundingClientRect()
+                if (!held && (slotRect.width > 0 || slotRect.height > 0)) {
+                    // The slot is the untransformed box (plan 012, 10o); a
+                    // clone that isn't held has no renderer for the
+                    // element's transform, so it keeps the drawn size,
+                    // centred on the slot (the default transform origin).
+                    rect = new DOMRect(
+                        slotRect.left + (slotRect.width - rect.width) / 2,
+                        slotRect.top + (slotRect.height - rect.height) / 2,
+                        rect.width,
+                        rect.height
+                    )
                 }
             }
         }
@@ -1783,11 +2336,16 @@ export const createAnimatePresenceContext = (context: {
         // Clone original node to preserve structure/classes, then inline the
         // snapshotted computed styles to freeze its look.
         const clone = child.element.cloneNode(true) as HTMLElement
-        if (clone.id) clone.removeAttribute('id')
+        // A held clone stands in for the element itself (plan 012, ruling 2).
+        if (clone.id && !held) clone.removeAttribute('id')
+        stripNestedExitArtifacts(clone)
+        // Keys the re-homed VisualElement writes itself (plan 012).
+        const ownedCss = new Set(Array.from(ownedKeys, toCssProperty))
         try {
             for (const prop in frozenStyle) {
                 // Skip transforms to avoid double offset/scale on the absolutely positioned clone
                 if (/transform/i.test(prop)) continue
+                if (ownedCss.has(prop)) continue
                 // The cloned `style` attribute is the element's latest inline
                 // styling — fresher than any snapshot (JS-driven animations
                 // write it every frame), so it wins.
@@ -1811,11 +2369,8 @@ export const createAnimatePresenceContext = (context: {
         // The clone goes back into the element's own DOM slot (below), like
         // upstream, where the real element stays mounted until its exit
         // finishes. It is absolutely positioned against its containing block:
-        // the nearest ancestor with a box. Svelte can detach keyed nodes
-        // before unregister runs, so fall back to the parent captured at
-        // registration time instead of escaping to <body>, which would bypass
-        // clipping parents.
-        const slotParent = insertionParent ?? doc.body
+        // the nearest ancestor with a box.
+        const slotParent = insertionParent
         let positioningParent = slotParent
 
         // Walk up to find a parent that has actual layout (not display: contents).
@@ -1839,9 +2394,14 @@ export const createAnimatePresenceContext = (context: {
             measuredPopLayoutSnapshot && restingPoint
                 ? { ...measuredPopLayoutSnapshot, point: restingPoint }
                 : measuredPopLayoutSnapshot
-        const parentRect = popLayoutSnapshot ? undefined : positioningParent.getBoundingClientRect()
+        // Plan 012: a held in-flow clone is placed against its real
+        // containing block, read in this same pass.
+        const heldBlock =
+            held && !popLayoutSnapshot && placeholder ? measureContainingBlock(slotParent) : null
+        const parentRect =
+            popLayoutSnapshot || held ? undefined : positioningParent.getBoundingClientRect()
 
-        if (!popLayoutSnapshot) {
+        if (!popLayoutSnapshot && !held) {
             const parentPosition = getComputedStyle(positioningParent).position
             if (parentPosition === 'static') {
                 positioningParent.style.position = 'relative'
@@ -1870,14 +2430,55 @@ export const createAnimatePresenceContext = (context: {
             if (popStyles.top) clone.style.top = popStyles.top
             if (popStyles.bottom) clone.style.bottom = popStyles.bottom
         }
+        /** Write `value` unless the re-homed VisualElement owns `key`. */
+        const setUnowned = (
+            key: 'width' | 'height' | 'top' | 'right' | 'bottom' | 'left',
+            value: string
+        ) => {
+            if (!ownedKeys.has(key)) clone.style[key] = value
+            else clone.style[key] = ''
+        }
         if (popLayoutSnapshot) {
             applyPopStyles(popLayoutSnapshot)
+        } else if (held) {
+            // Plan 012 (M1): placed exactly, with no extra forced layout. The
+            // re-homed VisualElement renders the element's transforms and
+            // its `style` motion values onto the clone, so the clone takes
+            // the untransformed box, and leaves owned keys alone.
+            setUnowned('width', `${size.width}px`)
+            setUnowned('height', `${size.height}px`)
+            if (placeholder && slotRect && heldBlock) {
+                const margins = expandMargin(computed.margin)
+                const left =
+                    (slotRect.left - heldBlock.left) / heldBlock.scale[0] -
+                    heldBlock.clientLeft +
+                    heldBlock.scrollLeft -
+                    (ownedKeys.has('marginLeft') || ownedKeys.has('margin') ? margins[3] : 0)
+                const top =
+                    (slotRect.top - heldBlock.top) / heldBlock.scale[1] -
+                    heldBlock.clientTop +
+                    heldBlock.scrollTop -
+                    (ownedKeys.has('marginTop') || ownedKeys.has('margin') ? margins[0] : 0)
+                clone.style.position = 'absolute'
+                clone.style.left = `${left}px`
+                clone.style.top = `${top}px`
+            } else {
+                // Out of flow: its own resolved insets and position, in the
+                // same slot, so the same containing block.
+                clone.style.position = computed.position
+                setUnowned('top', computed.top)
+                setUnowned('right', computed.right)
+                setUnowned('bottom', computed.bottom)
+                setUnowned('left', computed.left)
+            }
         } else {
             clone.style.position = 'absolute'
             clone.style.top = `${rect.top - parentRect!.top + (positioningParent.scrollTop ?? 0)}px`
             clone.style.left = `${rect.left - parentRect!.left + (positioningParent.scrollLeft ?? 0)}px`
             clone.style.width = `${rect.width}px`
             clone.style.height = `${rect.height}px`
+        }
+        if (!popLayoutSnapshot) {
             // In its original slot the clone can be a grid item; frozen
             // explicit grid lines would make its grid AREA the containing
             // block and shift it off the offsets computed above.
@@ -1891,39 +2492,65 @@ export const createAnimatePresenceContext = (context: {
         if (originalDisplay === 'none' || originalDisplay === 'contents') {
             clone.style.display = 'block'
         }
-        if (!popLayoutSnapshot) {
+        // In flow its margin is in the slot already; out of flow a held
+        // clone's resolved insets position its margin box, as the element's.
+        if (!popLayoutSnapshot && (!held || placeholder)) {
             clone.style.margin = '0'
         }
-        clone.style.boxSizing = 'border-box'
+        if (held) {
+            // The element's own `box-sizing` (plan 012): a computed `width`
+            // excludes padding and border under `content-box`.
+            clone.style.boxSizing = computed.boxSizing
+        } else {
+            clone.style.boxSizing = 'border-box'
+        }
         // Redundantly ensure no transforms are applied before positioning/z-index take effect
         resetTransforms(clone)
-        // Elevate clone above siblings to ensure it renders on top during exit.
-        // Its stacking siblings are both its DOM siblings in the slot and the
-        // boxes laid out in its containing block.
-        try {
-            const siblings = new Set([
-                ...Array.from(slotParent.children),
-                ...Array.from(positioningParent.children)
-            ]) as Set<HTMLElement>
-            let maxZ = 0
-            for (const sib of siblings) {
-                if (sib === clone) continue
-                const z = parseInt(getComputedStyle(sib).zIndex || '0', 10)
-                if (!Number.isNaN(z)) maxZ = Math.max(maxZ, z)
+        // Elevate a non-held clone above siblings to ensure it renders on top
+        // during exit. Its stacking siblings are both its DOM siblings in the
+        // slot and the boxes laid out in its containing block. A held clone
+        // keeps the element's own stacking, as upstream, where the exiting
+        // element renders first and the entering one paints over it
+        // (`AnimatePresence/index.tsx:155-164`, `PopChild.tsx:167-168` @
+        // v14.7.1).
+        if (!held) {
+            try {
+                const siblings = new Set([
+                    ...Array.from(slotParent.children),
+                    ...Array.from(positioningParent.children)
+                ]) as Set<HTMLElement>
+                let maxZ = 0
+                for (const sib of siblings) {
+                    if (sib === clone) continue
+                    const z = parseInt(getComputedStyle(sib).zIndex || '0', 10)
+                    if (!Number.isNaN(z)) maxZ = Math.max(maxZ, z)
+                }
+                // Ensure positioned so z-index applies; already absolute above
+                clone.style.zIndex = String(maxZ + 1 || 9999)
+            } catch {
+                clone.style.zIndex = '9999'
             }
-            // Ensure positioned so z-index applies; already absolute above
-            clone.style.zIndex = String(maxZ + 1 || 9999)
-        } catch {
-            clone.style.zIndex = '9999'
         }
 
         clone.setAttribute('data-clone', 'true')
         clone.setAttribute('data-exiting', 'true')
         clone.setAttribute('data-mode', mode)
+        // Plan 015b (M3): its removal completes the exit. The element is
+        // detached by now, so the boundary comes from the parent captured at
+        // registration.
+        const exitBoundaryFrom = child.insertionParent ?? slotParent
+        const exitMarker: ExitMarker = {
+            boundary: exitBoundaryFrom.closest('.animate-presence-container') ?? exitBoundaryFrom,
+            group: child.layoutGroup
+        }
+        markExiting(clone, exitMarker)
+        // Part D's M5 report of the completion, from the slot it leaves.
+        const followParent = layoutParentOf(slotParent, true)
 
         pwLog('[presence] clone created', {
             key,
             mode,
+            held,
             rect: { w: rect.width, h: rect.height, top: rect.top, left: rect.left }
         })
         // Structural placement like upstream: the element's original slot, so
@@ -1931,9 +2558,18 @@ export const createAnimatePresenceContext = (context: {
         // `:first-child`) match the clone exactly as they matched the element.
         // With a placeholder holding the slot, the clone goes right before it
         // and takes the element's original sibling index.
-        const slotAnchor = placeholder ?? resolvePlaceholderAnchor(child)
-        slotParent.insertBefore(clone, slotAnchor?.parentElement === slotParent ? slotAnchor : null)
-        const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false }
+        // A held clone takes the element's own place in the paint order (plan
+        // 012, M2): where it was when Svelte removed it, before an entering
+        // sibling Svelte inserted after it (`{#key}` creates the new branch
+        // first), as upstream renders the exiting child first.
+        const removedBefore =
+            held && !placeholder ? removalNextSibling(child.element, slotParent) : null
+        const slotAnchor = placeholder ?? removedBefore ?? resolvePlaceholderAnchor(child)
+        slotParent.insertBefore(clone, slotAnchor?.parentNode === slotParent ? slotAnchor : null)
+        // No scroll-anchoring adjustment from the swap, as upstream keeps
+        // the element (plan 012 A6).
+        if (followParent instanceof HTMLElement) suppressScrollAnchoring(followParent)
+        const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false, holds: [] }
         activeExits.set(key, activeExit)
         if (popLayoutSnapshot) {
             // The "before" point is the element's; the "after" one is the
@@ -1955,14 +2591,98 @@ export const createAnimatePresenceContext = (context: {
         // before this exit animation completes
         const exitingElement = child.element
 
-        activeExit.frame = requestAnimationFrame(() => {
-            activeExit.frame = undefined
-            // Re-entry or boundary teardown can cancel before the first frame.
-            if (activeExit.cancelled || disposed) return
+        /**
+         * The existing completion tail, run once: every hold in the subtree
+         * ends first (their deferred unmounts run while the clone is still
+         * connected, as upstream unmounts nodes with their element attached),
+         * then the clone, the child record and the placeholder go, part D
+         * reports the completion, and the exit is finished.
+         */
+        const completeExit = () => {
+            if (activeExit.cancelled || disposed || activeExit.completed) return
+            activeExit.completed = true
+            for (const hold of activeExit.holds) hold.finish()
+            releaseActiveExit()
+            pwLog('[presence] exit animation complete', { key, mode })
+
+            // Reset elevated styles then remove
+            try {
+                clone.style.zIndex = ''
+            } catch {
+                // ignore
+            }
+            clone.remove()
+
+            // Log clone removal and element counts for debugging rapid toggle
+            pwLog('[presence] clone REMOVED from DOM', {
+                key,
+                mode,
+                clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
+                boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
+            })
+
+            // Only delete from children map if the current registration is for the SAME element
+            // If a re-entry happened while we were animating, a new element is registered
+            // and we should NOT delete it
+            const currentChild = children.get(key)
+            if (currentChild && currentChild.element === exitingElement) {
+                children.delete(key)
+                pwLog('[presence] child deleted from map (same element)', { key })
+            } else {
+                pwLog('[presence] child NOT deleted (re-entry registered new element)', {
+                    key,
+                    hasCurrentChild: !!currentChild,
+                    isSameElement: currentChild?.element === exitingElement
+                })
+            }
+
+            // Log final state
+            pwLog('[presence] element count after exit', {
+                childrenMapSize: children.size,
+                inFlightExits: inFlightExits - 1,
+                clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
+            })
+
+            removeExitPlaceholder(key, placeholder)
+            // Plan 015b (M5): `layout` nodes after the list snap to
+            // where the completion leaves them, even when no sibling
+            // is left to report it. After the placeholder is gone:
+            // in sync mode it still held the slot.
+            if (followParent) {
+                MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, {
+                    kind: 'exit-complete',
+                    markers: [exitMarker]
+                })
+            }
+            if (activeExit.started) finishExit()
+        }
+        // Plan 012: the clone goes once the exit and every hold have settled.
+        let pendingFlags = 1
+        const settle = () => {
+            pendingFlags -= 1
+            if (pendingFlags === 0) completeExit()
+        }
+        const startTracking = () => {
+            if (activeExit.started) return
+            activeExit.started = true
+            // Start exit and track in-flight count (handles wait-mode blocking)
+            startExit()
+        }
+
+        /**
+         * Start the exit. A held child with nothing to animate settles its
+         * exit flag; a non-held one is removed at once, as before.
+         */
+        const startExitAnimation = () => {
             const resolvedExit = child.resolveExit?.(getCustom()) ?? child.exit
 
             if (!resolvedExit) {
                 pwLog('[presence] unregisterChild - no resolved exit animation after custom update')
+                if (held) {
+                    startTracking()
+                    settle()
+                    return
+                }
                 releaseActiveExit()
                 clone.remove()
                 removeExitPlaceholder(key, placeholder)
@@ -1995,8 +2715,7 @@ export const createAnimatePresenceContext = (context: {
                 finalTransition
             })
 
-            // Start exit and track in-flight count (handles wait-mode blocking)
-            startExit()
+            startTracking()
 
             activeExit.base = readAnimatedValues(clone, Object.keys(exitKeyframes))
             const exitAnimation = animate(
@@ -2010,50 +2729,68 @@ export const createAnimatePresenceContext = (context: {
                 .finally(() => {
                     // Re-entry or boundary teardown already cleaned up.
                     if (activeExit.cancelled || disposed) return
-                    releaseActiveExit()
-                    pwLog('[presence] exit animation complete', { key, mode })
-
-                    // Reset elevated styles then remove
-                    try {
-                        clone.style.zIndex = ''
-                    } catch {
-                        // ignore
-                    }
-                    clone.remove()
-
-                    // Log clone removal and element counts for debugging rapid toggle
-                    pwLog('[presence] clone REMOVED from DOM', {
-                        key,
-                        mode,
-                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length,
-                        boxesInDOM: document.querySelectorAll('[data-testid="box"]').length
-                    })
-
-                    // Only delete from children map if the current registration is for the SAME element
-                    // If a re-entry happened while we were animating, a new element is registered
-                    // and we should NOT delete it
-                    const currentChild = children.get(key)
-                    if (currentChild && currentChild.element === exitingElement) {
-                        children.delete(key)
-                        pwLog('[presence] child deleted from map (same element)', { key })
-                    } else {
-                        pwLog('[presence] child NOT deleted (re-entry registered new element)', {
-                            key,
-                            hasCurrentChild: !!currentChild,
-                            isSameElement: currentChild?.element === exitingElement
-                        })
-                    }
-
-                    // Log final state
-                    pwLog('[presence] element count after exit', {
-                        childrenMapSize: children.size,
-                        inFlightExits: inFlightExits - 1,
-                        clonesInDOM: document.querySelectorAll('[data-clone="true"]').length
-                    })
-
-                    removeExitPlaceholder(key, placeholder)
-                    finishExit()
+                    settle()
                 })
+        }
+
+        if (held) {
+            // Plan 012 (A2): the element's running animations (Motion's
+            // accelerated value and transform animations, an interrupted
+            // enter) move to the clone with their timing, as upstream keeps
+            // animating the exiting element itself. A Motion `stop()` still
+            // reaches them: it holds the same Animation objects.
+            continueAnimationsOnClone(
+                exitingElement,
+                clone,
+                child.lastAnimations ?? [],
+                exitingElement.hasAttribute('data-layout-id')
+            )
+            // Plan 012: hand the node to the clone, after the #2348
+            // correction was queued, so the node's update pass measures the
+            // corrected clone (its root update queues after the correction).
+            const hold = layoutHandOff!.handOff(clone, () => {
+                if (activeExit.cancelled || disposed) return
+                settle()
+            })
+            if (hold) {
+                activeExit.holds.push(hold)
+                pendingFlags += 1
+            }
+        }
+        // Plan 012: nested motion nodes move to their clone copies (every
+        // clone runs a `propagate` boundary's child exits).
+        rehomeDescendants(exitingElement, clone, held, ({ hold, settles, exit }) => {
+            if (hold) activeExit.holds.push(hold)
+            if (exit) {
+                pendingFlags += 1
+                exit.catch(() => {}).finally(() => {
+                    if (activeExit.cancelled || disposed) return
+                    settle()
+                })
+            }
+            if (!settles) return
+            pendingFlags += 1
+            return () => {
+                if (activeExit.cancelled || disposed) return
+                settle()
+            }
+        })
+        if (held) {
+            // Resolved now: with nothing to animate, the exit starts (and
+            // settles) at hand-off, so wait mode and `onExitComplete` wait
+            // for the hold, as upstream.
+            if (!(child.resolveExit?.(getCustom()) ?? child.exit)) {
+                startTracking()
+                settle()
+                return
+            }
+        }
+
+        activeExit.frame = requestAnimationFrame(() => {
+            activeExit.frame = undefined
+            // Re-entry or boundary teardown can cancel before the first frame.
+            if (activeExit.cancelled || disposed) return
+            startExitAnimation()
         })
     }
 
@@ -2070,14 +2807,18 @@ export const createAnimatePresenceContext = (context: {
 
         active.cancelled = true
         activeExits.delete(key)
+        if (active.frame !== undefined) cancelAnimationFrame(active.frame)
         active.animation?.stop?.()
+        // After the read: cancelling unmounts the VisualElement that renders
+        // the clone's values (plan 012).
+        for (const hold of active.holds) hold.cancel()
         active.clone.remove()
         removeExitPlaceholder(key, active.placeholder)
         if (children.get(key) === active.child) {
             children.delete(key)
             refreshSiblingAnchors()
         }
-        if (active.animation) cancelExit()
+        if (active.started) cancelExit()
 
         pwLog('[presence] exit handed off to re-entering element', { key, from, base })
         return { from, base }
@@ -2105,6 +2846,7 @@ export const createAnimatePresenceContext = (context: {
             active.cancelled = true
             if (active.frame !== undefined) cancelAnimationFrame(active.frame)
             active.animation?.stop?.()
+            for (const hold of active.holds) hold.cancel()
             active.clone.remove()
         }
         for (const placeholder of exitPlaceholders.values()) placeholder.remove()
@@ -2115,8 +2857,10 @@ export const createAnimatePresenceContext = (context: {
         exitedKeys.clear()
         enterUnblockedCallbacks.clear()
         customSubscribers.clear()
-        for (const release of layoutIdHolds.splice(0)) release()
-        inFlightExits = 0
+        // Propagated exits still in flight keep their count and holds (see
+        // `finishPropagatedExit`); everything else is cancelled.
+        for (const release of layoutIdHolds.splice(pendingPropagatedExits)) release()
+        inFlightExits = pendingPropagatedExits
         enterBlocked = false
     }
 

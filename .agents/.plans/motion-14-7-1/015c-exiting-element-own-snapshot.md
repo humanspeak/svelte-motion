@@ -7,8 +7,10 @@
 > **Never use `git stash`.** Use **Port 4223** (`PW_PORT=4223`). Never use or kill port 4198. Never set
 > `PW_REUSE_SERVER`.
 >
-> **Third of three plans split from the old 015.** It runs in lane `siblings` after 015b has merged. In the lane,
-> run `git merge --no-ff feat/motion-14.7.1` and then `pnpm install --frozen-lockfile`.
+> **Third of three plans split from the old 015.** It runs in lane `siblings` after 015b **and 012** have merged
+> (batch order 015a → 015b → 012 → 015c). In the lane, run `git merge --no-ff feat/motion-14.7.1` and then
+> `pnpm install --frozen-lockfile`. Also confirm 012 is in: `grep -n "handOffToExitClone" src/lib/utils/motionDomProjection.ts`
+> prints a line, otherwise STOP.
 >
 > **Precondition B1: 008's A2 fix is merged.** 008's A2 resting-point cache used to observe the
 > `display: contents` container. The fix (presence lane `c817fe6e`, lane now at `6972dac3`) walks past
@@ -24,20 +26,44 @@
 > **Re-pin the presence line numbers.** Presence-side lines are cited at `6972dac3`, as "008's merge SHA (to be
 > pinned)". Re-locate each one by its anchor at the merged SHA before you start.
 >
-> **Drift check**: `git diff --stat <015b merge SHA>..HEAD -- src/lib/utils/layout.ts src/lib/html/_MotionContainer.svelte src/lib/utils/presence.ts`
-> should show only 008's A2 fix. The `_MotionContainer.svelte` line numbers below are at `3365c175`, so locate
+> **Drift check**: `git diff --stat <012 merge SHA>..HEAD -- src/lib/utils/layout.ts src/lib/html/_MotionContainer.svelte src/lib/utils/presence.ts src/lib/utils/motionDomProjection.ts`
+> should show only 008's A2 fix, if that landed after 012. Get the SHA with
+> `git log --merges --oneline --grep "1471-layoutid" feat/motion-14.7.1 | head -1` (012's lane merge). The grep
+> assumes 012's merge is the **newest** `layoutid`-lane merge into feat. If a later layoutid merge exists,
+> confirm with `git log --merges --oneline --grep "plan 012" feat/motion-14.7.1` instead, and STOP if neither
+> identifies it.
+>
+> 012 changed these files after 015b:
+> - `_MotionContainer.svelte`: the registration gate P5, the presence teardown P6, the presence effect pair after
+>   006's switch pair, the `registerChild` hand-off argument, and two props;
+> - `presence.ts`: `unregisterChild` holds, part C deleted;
+> - `motionDomProjection.ts`: `setPresence`, `commitPresence`, `handOffToExitClone`.
+>
+> 012 did **not** edit R2. R2 must stay declared **before** 012's presence pair: 012's `willUpdate()` is a no-op
+> once R2 has snapshotted, so R2's cached snapshot wins. The `_MotionContainer.svelte` line numbers below are at `3365c175`, so locate
 > each excerpt by its anchor. If an anchor's content differs, STOP.
+
+> **Revision 2026-11-04 (dispatcher pre-flight, after 012 merged as `6ef9b56a`).** 012 is in: its merge is
+> `6ef9b56a`, and every precondition grep prints. The drift check
+> (`git diff --stat 6ef9b56a..HEAD -- <the four files>`) now also shows `e08cb6a1` on `presence.ts`
+> (`suppressScrollAnchoring` keeps an app's own `overflow-anchor`, about 5 lines near 492-540). That change is
+> outside every region this plan touches, so it is expected drift and not a STOP. Anything else in that diff is
+> still a STOP. 012 A6 (`1a0938d0`) also changed `commitObservedLayoutChange`'s gate in
+> `motionDomProjection.ts` before the merge; re-locate anchors as the header says. An upstream React repro of
+> the batch's pages runs at `/tmp/fm1471-repro-012` (port 4227, framer-motion 14.7.1) if you need a reference.
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: S-M
 - **Risk**: MED. It changes the snapshot source of one effect run.
-- **Depends on**: 015a (rebased caches and `onScreenSnapshot`, which this plan's new `seedOwnSnapshotFromCache`
-  builds on), 015b (`layout.ts` edits in the same function), and 008's A2 fix.
-- **Wave**: after 015b, same lane.
+- **Depends on**: 015a (rebased caches and `onScreenSnapshot`), 015b (`layout.ts` edits in the same function),
+  012 (it edits `_MotionContainer.svelte`, `presence.ts` and `motionDomProjection.ts` after 015b; it adds the
+  presence pair that must follow R2; and it already reuses `seedOwnOnScreenSnapshot` for `layout`-only exit
+  hand-offs), and 008's A2 fix.
+- **Wave**: after 015b and 012, same lane (`siblings`).
 - **Category**: bug (upstream parity)
-- **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28.
+- **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28. Re-stamped against feat `e08cb6a1` (012 merged), 2026-11-04.
 
 ## Why this matters
 
@@ -107,8 +133,11 @@ callback drains them. It reads no layout, does nothing per frame while idle, and
 - The ancestor-attribute bookkeeping: `layout.ts`'s `onAncestorAttributes` handler records a per-element
   "ancestor changed" stamp, and the adapter clears it when its cache is written. That bookkeeping is in
   `layout.ts` and `motionDomProjection.ts` (both listed in this scope).
-- `src/lib/utils/motionDomProjection.ts`: `seedOwnSnapshotFromCache()`, which runs `startUpdate`, then
-  `seedOwnOnScreenSnapshot`, then `seedCachedSnapshotsForGroup`, and returns the rect. Its spec gets a new case.
+- `src/lib/utils/motionDomProjection.ts`: `seedOwnSnapshotFromCache()`, a thin public wrapper that runs
+  `root.startUpdate()`, then the **existing** private `seedOwnOnScreenSnapshot()` (anchor
+  `private seedOwnOnScreenSnapshot(): number`; 012 also calls it), then `seedCachedSnapshotsForGroup`, and returns
+  the rect. Don't duplicate or change `seedOwnOnScreenSnapshot`: 012's `layout`-only hand-off depends on it. Its
+  spec gets a new case.
 - `src/lib/components/presenceSiblingSnapshots.spec.ts` and its harness: case 4.
 - `e2e/animate-presence/pop-layout-container-move.spec.ts`: delete only the same-render `test.fixme` and its
   comment.

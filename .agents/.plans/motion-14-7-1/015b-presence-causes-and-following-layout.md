@@ -534,12 +534,231 @@ Divergences from upstream that this plan records rather than closes:
   document) that upstream would snap. Svelte has no component boundaries in the DOM. D also assumes normal flow.
 - **Unattributed ResizeObserver deliveries (m9).** A delivery caused by a completion, on a node that got no
   MutationObserver record (so no cause), animates where upstream snaps.
-- **Clone exits without `exit`** are removed immediately, so they read as plain removals.
+- **Clone exits without `exit`** that have no `layout` or `layoutId` are removed immediately, so they read as
+  plain removals. Since plan 012, `layout`/`layoutId` children are held instead: the clone appears (an
+  ordinary trigger), and its release is classified exit-complete, as upstream (012, "015b's maintenance line").
 - **Per-clone removal.** Upstream removes in a batch (`index.tsx:171-176`).
 - **`presenceAffectsLayout={false}`** isn't supported.
 - **Plain non-motion lists** never trigger D.
-- **Wait mode.** `commitPresenceLayoutRelease` keeps its own rule (not `MeasureLayout.tsx:116-127`) and an
-  un-rebased `previousRect`.
+- **Wait mode.** `commitPresenceLayoutRelease` follows B(c)'s rule since A2.1, but keeps an un-rebased
+  `previousRect`. See A3.
+- **Grouped wait label (A3.3, issue #510).** This is our gap, not an upstream bug. Upstream's `layout="position"`
+  `.state` runs its own position animation on its own (default spring) transition, so it drifts up to 7.83 px
+  off-centre inside the 2.4 s linear shell. Ours keeps it centred because that animation never runs.
 
 Reviewers: check the merged causes across both throttles, the boundary-contains and same-group rule, the
 completion-teardown D call (it runs only for marked elements), and the parity diff allow-list.
+
+## Amendments
+
+### A1 (2026-10-29, operator-approved)
+
+Answers the Step 2–4 STOP (Step 1 at `92fc6a0a`; the Steps 2–4 work stays uncommitted in the lane and continues
+from there). Upstream behaviour comes from a React 18 + `framer-motion@14.7.1` repro measured frame by frame
+(`/tmp/fm1471-repro`: `src/shell.tsx`, `src/footer.tsx`, `src/issue2348.tsx`; it serves on a free port such as
+4224 or 4225). Where this amendment and the body disagree, this amendment wins.
+
+**1. D runs on an add, including an add to an empty list (replaces "Never on mount" for this one case).**
+- Upstream: an add re-renders the list's parent, so a following `layout` footer snapshots in
+  `MeasureLayout.getSnapshotBeforeUpdate` (`MeasureLayout.tsx:149-186`) and animates, with or without a
+  `LayoutGroup`. The repro confirms this for an add to an empty list.
+- With an empty list no sibling observer exists to deliver the batch (M5's add half). So a `layout` container that
+  mounts **after its layout parent was already connected and observed by an earlier render** (that is, an add, not
+  the initial render) calls `seedFollowingLayout(layoutParent, null, { kind: 'add' })` once, through the same M2
+  per-(layout parent, microtask) dedupe. N items mounting in one flush give one walk.
+- Seed mode uses each follower's rebased cached snapshot, never a live read, because the DOM has already changed by
+  mount time.
+- Initial render must not seed: followers mount after the list, so at that point they're unmounted or have no cache,
+  and the walk skips them. Add a GUARD unit case: mounting a list of N items plus a footer in one render calls
+  `seedFollowingLayout` at most once per layout parent and gives the footer no `didUpdate`.
+- The STOP condition "D needs to run on mount" now reads "D needs to run on the **initial** mount, on scroll, on
+  resize or per frame". Update "Considered and rejected" to say that D runs on an add, not on every mount.
+
+**2. Wait mode follows upstream (operator: "match upstream").**
+- Upstream (`src/shell.tsx`, no `LayoutGroup`, `mode="wait"`): the `motion.button layout` shell **snaps** to the
+  new width when the new label mounts (32.6 → 167.5 px in one frame). The exit's completion re-renders only
+  `AnimatePresence` (`index.tsx:244`), so the shell has no snapshot and snaps (`create-projection-node.ts:507-509`,
+  825-833). Inside a `LayoutGroup`, it animates (`LayoutGroup/index.tsx:31,50-53`, `group.ts`).
+- **Mirror ModeButton exactly first.** Change the repro's `Shell` (or add a sibling component) to ModeButton's
+  real structure: the same elements, `layout` props, transitions, padding and labels from
+  `src/routes/tests/animate-presence/layout-button/ModeButton.svelte`. Record upstream's painted frames for the
+  wait swap: shell width per frame, and the active label's centre against the shell's centre per frame.
+  - Ours must paint what upstream paints. If our label's centring (`:898`, 15.7 px against an 8.5 px cap) differs
+    from upstream's frames, that's a bug in ours: fix it. Don't loosen the cap.
+  - If upstream's own label leaves the 8.5 px cap at the snap frame, update only the `wait` branch of `:898` to
+    upstream's measured worst case plus 2 px, and cite the repro numbers and `index.tsx:244`.
+- `layout-button.spec.ts:1641` "animates button width instead of snapping to the final size" (wait only): change it
+  to assert upstream's snap (the final width within one frame of the label swap, with no in-between widths), and
+  cite `index.tsx:244`.
+- **Add a LayoutGroup variant.** Give `ModeButton.svelte` an optional `layoutGroup` prop that wraps the shell in
+  `LayoutGroup`, and add a `Wait (LayoutGroup)` row to the page (`testIdPrefix="wait-group"`). Add a spec case
+  asserting it **animates** (at least 3 in-between widths and no step above 35 % of the width change), as
+  upstream does. Label it RED or GUARD when you first run it. If it can't animate without touching
+  `commitPresenceLayoutRelease`, `PresenceChild.svelte` or `AnimatePresence.svelte`, STOP.
+- If any other `layout-button` test fails in its `wait` branch, handle it the same way: record upstream, match it,
+  and edit only that branch. Any other failure is a STOP.
+- Add these rows to the parity table's intent. The Done criteria's "edited existing specs" check now also allows
+  the `wait` branches and the new `wait-group` case. The allow-list adds
+  `src/routes/tests/animate-presence/layout-button/ModeButton.svelte` and
+  `src/routes/tests/animate-presence/layout-button/+page.svelte`.
+
+**3. The 240 px drift is a bug: fix it, red first.**
+- Case: 008's `e2e/animate-presence/pop-layout-container-move.spec.ts:307`, owned path, a `scale(0.5)` wrapper,
+  page scrolled, popLayout exit. Upstream holds still, with 0.0 px drift every frame (`dev/react/src/tests/issue-2348.tsx`,
+  repro `src/issue2348.tsx`, `m-q3.mjs`). Ours drifts 240 px.
+- Hypothesis to confirm before fixing (and record what you find):
+  - (a) Step 2's `POP_ATTRIBUTE_INIT` subtree observer delivers the item's **own** pop attribute, so the popped
+    owned element commits its own layout. Upstream never re-snapshots a popped exiting element for its own pop.
+  - (b) In that commit, `scrollDelta` applies the `fixedRoot` term, because `getScrollAncestors` stops at the
+    `position: fixed` `ul`. That `ul`'s containing block is the transformed ancestor, so it scrolls with the page.
+    480 px of scroll × 0.5 = 240 px.
+- Fix both:
+  - a popped owned element (its own `data-motion-pop-id` set) doesn't self-commit from pop-attribute records or
+    from its own ancestors' childList records while it's popped;
+  - **`scrollBasis.ts` comes into scope for this one check only**: a `position: fixed` box whose containing block
+    is a transformed, filtered, `perspective`, `will-change: transform` or `contain: paint` ancestor isn't a
+    fixed root. It scrolls with that ancestor's scroll chain.
+- Red first: a `scrollBasis.spec.ts` case (a fixed element under a `transform` ancestor isn't a fixed root), a
+  `layout.spec.ts` or component case for (a), and the existing `:307` e2e. Then fix, and all three go green.
+- If the drift has a different cause, STOP and report it with the frames.
+
+**4. The two regressed GUARDs must pass, unchanged.**
+- These are owned `?layoutScroll` popLayout (5 frames < 10) and owned clamp (green step 59 px > 35) in
+  `pop-layout-scroll-siblings.spec.ts`.
+- They're expected to be the same self-commit as 3(a). Don't raise a budget or a frame count. If 3 doesn't fix
+  them, diagnose with painted frames and STOP with the cause.
+
+**Not changed.** MultiStateBadge (`mode="sync"`, width through `animate.width`) needs no snap. Its operator
+sign-off stays in Done criteria.
+
+### A2 (2026-10-29, operator-approved)
+
+Answers the A1 STOPs at `0c065cae`. Upstream frames come from the ModeButton mirror (`/tmp/fm1471-repro/src/modeshell.tsx`,
+`m-mode.mjs`) and the siblings mirror (`src/siblings.tsx`, `m-siblings.mjs`), both on React 18 + `framer-motion@14.7.1`.
+
+**1. Wait-mode release snaps outside the boundary (`commitPresenceLayoutRelease` comes into scope).**
+- Upstream, with no group: the shell snaps from 77.31 to 92.97 px, and the label centre stays at 0 px in every frame.
+- Ours: the shell snaps the same way, but the label starts 15.66 px off-centre. The wait-mode hold-release FLIP
+  animates the `.state` span, which sits outside the `AnimatePresence` boundary.
+- Fix: in `commitPresenceLayoutRelease`, apply the same rule as B(c). A completion that doesn't re-render the held
+  element (not inside a cause boundary, and not in the same `LayoutGroup`) refreshes it silently instead of running
+  the release FLIP (`index.tsx:244`, `use-presence.ts:40-43`).
+- Inside a shared `LayoutGroup`, the release still animates.
+- Keep the 8.5 px cap on `:898` unchanged. Our wait frames must match upstream's within 1 px, per frame.
+- Red first: `:898`'s wait branch already fails. Add a unit case for the rule.
+- The "Wait mode" maintenance note is now partly closed. Update it.
+
+**2. Fix the grouped shell's size animation clash in 015b (pre-existing bug; operator: "fix the bug").**
+- The bug: in `wait-group`, the shell's inline-width size animation and its projection `scale` run together. The width
+  restarts from near its origin (79 → 86 → 80 → 93 px), and the inline `width` never clears.
+- It reproduces on the Step 1 code too.
+- Upstream (the `?group` mirror) animates the width smoothly in one run. The label drifts at most 7.83 px off
+  centre.
+- In scope: the size-animation path that the clash runs through (find it from `data-svelte-motion-layout` /
+  `[data-layout-size-animation]` and `commitGroup`), plus whatever it touches in `_MotionContainer.svelte`,
+  `layout.ts` and `motionDomProjection.ts`.
+- First, record the root cause and the frames, and add a red unit or component case that reproduces the restart.
+- Then fix it so that:
+  - `wait-group` animates in one monotonic run, with no restart toward the origin;
+  - the inline `width` clears at rest;
+  - ours paints upstream's `?group` frames within 2 px per frame.
+- Still out of scope: `PresenceChild.svelte` and `AnimatePresence.svelte`. If the fix needs either one, STOP.
+- No budget raises, and no loosening of other `layout-button` cases. The full `e2e/animate-presence` run and the
+  Step 5 guard set must stay green.
+
+**3. The owned `?layoutScroll` GUARD follows upstream's stacking.**
+- On the owned path, upstream draws exactly what we draw:
+  - pink is hit in 10–11 of 20 frames;
+  - green covers pink's centre from 164–170 ms;
+  - the popped element has no z-index (`PopChild.tsx:167-168`).
+- Only our exit clone raises its z-index.
+- Change the owned branch of that case so that pink holds its position, stays fully visible until green first covers
+  its centre, and green covers it no earlier than 140 ms after the pop.
+- The clone branch keeps "at least 10 frames with blue and pink". Cite `PopChild.tsx:167-168` in the spec.
+- This one edit is allowed by the Done criteria's "no weakening" check.
+
+### A3 (2026-10-29, operator-approved)
+
+Answers the Step 5 STOPs at `07a24e2e`.
+
+**1. `e2e/layout/layout-dependency.spec.ts:293`: the ungated wait-mode parent snaps, as upstream does.**
+- This is the same rule as A2.1. A `layout` parent outside a `LayoutGroup` doesn't re-render when a wait-mode exit
+  completes, so it snaps (`index.tsx:244`; the `modeshell.tsx` mirror with no group).
+- Change only the ungated half to assert that no FLIP transform appears and that the width reaches its final value.
+  Cite `index.tsx:244`.
+- Update the card's caption in `src/routes/tests/layout-dependency/+page.svelte`. Both parents jump, as in Motion.
+  Inside a `LayoutGroup`, the ungated one would animate.
+- Both files join the allow-list.
+
+**2. `pop-layout-scroll-siblings.spec.ts:597`, the owned clamp: skip covered readings.**
+- Upstream fails this hit test too (`m-clamp.mjs`, two runs). Upstream and ours paint the same here:
+  - pink is transformed, takes pointer events, has `z-index: auto` and draws over green;
+  - green's bottom holds in every frame.
+- Keep the "no step above 35 px" rule. Drop any frame where the point just below the found green edge hit-tests as
+  pink, and treat it as a capture gap. Apply the same rule to the screencast green band.
+- Cite `PopChild.tsx:167-168`. The no-weakening check allows this edit.
+
+**3. A recorded divergence: the grouped wait label.** In `wait-group`, upstream's label drifts up to 7.83 px
+off-centre while the shell scales, because its `.state` is projected for position inside the scaling shell. Ours
+stays centred. Matching it would mean projecting `.state` through the size-animation path. That's logged here and not
+fixed. Correction: this is a svelte-motion gap and upstream behaves as designed. `.state` has
+`layout="position"` and no `transition`, so upstream runs its own spring. It's tracked after 2.7.0 as issue #510.
+
+**Plan text** (dispatcher edit). The "Wait mode" maintenance note now reads as follows.
+
+> `commitPresenceLayoutRelease` follows B(c)'s rule (A2.1): it refreshes silently outside the boundary or group and
+> animates inside a shared `LayoutGroup`. It still keeps an un-rebased `previousRect`. A node starting its own
+> box-size animation yields any group-seeded snapshot from the same task (`yieldToSizeAnimation`, A2.2).
+
+### A4 (2026-10-29, operator-approved)
+
+- **The covered-reading rule now covers the owned `?sticky` case.**
+  - A3.2's rule now also applies to owned `?sticky` (`pop-layout-scroll-siblings.spec.ts`, about 762, "?sticky,
+    scroll, remove: no jump").
+  - The rule: when the point just below the found green edge hit-tests as pink (or the painted pink band starts
+    within 2 px of green's bottom), that reading is a capture gap, and the step measurement resets.
+- **Why.**
+  - The siblings mirror's `?sticky` variant (three runs each, upstream and ours, `m-clamp.mjs`) shows the same paint
+    on both. Pink is transformed, has `z-index: auto`, takes pointer events and draws over green. Green's bottom
+    holds in every frame.
+  - On both, the hit-tested reading drops 57–58 px when pink covers green's bottom.
+  - The sticky header never reaches green's column.
+- **Where the change goes.** Make it in `expectNoJump` or in that test. If it goes in the shared helper, gate it to
+  readings where pink covers the next point, so other callers' counted steps are unchanged.
+- **What stays the same.** The "no step above 35 px" rule. Cite `PopChild.tsx:167-168`. The no-weakening check allows
+  this edit.
+- **Verify.**
+  - `:762` passes 5 times in a row.
+  - The owned clamp passes 5 times.
+  - The full Step 5.1 guard set, `pnpm test:only`, `pnpm check` and `pnpm build` all pass.
+
+### A5 (2026-10-30, operator-approved)
+
+Answers the guard's findings at `3f2fe7cf`.
+
+**1. Case 6 checks both phases.**
+- Applies to `presenceSiblingSnapshots.spec.ts`, case 6: "clone sync completion: a footer outside the list parent
+  snaps".
+- An exit **start** re-renders the list's owner, and upstream re-renders the footer with it. So the footer may get a
+  `didUpdate` then, but it must not move: every update must have `snapshot === layout`.
+- When the exit **completes**, the footer gets **no** `didUpdate` at all.
+- Attach the listener before the removal, as Step 1 did. The no-weakening check allows this edit. It is stricter than the `3f2fe7cf` version.
+  Compared with Step 1, it allows only the zero-move update at exit start, which upstream also produces.
+
+**2. The fixed-root check reads live containing-block styles (A1.3 follow-up).**
+- In `scrollBasis.ts`, `holdsFixed` is cached in `styleMemo` forever, but it depends on `transform`, `filter`,
+  `perspective`, `will-change` and `contain`, which can change at any time (a motion ancestor animating its
+  transform).
+- Keep caching overflow and position. Read the containing-block properties fresh on each walk. The bounds don't
+  change: the read happens only on the walk that already runs for a commit, never per frame.
+- Red first: a `scrollBasis.spec.ts` case. An ancestor's transform goes from `none` to a scale after a first walk, and
+  the fixed box must then be treated as scrolling with that ancestor. Also cover the reverse, from a scale back to
+  `none`.
+
+**3. Two more containing-block triggers.**
+- Add `contain: layout` (and the `strict` and `content` values that include it) and `backdrop-filter` (anything other
+  than `none`) to the fixed-root check.
+- Red first: one `scrollBasis.spec.ts` case for each.
+
+**Verify.** The new cases fail before the fix and pass after it, and 008's `:307` and the owned clamp still pass. The
+full Step 5.1 guard set, `pnpm test:only`, `pnpm check` and `pnpm build` all pass.

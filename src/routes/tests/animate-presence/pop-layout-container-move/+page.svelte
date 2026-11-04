@@ -318,16 +318,6 @@
         border-radius: 10px;
         background: #ff0088;
         cursor: pointer;
-        /*
-         * Known divergence, not #2348: `setCompositorHints`
-         * (src/lib/utils/layout.ts) pins `transform-origin: 0 0` inline on
-         * every `layout` element at rest, so a scale exit would shrink towards
-         * the top-left corner. Upstream keeps the default centre origin (the
-         * projection writes `50% 50% 0`), which the centre-drift assertions in
-         * the e2e rely on. Plan 013 (motion-14-7-1) owns that divergence; drop
-         * this pin once it lands.
-         */
-        transform-origin: 50% 50% !important;
     }
 
     .example :global(ul.fixed.anchor-top) {

@@ -295,6 +295,21 @@
     // below re-evaluates with stale phase and unmounts/remounts the children,
     // which (a) breaks any CSS transition the consumer relies on for exit and
     // (b) makes `bind:this` references go stale.
+    //
+    // That ordering doesn't always hold: a flip made from a user effect in
+    // the same flush (the page's `onMount`, during hydration) re-ran the
+    // {#if} first. Upstream's `PresenceChild` keeps rendering its children
+    // through the flip (PresenceChild.tsx:115-125 @ v14.7.1), so the
+    // condition also renders them while an exit is about to start (the last
+    // seen `present` was true and the phase is still idle). A child
+    // re-created already not present never relegated its `layoutId` node,
+    // which stayed the stack's present lead and was never released
+    // (plan 012 A5).
+    const rendersChildren = () =>
+        present
+            ? phase !== 'enter-blocked'
+            : phase === 'holding' || (phase === 'idle' && prevPresent === true)
+
     $effect.pre(() => {
         // Read both reactive sources (`present` prop + `phase` $state)
         // unconditionally at the top so the effect's dependency set is
@@ -375,6 +390,6 @@
     })
 </script>
 
-{#if (present && phase !== 'enter-blocked') || phase === 'holding'}
+{#if rendersChildren()}
     {@render children?.()}
 {/if}

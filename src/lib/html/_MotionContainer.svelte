@@ -52,7 +52,7 @@
         type Transition
     } from 'motion-dom'
     import { isPlaywrightEnv, pwLog } from '$lib/utils/log'
-    import { onDestroy, untrack, type Snippet } from 'svelte'
+    import { untrack, type Snippet } from 'svelte'
     import { VOID_TAGS } from '$lib/utils/constants'
     // The container never animates an ELEMENT directly: every writer goes
     // through the VisualElement (`animationState` or `animateTarget`).
@@ -70,9 +70,15 @@
         computeFlipTransforms,
         runLayoutSizeAnimation,
         finishFlipAnimations,
-        setCompositorHints,
         isLayoutMeasurementGated,
+        isObservedLayoutParent,
+        layoutParentOf,
+        markExiting,
+        mergeLayoutCauses,
         observeLayoutChanges,
+        unmarkExiting,
+        type ExitMarker,
+        type LayoutChangeCause,
         selectLayoutDependencies,
         sizeCorrectionSeedEvent,
         sizeCorrectionEndEvent,
@@ -90,10 +96,12 @@
         getAnimatePresenceContext,
         getPresenceChildContext,
         getPresenceDepth,
-        setPresenceDepth
+        setPresenceDepth,
+        type PresenceLayoutHandOff
     } from '$lib/utils/presence'
     import { getInitialKeyframes } from '$lib/utils/initial'
     import { boxFromRect, MotionDomProjectionAdapter } from '$lib/utils/motionDomProjection'
+    import { isResizeBlocked, type ScrollBasis } from '$lib/utils/scrollBasis'
     import {
         getMotionDomProjectionParent,
         setMotionDomProjectionParent
@@ -231,6 +239,8 @@
         layoutDependency: layoutDependencyProp,
         onProjectionUpdate: onProjectionUpdateProp,
         onLayoutMeasure: onLayoutMeasureProp,
+        onLayoutAnimationStart: onLayoutAnimationStartProp,
+        onLayoutAnimationComplete: onLayoutAnimationCompleteProp,
         // trunk-ignore(eslint/no-useless-assignment): `ref` is write-only here — mirrored from the internal `element` node via the effect below
         ref = $bindable(),
         ...rest
@@ -325,6 +335,38 @@
     // node group is handed to the adapter below (plan 007 D3).
     const layoutGroupContext = getLayoutGroupContext()
     const layoutGroupId = layoutGroupContext?.id
+
+    // Plan 015b (R5): mark this element as exiting when its own presence
+    // flips to absent, so the removal that completes the exit reads as one
+    // (see `markExiting`). Only while it is shown: a wait-mode child that was
+    // never revealed has no exit to complete. Cleared only on re-entry, never
+    // in a teardown: Svelte removes the DOM before teardowns run, and the
+    // removal is classified after both.
+    let exitMarker: ExitMarker | null = null
+    $effect(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const target = element
+        if (!presenceChildContext || !target) return
+        untrack(() => {
+            if (isPresent === false) {
+                if (
+                    exitMarker ||
+                    !target.isConnected ||
+                    target.hasAttribute('data-presence-wait-hidden')
+                ) {
+                    return
+                }
+                exitMarker = {
+                    boundary: target.closest('.animate-presence-container'),
+                    group: layoutGroupContext?.group
+                }
+                markExiting(target, exitMarker)
+            } else if (exitMarker) {
+                unmarkExiting(target)
+                exitMarker = null
+            }
+        })
+    })
     const scopedLayoutId = $derived(
         layoutIdProp ? scopeLayoutId(layoutGroupId, layoutIdProp) : undefined
     )
@@ -396,9 +438,11 @@
      * the feature would never see a flip.
      *
      * Only the `PresenceChild` path is wired: direct `AnimatePresence` children
-     * exit through the CLONE path in `presence.ts`, which is a deliberate
-     * architectural deviation this plan keeps (the clone is detached and has no
-     * VisualElement, so it cannot fight the original's).
+     * exit through the CLONE path in `presence.ts`, a deliberate architectural
+     * deviation. Since plan 012 a direct child's VisualElement and projection
+     * node move to its exit clone when it measures layout (`layout`,
+     * `layoutId`, `drag`), so the clone animates through the same renderer;
+     * any other clone is a copy with no VisualElement.
      *
      * @returns The presence context, or `null` outside a `PresenceChild`.
      */
@@ -674,6 +718,11 @@
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
             transformTemplate: transformTemplateProp,
+            // Plan 012: read by the projection node off `visualElement.getProps()`
+            // and passed to the layout animation as `onPlay` / `onComplete`
+            // (create-projection-node.ts:586-589, 626-628 @ v14.7.1).
+            onLayoutAnimationStart: onLayoutAnimationStartProp,
+            onLayoutAnimationComplete: onLayoutAnimationCompleteProp,
             // Forwarded only, never invoked here: motion-dom subscribes it
             // through `propEventHandlers` and fires it on `preRender` with
             // `latestValues` whenever a bound value changes. Its presence also
@@ -778,15 +827,28 @@
         mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {})
     )
 
-    // Register onDestroy at component level (guaranteed to work in Svelte 5)
-    // — getContext()/onDestroy() must run during component initialization.
+    // The presence teardown (plan 012, P6). A script-level `$effect.pre` is a
+    // render effect created now, before the template, and Svelte destroys an
+    // effect's children in creation order (`destroy_effect_children`,
+    // effects.js:464-488), so this teardown runs before the descendants'
+    // and before this component's own projection and VisualElement
+    // teardowns: `unregisterChild` can hand the still-mounted nodes, nested
+    // ones included, to the exit clone. An `onDestroy` (a user effect, queued
+    // until `pop()`) ran after the descendants had torn down.
     if (shouldRegisterPresenceExit) {
-        onDestroy(() => {
-            pwLog('[presence] onDestroy triggered', { key: presenceKey })
-            // Already exited with its parent (`propagate`): no clone exit.
-            if (presenceChildContext?.propagated === true && !presenceChildContext.isPresent) return
-            context.unregisterChild(presenceKey)
-        })
+        $effect.pre(
+            () => () =>
+                untrack(() => {
+                    pwLog('[presence] teardown', { key: presenceKey })
+                    // Already exited with its parent (`propagate`): no clone exit.
+                    if (
+                        presenceChildContext?.propagated === true &&
+                        !presenceChildContext.isPresent
+                    )
+                        return
+                    context.unregisterChild(presenceKey)
+                })
+        )
     }
 
     // Capture mid-animation computed styles via rAF so exit clones can start
@@ -802,7 +864,8 @@
         let wasAnimating = false
         const capture = () => {
             if (element && element.isConnected) {
-                const isAnimating = element.getAnimations().length > 0
+                const animations = element.getAnimations()
+                const isAnimating = animations.length > 0
                 // ResizeObserver doesn't fire for transform-only animations.
                 // Capture their visual rect while they run, plus one final
                 // settled frame, so a later clone exit never reuses the tiny
@@ -814,7 +877,14 @@
                     // the full style snapshot the exit clone freezes; the
                     // animating frames before it only copy layout fields.
                     context.updateChildState(presenceKey, rect, cs, !isAnimating)
-                    context.updateChildAnimatedStyle(presenceKey, cs.opacity, cs.transform)
+                    // The running animations too: a held exit clone takes them
+                    // over (plan 012 A2), and a detached element reports none.
+                    context.updateChildAnimatedStyle(
+                        presenceKey,
+                        cs.opacity,
+                        cs.transform,
+                        animations
+                    )
                 }
                 wasAnimating = isAnimating
             }
@@ -892,6 +962,51 @@
         }
     })
 
+    /** Layout keys a `style` motion value can drive (plan 012, placement). */
+    const LAYOUT_STYLE_KEYS = [
+        'top',
+        'right',
+        'bottom',
+        'left',
+        'width',
+        'height',
+        'margin',
+        'marginTop',
+        'marginRight',
+        'marginBottom',
+        'marginLeft',
+        'padding',
+        'paddingTop',
+        'paddingRight',
+        'paddingBottom',
+        'paddingLeft'
+    ]
+    /**
+     * Plan 012 (P3): how this element's projection node moves to its exit
+     * clone. Every element whose `MeasureLayout` upstream renders (`layout`,
+     * `layoutId`, `drag`) is held. `canHandOff` runs in the teardown, where
+     * the destroyed `measureLayoutMounted` recomputes from its dependencies'
+     * pre-flush values, as upstream's `MeasureLayout` keeps its last props.
+     */
+    const layoutHandOff: PresenceLayoutHandOff = {
+        canHandOff: () =>
+            !!motionDomProjection?.isMounted &&
+            !motionDomProjection.isHandedOff &&
+            measureLayoutMounted,
+        ownedLayoutKeys: () => {
+            const style = untrack(() => styleProp)
+            const keys =
+                style && typeof style === 'object'
+                    ? LAYOUT_STYLE_KEYS.filter((key) =>
+                          isMotionValue((style as Record<string, unknown>)[key])
+                      )
+                    : []
+            // trunk-ignore(eslint/svelte/prefer-svelte-reactivity): a read-only snapshot for the exit clone, never mutated or tracked
+            return new Set(keys)
+        },
+        handOff: (clone, release) => motionDomProjection?.handOffToExitClone(clone, release)
+    }
+
     // Reactively update registration when element/exit/transition props change.
     //
     // Only with a node. Upstream registers a child with its `PresenceChild`
@@ -900,8 +1015,17 @@
     // removed nothing holds it (`PresenceChild.tsx:104-113`): it leaves at once,
     // with no clone, and never blocks a `mode="wait"` sibling. The node is
     // `$state.raw`, so a late node registers as soon as it exists.
+    // Plan 012 (P5): also a child without an `exit` whose `MeasureLayout`
+    // would be rendered upstream (`layout`, `layoutId`, `drag`): its
+    // projection node holds the exit (`MeasureLayout.tsx:136-143, 188-217`
+    // @ v14.7.1), so it must be found when it unregisters.
     $effect(() => {
-        if (element && visualElement && shouldRegisterPresenceExit && exitProp !== undefined) {
+        if (
+            element &&
+            visualElement &&
+            shouldRegisterPresenceExit &&
+            (exitProp !== undefined || measureLayoutMounted)
+        ) {
             const resolvePresenceExit = (custom: unknown) => {
                 const resolved = resolveExit(
                     exitProp,
@@ -919,8 +1043,10 @@
                 presenceKey,
                 element,
                 filteredExit,
-                // The clone-based exit animates a DETACHED copy with no
-                // VisualElement, so `shouldSkipAnimations` cannot reach it.
+                // A clone that isn't held animates a copy with no
+                // VisualElement, so `shouldSkipAnimations` cannot reach it; a
+                // held clone animates through the re-homed VisualElement (plan
+                // 012), whose `animate(clone, …)` copies the transition too.
                 // motion-dom's `animateTarget` copies `transition.skipAnimations`
                 // onto every per-value transition, so threading it here is what
                 // makes exits instant under `<MotionConfig skipAnimations>`.
@@ -928,7 +1054,11 @@
                 // derived: that value also feeds the projection adapter, and
                 // upstream does not skip layout/FLIP animations.
                 skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
-                resolvePresenceExit
+                resolvePresenceExit,
+                // Plan 015b (R6): the clone's completion re-renders this group.
+                layoutGroupContext?.group,
+                // Plan 012 (P3): hand the projection node to the exit clone.
+                layoutHandOff
             )
         }
     })
@@ -1899,7 +2029,10 @@
             new CustomEvent(presenceLayoutReleaseEvent, {
                 detail: {
                     previousRect,
-                    viewportScrolledDuringHold
+                    viewportScrolledDuringHold,
+                    // Plan 015b A2.1: where the completed exit re-renders.
+                    boundary: element?.closest('.animate-presence-container') ?? null,
+                    group: layoutGroupContext?.group
                 }
             })
         )
@@ -2070,6 +2203,8 @@
             layoutScroll: layoutScrollProp,
             layoutAnchor: layoutAnchorProp,
             layoutDependency: layoutDependencyProp,
+            // Plan 015b (R7): part D never seeds a gated node.
+            measurementGated: layoutMeasurementGated,
             transition: mergedTransition as never,
             style: styleProp,
             alwaysMeasureLayout: upstreamAlwaysMeasureLayout
@@ -2107,6 +2242,7 @@
                 layoutRoot: layoutRootProp,
                 layoutAnchor: layoutAnchorProp,
                 layoutDependency: layoutDependencyProp,
+                measurementGated: layoutMeasurementGated,
                 transition: mergedTransition as never,
                 style: styleProp,
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
@@ -2341,7 +2477,31 @@
     const layoutMountTracker = createMeasureLayoutMountTracker()
     let lastRect: RectLike | null = null
     let observerRestartRect: RectLike | null = null
+    // Plan 015b A1.1: this element's mount was reported to part D (once).
+    let followAddReported = false
     let observerRestartElement: HTMLElement | null = null
+    // The scroll basis each cached rect was read in (plan 015a): a scroll
+    // container that isn't `layoutScroll`, or the window under a fixed
+    // element, can move the element's page box with no read here, so the
+    // cache is rebased (`rebaseRect`) before it is compared with a fresh
+    // read. Every write goes through `setLastRect`.
+    let lastRectBasis: ScrollBasis | undefined
+    let observerRestartBasis: ScrollBasis | undefined
+    /** The basis of the adapter's latest read, taken right after that read. */
+    const readRectBasis = () => motionDomProjection?.lastReadScrollBasis
+    /**
+     * Cache `rect` with the basis of the read that produced it.
+     *
+     * @param rect The rect just read, or `null` to clear the cache.
+     * @param basis Its scroll basis (defaults to the adapter's latest read).
+     */
+    const setLastRect = (rect: RectLike | null, basis = rect ? readRectBasis() : undefined) => {
+        lastRect = rect
+        lastRectBasis = basis
+    }
+    /** The cached rect, moved by any scroll since it was read. */
+    const rebasedLastRect = () =>
+        motionDomProjection?.rebaseRect(lastRect, lastRectBasis) ?? lastRect
     // Coordinates the two delivery paths so one layout change produces exactly
     // one FLIP commit (upstream guarantees one measure/animate pass per commit:
     // MeasureLayout.tsx getSnapshotBeforeUpdate→componentDidUpdate + the
@@ -2489,6 +2649,7 @@
         if (element.parentElement?.closest('[data-layout-size-animation]')) return
         const next = measureLayoutRect()
         if (!next) return
+        const nextBasis = readRectBasis()
         // The DOM observer already consumed this exact change: it committed a
         // changed rect on its microtask (serial advanced since this callback
         // was scheduled) AND the cached `lastRect` already equals `next`. The
@@ -2510,7 +2671,7 @@
         // idle "changed=false" event is part of the observable contract).
         emitProjectionUpdate(prev, next)
         if (hasRectChanged(prev, next)) {
-            lastRect = next
+            setLastRect(next, nextBasis)
             // A Svelte-owned prop change is this component re-rendering:
             // upstream re-renders (and so snapshots) every descendant,
             // including ones in a separate LayoutGroup (Step 4b-d). A live
@@ -2704,6 +2865,79 @@
         measuredBeforeLayoutIdChange = measured
     })
 
+    // ── Presence in shared layout (plan 012, P1/P2) ─────────────────────────
+    //
+    // Upstream `MeasureLayout` uses `usePresence()` (MeasureLayout.tsx:246-260
+    // @ v14.7.1): it registers with its `PresenceChild` (use-presence.ts:52-57)
+    // so an exiting element is held until `safeToRemove`, and on a presence
+    // flip it relegates or promotes the node (getSnapshotBeforeUpdate 163,
+    // 177-201) and runs the root update (componentDidUpdate 206-217). This is
+    // the owned path (`present` + `child`), where the element stays mounted;
+    // direct children hand their node to the exit clone instead (P3).
+    const measureParticipantId = `measure-${componentHydrationId}`
+
+    // P2: one participant while `MeasureLayout` would be rendered. A
+    // featureless `m` has no node, so it registers nothing (plan 016).
+    $effect(() => {
+        const presence = presenceChildContext
+        if (!presence || !measureLayoutMounted || !visualElement || !motionDomProjection) return
+        if (!motionDomProjection.isMounted) return
+        return untrack(() => presence.register(measureParticipantId))
+    })
+
+    // P1: the flip, pre-update then post-update, after the `layoutId` switch
+    // pair above (and after 015c's R2 once it lands, so its snapshot wins:
+    // `willUpdate()` returns for a node that is already dirty).
+    let lastSeenPresence: boolean | undefined
+    let presenceFlipPending = false
+    $effect.pre(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const adapter = motionDomProjection
+        if (!presenceChildContext || isPresent === undefined || !visualElement || !adapter) return
+        if (!adapter.isMounted) return
+        untrack(() => {
+            // The first run with a mounted adapter is the mount, not a flip
+            // (`getSnapshotBeforeUpdate` only compares with `prevProps`).
+            const previous = lastSeenPresence
+            lastSeenPresence = isPresent
+            if (previous === undefined || previous === isPresent || !measureLayoutMounted) return
+            // This cycle's versioned completion, captured now.
+            const onExitComplete = presenceChildContext.onExitComplete
+            adapter.setPresence(isPresent, () => {
+                if (!isPresent) onExitComplete(measureParticipantId)
+            })
+            presenceFlipPending = true
+        })
+    })
+    $effect(() => {
+        const isPresent = presenceChildContext?.isPresent
+        const adapter = motionDomProjection
+        if (!adapter) return
+        untrack(() => {
+            // The adapter mounts in a user effect, after the pre effect's
+            // first run: the first presence seen with it mounted is here.
+            if (lastSeenPresence === undefined && adapter.isMounted) lastSeenPresence = isPresent
+            if (!presenceFlipPending) return
+            presenceFlipPending = false
+            // Upstream's root update is queued in the commit itself
+            // (`componentDidUpdate`), ahead of the motion component's own
+            // `scheduleRenderMicrotask`: a render in between would project
+            // the relegated node onto the new lead's stale target from its
+            // previous animation, and the update pass would then measure
+            // that transform as its layout (plan 012 A4: a second close).
+            // Except for a popLayout exit: its pop and the #2348 correction
+            // are queued by `PresenceChild`'s effects, which run after this
+            // child's, and the update must queue behind the correction
+            // (upstream's pop is in place before `componentDidUpdate`). Not
+            // from inside motion-dom's batch.
+            if (isPresent === false && context?.mode === 'popLayout') {
+                queueMicrotask(() => adapter.commitPresence())
+            } else {
+                adapter.commitPresence()
+            }
+        })
+    })
+
     // Cancel a pending reactive commit when the component tears down.
     $effect(() => {
         return () => {
@@ -2748,7 +2982,7 @@
 
         if (element.parentElement?.closest('[data-layout-size-animation]')) {
             finishFlipAnimations(element)
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.seedLayout()
             motionDomProjection?.finishAnimation()
             return true
@@ -2764,7 +2998,7 @@
         if (hasPresenceHold || hasHiddenWaitEnter) return true
         if (hasPresencePlaceholder && !hasSizeCorrectionTarget) {
             finishFlipAnimations(element)
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.seedLayout()
             motionDomProjection?.finishAnimation()
             return true
@@ -2779,8 +3013,9 @@
         const layoutMode =
             layoutProp && isLoaded === 'ready' && hasLayoutFeatures ? layoutProp : false
         if (!(observedElement && layoutMode)) {
-            lastRect = null
+            setLastRect(null)
             observerRestartRect = null
+            observerRestartBasis = undefined
             observerRestartElement = null
             return
         }
@@ -2792,16 +3027,21 @@
         // MutationObserver can deliver its child-list record. Preserve the
         // prior slot across that restart: startup's post-patch measurement is
         // the only path that still owns both sides of the keyed move.
-        const previousBeforeObserverRestart =
-            observerRestartElement === observedElement ? observerRestartRect : null
+        const restartedHere = observerRestartElement === observedElement
+        const restartRect = restartedHere ? observerRestartRect : null
+        const restartBasis = restartedHere ? observerRestartBasis : undefined
         observerRestartRect = null
+        observerRestartBasis = undefined
         observerRestartElement = null
         // One read seeds the projection AND primes the observer cache
         // (`seedLayout()` + `measureLayoutRect()` would read the box twice —
         // and a keyed reorder restarts this effect for every moved row).
         // Loud on purpose: this is the mount / restart slot `onLayoutMeasure`
         // consumers (Reorder.Item) register from.
-        lastRect = motionDomProjection?.refreshLayout() ?? measureLayoutRect()
+        setLastRect(motionDomProjection?.refreshLayout() ?? measureLayoutRect())
+        // The slot from before the restart, moved by any scroll since.
+        const previousBeforeObserverRestart =
+            motionDomProjection?.rebaseRect(restartRect, restartBasis) ?? restartRect
         // Upstream gate (#470): a `layoutDependency`-gated node only snapshots
         // when the dependency changed in THIS update (MeasureLayout.tsx:93-100
         // `prevProps.layoutDependency !== layoutDependency`). A pending reactive
@@ -2822,7 +3062,6 @@
             emitProjectionUpdate(previousBeforeObserverRestart, lastRect)
             motionDomProjection?.commitObservedLayoutChange(previousBeforeObserverRestart)
         }
-        setCompositorHints(observedElement, true)
 
         // Gated on `layoutDependency` with no dependency (or own-presence)
         // change in this update: upstream takes no snapshot, so the node is
@@ -2839,7 +3078,7 @@
             // ONE DOM read: seeds the projection layout and returns the rect
             // (`measurePageRect` + `seedLayout` would read the box twice).
             const next = motionDomProjection?.refreshLayout({ silent: true }) ?? null
-            if (next) lastRect = next
+            if (next) setLastRect(next)
         }
 
         // Own-subtree DOM changes (children added/removed, text changed) are
@@ -2867,17 +3106,70 @@
             return changed
         }
 
-        const commitObservedLayout = () => {
+        // Plan 015b: a completed exit re-renders only its AnimatePresence
+        // (and the children of a nested one in it) and, through
+        // `forceRender`, its LayoutGroup (`AnimatePresence/index.tsx:206,
+        // 244` @ v14.7.1, `use-presence.ts:40-43`, `group.ts:26-33`). Any
+        // other node snaps.
+        const boundariesHolding = (cause: LayoutChangeCause | undefined) =>
+            cause?.kind === 'exit-complete'
+                ? cause.markers.flatMap(({ boundary }) =>
+                      boundary?.contains(element!) ? [boundary] : []
+                  )
+                : []
+        const isSnappedBy = (cause: LayoutChangeCause | undefined) =>
+            cause?.kind === 'exit-complete' &&
+            !boundariesHolding(cause).length &&
+            !(
+                layoutGroupContext?.group &&
+                cause.markers.some(({ group }) => group === layoutGroupContext.group)
+            )
+
+        // One completion is one upstream render: the trailing frame and an
+        // inheriting ResizeObserver delivery carry the same cause object, and
+        // must not snap or re-seed again (a second seed would restart the
+        // descendants from their stale caches).
+        const handledCompletions = new WeakSet<LayoutChangeCause>()
+        const isHandledCompletion = (cause: LayoutChangeCause | undefined) => {
+            if (cause?.kind !== 'exit-complete') return false
+            if (handledCompletions.has(cause)) return true
+            handledCompletions.add(cause)
+            return false
+        }
+
+        const commitObservedLayout = (cause?: LayoutChangeCause) => {
             if (suppressObservedLayoutCommit()) return
             if (isObservedCommitGated()) {
+                if (isHandledCompletion(cause)) return
+                refreshGatedLayoutCache()
+                // M1: a gated node inside the completing boundary still
+                // re-renders upstream, so its descendants in that boundary
+                // snapshot (its own box stays gated).
+                const boundaries = boundariesHolding(cause)
+                if (boundaries.length) motionDomProjection?.commitDescendantsWithin(boundaries)
+                return
+            }
+            if (isSnappedBy(cause)) {
+                if (isHandledCompletion(cause)) return
+                takeOwnSubtreeChange()
+                refreshGatedLayoutCache()
+                return
+            }
+            // Upstream blocks updates for 250ms after a width change and
+            // measures without animating (create-projection-node.ts @
+            // v14.7.1, 523-528, 797-820): refresh the cache silently.
+            if (isResizeBlocked()) {
+                takeOwnSubtreeChange()
                 refreshGatedLayoutCache()
                 return
             }
 
+            // The cached rect moved by any scroll since its read (plan
+            // 015a), before any comparison with the fresh one.
+            const previous = rebasedLastRect()
             const next = measureLayoutRect()
             if (!next) return
-            const previous = lastRect
-            lastRect = next
+            setLastRect(next)
             if (previous && hasRectChanged(previous, next)) {
                 // Separate LayoutGroup node group (plan 007 D6): a grouped
                 // node that wasn't snapshotted and only moved because its
@@ -2919,6 +3211,7 @@
 
                 if (shouldUseSizeCorrectedFallback) {
                     finishFlipAnimations(element!)
+                    motionDomProjection?.yieldToSizeAnimation()
                     runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
                 } else {
                     motionDomProjection?.commitObservedLayoutChange(previous, {
@@ -2935,6 +3228,8 @@
                 event as CustomEvent<{
                     previousRect?: RectLike
                     viewportScrolledDuringHold?: boolean
+                    boundary?: Element | null
+                    group?: object
                 }>
             ).detail
             // A wait-mode child swap is a CHILD's presence change, not this
@@ -2947,12 +3242,24 @@
                 refreshGatedLayoutCache()
                 return
             }
+            // Plan 015b A2.1, the B(c) rule: the release follows a wait-mode
+            // exit's completion, which re-renders only its AnimatePresence
+            // and, through `forceRender`, its LayoutGroup
+            // (`AnimatePresence/index.tsx:206, 244` @ v14.7.1,
+            // `use-presence.ts:40-43`). A held element outside both snaps.
+            const rerendered =
+                !!detail?.boundary?.contains(element!) ||
+                (!!layoutGroupContext?.group && detail?.group === layoutGroupContext.group)
+            if (!rerendered) {
+                refreshGatedLayoutCache()
+                return
+            }
             const previous = detail?.previousRect
             const viewportRect = element!.getBoundingClientRect()
             const next = measureLayoutRect()
             if (!(previous && next)) return
 
-            lastRect = next
+            setLastRect(next)
             // Presence-hold semantics: a hold that spanned a viewport scroll
             // or released offscreen still skips its release FLIP.
             // `previousRect` arrives in PAGE space (converted at capture in
@@ -2967,6 +3274,7 @@
 
             if (!shouldSkipLayoutAnimation && shouldUseSizeCorrectedFallback) {
                 finishFlipAnimations(element!)
+                motionDomProjection?.yieldToSizeAnimation()
                 runLayoutSizeAnimation(element!, transforms, mergedTransition ?? {})
             }
             if (!shouldSkipLayoutAnimation && hasRectChanged(previous, next)) {
@@ -2978,13 +3286,18 @@
             }
         }
 
-        const scheduleProjectionCommit = () => {
+        // Causes of calls the throttle dropped, merged (plan 015b).
+        let pendingCommitCause: LayoutChangeCause | undefined
+        const scheduleProjectionCommit = (cause?: LayoutChangeCause) => {
+            pendingCommitCause = mergeLayoutCauses(pendingCommitCause, cause)
             // A sibling animation can occupy this frame's throttle before a
             // keyed reorder moves the dragged element. Consume its fresh slot
             // immediately so the upstream delta compensates the drag before
             // paint; waiting another frame exposes the uncompensated DOM move.
             if (rafId && !isDragActive()) return
-            commitObservedLayout()
+            const merged = pendingCommitCause
+            pendingCommitCause = undefined
+            commitObservedLayout(merged)
             if (rafId) return
             rafId = requestAnimationFrame(() => {
                 rafId = null
@@ -3003,17 +3316,40 @@
         // fix race-proof: `finishAnimation()` alone can be outrun by a
         // projection update already queued on the frameloop.
         const handleSizeCorrectionSeed = () => {
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.blockLayoutAnimation()
         }
         const handleSizeCorrectionEnd = () => {
-            lastRect = measureLayoutRect()
+            setLastRect(measureLayoutRect())
             motionDomProjection?.unblockLayoutAnimation()
         }
         element!.addEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
         element!.addEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
 
-        const disconnectObservers = observeLayoutChanges(element!, () => scheduleProjectionCommit())
+        // Part D (plan 015b): `layout` nodes after this element's layout
+        // parent, outside it, follow its children's changes.
+        const followParent = layoutParentOf(element!)
+        // A1.1: mounting into a list an earlier render already observed is
+        // an add. Upstream re-renders the list's parent, so `layout` nodes
+        // after it snapshot; with an empty list no sibling observer exists to
+        // report it, so this element does (once, deduped per microtask).
+        if (
+            !followAddReported &&
+            !restartedHere &&
+            followParent &&
+            isObservedLayoutParent(followParent)
+        ) {
+            MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, { kind: 'add' })
+        }
+        followAddReported = true
+        const disconnectObservers = observeLayoutChanges(
+            element!,
+            (cause) => scheduleProjectionCommit(cause),
+            {
+                onLayoutParentChange: (parent, records, cause) =>
+                    MotionDomProjectionAdapter.seedFollowingLayout(parent, records, cause)
+            }
+        )
         // A sibling can re-slot a dragged layout element without changing the
         // dragged node, its parent, or either element's size. React observes
         // this through the parent's render commit. Svelte's fine-grained DOM
@@ -3049,27 +3385,42 @@
         // reactive commit) see the change as already consumed instead of
         // restarting the animation from origin. Grouped nodes only, so
         // ungrouped elements keep their existing arbitration untouched.
-        const offProjectionCommit = layoutGroupContext?.group
-            ? motionDomProjection?.onProjectionCommit((rect) => {
-                  lastRect = rect
-                  observerCommitSerial += 1
-              })
-            : undefined
+        // Ungrouped nodes fire it too when part D seeded them (plan 015b).
+        const offProjectionCommit = motionDomProjection?.onProjectionCommit((rect) => {
+            setLastRect(rect)
+            observerCommitSerial += 1
+        })
+        // A resize moves elements without resizing them: the adapter
+        // refreshes its cache once the resize settles and hands the rect over
+        // (plan 015a), so no second read is needed here.
+        const offCacheRefresh = motionDomProjection?.onCacheRefresh((rect) => setLastRect(rect))
 
         return () => {
+            // M5: when the last item of a list completes its exit, no
+            // sibling observer is left to report it, so this element's own
+            // teardown does (deduped with the observers' report).
+            if (exitMarker && followParent && !observedElement.isConnected) {
+                MotionDomProjectionAdapter.seedFollowingLayout(followParent, null, {
+                    kind: 'exit-complete',
+                    markers: [exitMarker]
+                })
+            }
             ownSubtreeObserver?.disconnect()
             offProjectionCommit?.()
+            offCacheRefresh?.()
             disconnectObservers()
             siblingLayoutObserver?.disconnect()
             element?.removeEventListener(presenceLayoutReleaseEvent, commitPresenceLayoutRelease)
             element?.removeEventListener(sizeCorrectionSeedEvent, handleSizeCorrectionSeed)
             element?.removeEventListener(sizeCorrectionEndEvent, handleSizeCorrectionEnd)
             observerRestartRect = lastRect
+            observerRestartBasis = lastRectBasis
             observerRestartElement = observedElement
-            lastRect = null
-            if (element) {
-                setCompositorHints(element, false)
-            }
+            setLastRect(null)
+            // Clear a projected transform when layout stops (unmount, layout turned off,
+            // observer restart). Upstream never writes or clears transform-origin /
+            // will-change for layout, so neither do we.
+            if (element) element.style.transform = ''
             if (rafId) cancelAnimationFrame(rafId)
         }
     })

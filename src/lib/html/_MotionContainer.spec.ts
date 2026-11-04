@@ -526,9 +526,10 @@ describe('_MotionContainer', () => {
 
         const el = container.firstElementChild as HTMLElement
         expect(el).toBeTruthy()
-        // Compositor hints applied on ready
-        expect(el.style.willChange).toBe('transform')
-        expect(el.style.transformOrigin).toBe('0 0')
+        // Upstream writes no layout hints at rest (create-projection-node.ts:2119 is the only
+        // transform-origin writer, and only while projecting).
+        expect(el.style.willChange).toBe('')
+        expect(el.style.transformOrigin).toBe('')
 
         // Trigger size change
         currentRect = {
@@ -541,13 +542,71 @@ describe('_MotionContainer', () => {
         roInstances.at(-1)?.fire()
 
         // In JSDOM, style/animation timing can be inconsistent; assert that
-        // a ResizeObserver was created and compositor hints are applied.
+        // a ResizeObserver was created.
         expect(roInstances.length).toBeGreaterThan(0)
 
-        // Teardown cleans compositor hints
         unmount()
-        expect(el.style.willChange).toBe('')
-        expect(el.style.transformOrigin).toBe('')
+        expect(el.style.transform).toBe('')
+
+        rectSpy.mockRestore()
+    })
+
+    it('leaves no top-left transform-origin on a layout element at rest, before or after a layout change', async () => {
+        const roInstances: Array<{ fire: () => void }> = []
+        class FakeResizeObserver {
+            private _cb: ResizeObserverCallback
+            constructor(cb: ResizeObserverCallback) {
+                this._cb = cb
+                roInstances.push({ fire: () => this._cb([], this as unknown as ResizeObserver) })
+            }
+            observe() {}
+            disconnect() {}
+        }
+        vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+
+        let currentRect = {
+            left: 0,
+            top: 0,
+            width: 100,
+            height: 100
+        } as unknown as DOMRect
+        const rectSpy = vi
+            .spyOn(
+                HTMLElement.prototype as unknown as { getBoundingClientRect: () => DOMRect },
+                'getBoundingClientRect'
+            )
+            .mockImplementation(() => currentRect)
+
+        const { container, unmount } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', layout: true }
+        })
+
+        await flushTimers()
+
+        const el = container.firstElementChild as HTMLElement
+        expect(el).toBeTruthy()
+        // At rest, before any layout animation: upstream leaves the browser's
+        // default centre origin and writes no will-change for layout.
+        expect(el.style.transformOrigin).not.toMatch(/^0(px)? 0(px)?/)
+        expect(el.style.willChange).not.toBe('transform')
+
+        // A layout change, then let it settle.
+        currentRect = {
+            left: 10,
+            top: 5,
+            width: 200,
+            height: 120
+        } as unknown as DOMRect
+        roInstances.at(-1)?.fire()
+        await flushTimers()
+        await flushTimers()
+        await flushTimers()
+
+        expect(el.style.transformOrigin).not.toMatch(/^0(px)? 0(px)?/)
+
+        // Unmount still clears a projected transform.
+        unmount()
+        expect(el.style.transform).toBe('')
 
         rectSpy.mockRestore()
     })

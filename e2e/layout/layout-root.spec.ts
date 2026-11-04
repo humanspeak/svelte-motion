@@ -84,6 +84,15 @@ function expectCrossfade(records: { underlines: number[] }[]) {
 }
 
 /**
+ * Each crossfade case runs on the clone path (`{#if}` children) and on the
+ * owned path (`?owned=true`: `present` + `child`), plan 012.
+ */
+const crossfadeVariants = [
+    ['', ''],
+    [' (owned)', '&owned=true']
+] as const
+
+/**
  * The left edge of the new underline relative to the list, per frame
  */
 const leadOffsets = (records: { underlines: number[]; list: number }[]) =>
@@ -99,30 +108,27 @@ test('Shared layout animation inside a layoutRoot animates relative to it', asyn
     expectSlideAcrossList(records.map(({ underlines, list }) => underlines[0] - list))
 })
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading shared layout animation inside a layoutRoot animates relative to it', async ({
-    page
-}) => {
-    const records = await selectLettuce(page, 'exit=true')
-    expect(records.length).toBeGreaterThan(20)
-    for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading shared layout animation inside a layoutRoot animates relative to it${suffix}`, async ({
+        page
+    }) => {
+        const records = await selectLettuce(page, `exit=true${owned}`)
+        expect(records.length).toBeGreaterThan(20)
+        for (const { list } of records) expect(list).toBeCloseTo(200, 0)
 
-    // Both underlines are mounted while the old one fades out
-    const crossfading = records.filter(({ underlines }) => underlines.length === 2)
-    expect(crossfading.length).toBeGreaterThan(20)
+        // Both underlines are mounted while the old one fades out
+        const crossfading = records.filter(({ underlines }) => underlines.length === 2)
+        expect(crossfading.length).toBeGreaterThan(20)
 
-    // The new underline slides across the list, and the old one follows it
-    expectSlideAcrossList(
-        records.map(({ underlines, list }) => underlines[underlines.length - 1] - list)
-    )
-    for (const { underlines } of crossfading) {
-        expect(underlines[0]).toBeCloseTo(underlines[1], 0)
-    }
-})
+        // The new underline slides across the list, and the old one follows it
+        expectSlideAcrossList(
+            records.map(({ underlines, list }) => underlines[underlines.length - 1] - list)
+        )
+        for (const { underlines } of crossfading) {
+            expect(underlines[0]).toBeCloseTo(underlines[1], 0)
+        }
+    })
+}
 
 test('Shared layout animation inside a translated layoutRoot animates relative to it', async ({
     page
@@ -219,34 +225,31 @@ test('Shared layout animation from outside a layoutRoot starts from its page pos
     expect(lefts[lefts.length - 1]).toBeCloseTo(350, 0)
 })
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading from a translated box outside a layoutRoot keeps the old underline on the new one', async ({
-    page
-}) => {
-    // The box outside the list is translated 80px, so the old underline
-    // starts at 380px and stays mounted while it fades out
-    const records = await selectLettuce(page, 'outside=true&exit=true&outsideX=80', {
-        underline: 380,
-        list: 400
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading from a translated box outside a layoutRoot keeps the old underline on the new one${suffix}`, async ({
+        page
+    }) => {
+        // The box outside the list is translated 80px, so the old underline
+        // starts at 380px and stays mounted while it fades out
+        const records = await selectLettuce(page, `outside=true&exit=true&outsideX=80${owned}`, {
+            underline: 380,
+            list: 400
+        })
+        expect(records.length).toBeGreaterThan(20)
+
+        const crossfading = records.filter(({ underlines }) => underlines.length === 2)
+        expect(crossfading.length).toBeGreaterThan(20)
+
+        // The new underline animates in page space, from 380px to 350px, and
+        // the old one follows it: its translated ancestor isn't ignored
+        const lefts = records.map(({ underlines }) => underlines[underlines.length - 1])
+        expect(lefts[0]).toBeGreaterThan(375)
+        expect(lefts[lefts.length - 1]).toBeCloseTo(350, 0)
+        for (const { underlines } of crossfading) {
+            expect(underlines[0]).toBeCloseTo(underlines[1], 0)
+        }
     })
-    expect(records.length).toBeGreaterThan(20)
-
-    const crossfading = records.filter(({ underlines }) => underlines.length === 2)
-    expect(crossfading.length).toBeGreaterThan(20)
-
-    // The new underline animates in page space, from 380px to 350px, and
-    // the old one follows it: its translated ancestor isn't ignored
-    const lefts = records.map(({ underlines }) => underlines[underlines.length - 1])
-    expect(lefts[0]).toBeGreaterThan(375)
-    expect(lefts[lefts.length - 1]).toBeCloseTo(350, 0)
-    for (const { underlines } of crossfading) {
-        expect(underlines[0]).toBeCloseTo(underlines[1], 0)
-    }
-})
+}
 
 /**
  * Tomato's underline is wrapped in a box inside its tab that's translated
@@ -267,27 +270,24 @@ test('Shared layout animation from a translated box inside a layoutRoot starts f
     expectSlideAcrossList(leadOffsets(records), 80)
 })
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading from a translated box inside a layoutRoot keeps the old underline on the new one', async ({
-    page
-}) => {
-    const records = await selectLettuce(page, 'innerX=80&exit=true', {
-        underline: 430,
-        list: 350
-    })
-    expect(records.length).toBeGreaterThan(20)
-    for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading from a translated box inside a layoutRoot keeps the old underline on the new one${suffix}`, async ({
+        page
+    }) => {
+        const records = await selectLettuce(page, `innerX=80&exit=true${owned}`, {
+            underline: 430,
+            list: 350
+        })
+        expect(records.length).toBeGreaterThan(20)
+        for (const { list } of records) expect(list).toBeCloseTo(200, 0)
 
-    // The new underline slides from the old one's visual position (checked
-    // first, so plan 012 sees the slide before the crossfade)
-    expectSlideAcrossList(leadOffsets(records), 80)
-    // The old underline's translated box isn't ignored
-    expectCrossfade(records)
-})
+        // The new underline slides from the old one's visual position (checked
+        // first, so plan 012 sees the slide before the crossfade)
+        expectSlideAcrossList(leadOffsets(records), 80)
+        // The old underline's translated box isn't ignored
+        expectCrossfade(records)
+    })
+}
 
 /**
  * Not in upstream's spec (plan 007 amendment A1): the slide half of the case
@@ -308,73 +308,64 @@ test('Crossfading from a translated box inside a layoutRoot: the new underline s
     expectSlideAcrossList(leadOffsets(records), 80)
 })
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading inside a scrolled layoutScroll box in a layoutRoot animates relative to it', async ({
-    page
-}) => {
-    // The tabs are in a box in the list that's scrolled 50px, so Tomato's
-    // underline starts at 300px, 50px left of the list
-    const records = await selectLettuce(page, 'scroll=50&exit=true', {
-        underline: 300,
-        list: 350
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading inside a scrolled layoutScroll box in a layoutRoot animates relative to it${suffix}`, async ({
+        page
+    }) => {
+        // The tabs are in a box in the list that's scrolled 50px, so Tomato's
+        // underline starts at 300px, 50px left of the list
+        const records = await selectLettuce(page, `scroll=50&exit=true${owned}`, {
+            underline: 300,
+            list: 350
+        })
+        expect(records.length).toBeGreaterThan(20)
+        for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+
+        // From -50px to 50px within the list: the scroll applies to both
+        expectSlideAcrossList(leadOffsets(records), -50, 50)
+        expectCrossfade(records)
     })
-    expect(records.length).toBeGreaterThan(20)
-    for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+}
 
-    // From -50px to 50px within the list: the scroll applies to both
-    expectSlideAcrossList(leadOffsets(records), -50, 50)
-    expectCrossfade(records)
-})
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading translated underlines inside a layoutRoot keeps their translate${suffix}`, async ({
+        page
+    }) => {
+        // Both underlines are translated 10px
+        const records = await selectLettuce(page, `underlineX=10&exit=true${owned}`, {
+            underline: 360,
+            list: 350
+        })
+        expect(records.length).toBeGreaterThan(20)
+        for (const { list } of records) expect(list).toBeCloseTo(200, 0)
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading translated underlines inside a layoutRoot keeps their translate', async ({
-    page
-}) => {
-    // Both underlines are translated 10px
-    const records = await selectLettuce(page, 'underlineX=10&exit=true', {
-        underline: 360,
-        list: 350
+        expectSlideAcrossList(leadOffsets(records), 10, 110)
+        expectCrossfade(records)
     })
-    expect(records.length).toBeGreaterThan(20)
-    for (const { list } of records) expect(list).toBeCloseTo(200, 0)
+}
 
-    expectSlideAcrossList(leadOffsets(records), 10, 110)
-    expectCrossfade(records)
-})
+for (const [suffix, owned] of crossfadeVariants) {
+    test(`Crossfading inside a scaled ancestor of a layoutRoot animates relative to it${suffix}`, async ({
+        page
+    }) => {
+        // The ancestor's 0.8 scale makes the tabs 80px wide, and the list starts
+        // at 430px
+        const records = await selectLettuce(page, `offset=true&offsetScale=0.8&exit=true${owned}`, {
+            underline: 430,
+            list: 430
+        })
+        expect(records.length).toBeGreaterThan(20)
+        for (const { list } of records) expect(list).toBeCloseTo(310, 0)
 
-// Plan 012: no relegate on the exit clone.
-// svelte-motion's `AnimatePresence` exits a direct child as a detached clone
-// with no projection node, and nothing relegates the exiting lead, so it can't
-// follow the new lead in a crossfade. Un-fixme when shared-layout crossfades
-// with exiting elements are ported (plan 012 in .agents/.plans/motion-14-7-1).
-test.fixme('Crossfading inside a scaled ancestor of a layoutRoot animates relative to it', async ({
-    page
-}) => {
-    // The ancestor's 0.8 scale makes the tabs 80px wide, and the list starts
-    // at 430px
-    const records = await selectLettuce(page, 'offset=true&offsetScale=0.8&exit=true', {
-        underline: 430,
-        list: 430
-    })
-    expect(records.length).toBeGreaterThan(20)
-    for (const { list } of records) expect(list).toBeCloseTo(310, 0)
-
-    expectSlideAcrossList(leadOffsets(records), 0, 80)
-    expectCrossfade(records)
-    for (const { underlineTops, listTop } of records) {
-        for (const top of underlineTops) {
-            expect(top - listTop).toBeCloseTo(30.4, 0)
+        expectSlideAcrossList(leadOffsets(records), 0, 80)
+        expectCrossfade(records)
+        for (const { underlineTops, listTop } of records) {
+            for (const top of underlineTops) {
+                expect(top - listTop).toBeCloseTo(30.4, 0)
+            }
         }
-    }
-})
+    })
+}
 
 /**
  * Not in upstream's spec (plan 007 amendment A1): the same `layout` types in

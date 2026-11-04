@@ -23,7 +23,9 @@
      * wraps Tomato's underline in a translated box inside its tab, within the
      * list. ?scroll=<px> puts the tabs in a scrolled layoutScroll box in the
      * list. ?underlineX=<px> translates the underlines. ?offsetScale=<n> also
-     * scales the ?offset ancestor.
+     * scales the ?offset ancestor. ?owned=true renders each underline through
+     * the owned syntax, `<AnimatePresence present={…}>{#snippet child()}`, so
+     * the exiting underline stays mounted as the real element (plan 012).
      *
      * Deviations: direct `AnimatePresence` children need a `key`. The fixture
      * sits in a `position: fixed` full-window box so the route layout's
@@ -67,6 +69,8 @@
     const scroll = parseInt(params.get('scroll') || '0')
     // Translate the underlines themselves
     const underlineX = parseInt(params.get('underlineX') || '0')
+    // Render the underlines through `present` + `child` instead of `{#if}`
+    const owned = params.get('owned') === 'true'
 
     let selected = $state(outside ? '' : tabs[0])
     // Set on mount, so the spec doesn't click before hydration
@@ -142,7 +146,10 @@
     let readout = $state<string | null>(null)
 
     const measureBefore = (): Before | null => {
-        const old = document.querySelector('.fixture-1935 .underline')
+        // The lead underline: the last one in document order. A held exiting
+        // underline (plan 012) can still be mounted before it.
+        const all = document.querySelectorAll('.fixture-1935 .underline')
+        const old = all[all.length - 1]
         const list = document.querySelector('.fixture-1935 ul')
         if (!old || !list) return null
         const box = old.getBoundingClientRect()
@@ -256,6 +263,11 @@
             action: { label: 'Select Tomato', run: () => testerSelect(tabs[0]) }
         },
         {
+            text: 'Open the exit=true variant, then exit=true&owned=true, and click Lettuce, then Tomato.',
+            expected:
+                'The old underline stays mounted and fades out sitting exactly on the new one as it slides (they read as one bar), then is removed when the slide ends. Every click reads MATCHES ✓. The owned variant (present + child) looks the same.'
+        },
+        {
             text: 'Open each variant link in the panel and click Lettuce, then Tomato, there.',
             expected:
                 'Every click reads MATCHES ✓. layoutRoot=false moves in page space (150 → 100 from the new list, and back -50 → 0); innerX=80 starts 80px into the list, and back to Tomato it moves in page space (its translated box turns relative projection off, as in Motion); layout=size keeps x and animates only the width; outside starts from the box left of the list (50 → 100).'
@@ -268,19 +280,34 @@
 </svelte:head>
 
 {#snippet underline(item: string)}
-    <AnimatePresence>
-        {#if item === selected}
-            <motion.div
-                key="underline"
-                class="underline"
-                layoutId="underline"
-                layout={layoutType || undefined}
-                style={{ x: underlineX }}
-                exit={exit ? { opacity: 0 } : undefined}
-                {transition}
-            />
-        {/if}
-    </AnimatePresence>
+    {#if owned}
+        <AnimatePresence present={item === selected}>
+            {#snippet child()}
+                <motion.div
+                    class="underline"
+                    layoutId="underline"
+                    layout={layoutType || undefined}
+                    style={{ x: underlineX }}
+                    exit={exit ? { opacity: 0 } : undefined}
+                    {transition}
+                />
+            {/snippet}
+        </AnimatePresence>
+    {:else}
+        <AnimatePresence>
+            {#if item === selected}
+                <motion.div
+                    key="underline"
+                    class="underline"
+                    layoutId="underline"
+                    layout={layoutType || undefined}
+                    style={{ x: underlineX }}
+                    exit={exit ? { opacity: 0 } : undefined}
+                    {transition}
+                />
+            {/if}
+        </AnimatePresence>
+    {/if}
 {/snippet}
 
 {#snippet tabItems()}
@@ -307,17 +334,30 @@
     <div class="window">
         {#if outside}
             <motion.div class="outside" style={{ x: outsideX }}>
-                <AnimatePresence>
-                    {#if !selected}
-                        <motion.div
-                            key="underline"
-                            class="underline"
-                            layoutId="underline"
-                            exit={exit ? { opacity: 0 } : undefined}
-                            {transition}
-                        />
-                    {/if}
-                </AnimatePresence>
+                {#if owned}
+                    <AnimatePresence present={!selected}>
+                        {#snippet child()}
+                            <motion.div
+                                class="underline"
+                                layoutId="underline"
+                                exit={exit ? { opacity: 0 } : undefined}
+                                {transition}
+                            />
+                        {/snippet}
+                    </AnimatePresence>
+                {:else}
+                    <AnimatePresence>
+                        {#if !selected}
+                            <motion.div
+                                key="underline"
+                                class="underline"
+                                layoutId="underline"
+                                exit={exit ? { opacity: 0 } : undefined}
+                                {transition}
+                            />
+                        {/if}
+                    </AnimatePresence>
+                {/if}
             </motion.div>
         {/if}
         <nav>
@@ -351,7 +391,7 @@
 <TesterPanel
     eyebrow="Motion 14.7.1 · #1935"
     title="Shared layoutId inside a layoutRoot"
-    status="Passes on this build (Motion 14.7.1). The exit=true crossfades wait for plan 012."
+    status="Passes on this build (Motion 14.7.1), the exit=true crossfades and the owned variants included (plan 012)."
     {steps}
 >
     {#snippet summary()}
@@ -392,6 +432,9 @@
             <a href="?layoutRoot=false&layout=position">layoutRoot=false&amp;layout=position</a> ·
             <a href="?layoutRoot=false&layout=size">layoutRoot=false&amp;layout=size</a> ·
             <a href="?innerX=80">innerX=80</a> ·
+            <a href="?exit=true">exit=true</a> ·
+            <a href="?exit=true&owned=true">exit=true&amp;owned=true</a> ·
+            <a href="?owned=true">owned</a> ·
             <a href="?">default</a>
         </p>
     {/snippet}
