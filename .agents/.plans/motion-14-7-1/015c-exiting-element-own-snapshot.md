@@ -43,6 +43,15 @@
 > once R2 has snapshotted, so R2's cached snapshot wins. The `_MotionContainer.svelte` line numbers below are at `3365c175`, so locate
 > each excerpt by its anchor. If an anchor's content differs, STOP.
 
+> **Revision 2026-11-04 (dispatcher pre-flight, after 012 merged as `6ef9b56a`).** 012 is in: its merge is
+> `6ef9b56a`, and every precondition grep prints. The drift check
+> (`git diff --stat 6ef9b56a..HEAD -- <the four files>`) now also shows `e08cb6a1` on `presence.ts`
+> (`suppressScrollAnchoring` keeps an app's own `overflow-anchor`, about 5 lines near 492-540). That change is
+> outside every region this plan touches, so it is expected drift and not a STOP. Anything else in that diff is
+> still a STOP. 012 A6 (`1a0938d0`) also changed `commitObservedLayoutChange`'s gate in
+> `motionDomProjection.ts` before the merge; re-locate anchors as the header says. An upstream React repro of
+> the batch's pages runs at `/tmp/fm1471-repro-012` (port 4227, framer-motion 14.7.1) if you need a reference.
+
 ## Status
 
 - **Priority**: P1
@@ -54,7 +63,7 @@
   hand-offs), and 008's A2 fix.
 - **Wave**: after 015b and 012, same lane (`siblings`).
 - **Category**: bug (upstream parity)
-- **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28.
+- **Planned at**: `3365c175`, with 015a and 015b on top, 2026-10-28. Re-stamped against feat `e08cb6a1` (012 merged), 2026-11-04.
 
 ## Why this matters
 
