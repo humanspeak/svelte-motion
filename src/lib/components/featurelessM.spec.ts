@@ -18,9 +18,9 @@ import FeaturelessSvgProbe from './__tests__/FeaturelessSvgProbe.svelte'
 // When the renderer arrives late, the node is created with
 // `manuallyAnimateOnMount = true` and animates in from `initial`.
 
-vi.mock('motion', () => {
+vi.mock('motion', async (importOriginal) => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
-    return { animate: animateMock }
+    return { ...(await importOriginal<typeof import('motion')>()), animate: animateMock }
 })
 
 beforeEach(() => {

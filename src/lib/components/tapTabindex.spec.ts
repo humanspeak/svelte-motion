@@ -11,9 +11,9 @@ import TapTabindexProbe from './__tests__/TapTabindexProbe.svelte'
 // under `domMin`, so motion-dom's `press()` (which also sets `tabIndex` on
 // mount) is never attached and only the prop-derived attribute can show.
 
-vi.mock('motion', () => {
+vi.mock('motion', async (importOriginal) => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
-    return { animate: animateMock }
+    return { ...(await importOriginal<typeof import('motion')>()), animate: animateMock }
 })
 
 beforeEach(() => {
