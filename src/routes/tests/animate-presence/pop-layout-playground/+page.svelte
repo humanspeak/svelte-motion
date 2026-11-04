@@ -68,7 +68,7 @@
             group: 'Harder scenarios',
             anchor: 'bottom',
             toast: true,
-            note: 'Owned path: plan 015 (the projection snapshot is taken after the new toast goes in), so it drifts there; the clone path holds.'
+            note: 'The oldest toast exits as a new one goes in, in one update. Its layout animation starts from where it was, so it shrinks in place on both paths.'
         },
         {
             id: 'scroll-mirror',
@@ -313,13 +313,13 @@
         {
             text: 'Pick "Toast queue" and press "Remove oldest, add one" a few times.',
             expected:
-                'The oldest toast shrinks in place each time. On the clone path the chip reads HOLDS; on the owned path it drifts (plan 015).',
+                'The oldest toast shrinks in place each time, and its chip reads HOLDS on both paths.',
             action: { label: 'Toast queue', run: () => select('toast') }
         },
         {
             text: 'Switch the path toggle between clone and owned and repeat any step.',
             expected:
-                'Both paths behave the same, apart from the plan 015 cases noted on the preset.'
+                'Both paths behave the same, apart from the scrollable-element cases noted on the preset.'
         }
     ]
 
@@ -503,7 +503,7 @@
 <TesterPanel
     eyebrow="AnimatePresence/PopChild.tsx (Motion 14.7.0, #2348)"
     title="popLayout playground"
-    status="Expected on this build: the reporter's scenarios read HOLDS on both paths. The scrollable-element presets and the owned toast queue are plan 015; the last group is wrong upstream too."
+    status="Expected on this build: the reporter's scenarios and the toast queue read HOLDS on both paths. The scrollable-element presets don't hold yet (see their notes); the last group is wrong upstream too."
     {steps}
 >
     {#snippet checks()}
