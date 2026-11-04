@@ -2967,9 +2967,11 @@ export type PresenceChildContext = {
     /** Reactive flag — `true` while present, `false` once the exit hold begins. */
     readonly isPresent: boolean
     /**
-     * Signal that the consumer's exit work is complete. Triggers actual
-     * unmount and decrements the parent `AnimatePresenceContext` exit count.
-     * Idempotent and versioned (calls from a canceled exit cycle are no-ops).
+     * Release the whole wrapper: triggers the actual unmount and decrements
+     * the parent `AnimatePresenceContext` exit count, even while registered
+     * participants are still exiting. This is what the legacy reactive
+     * `usePresence()` path returns. Idempotent and versioned (calls from a
+     * canceled exit cycle are no-ops).
      */
     safeToRemove: () => void
     /** Register a motion descendant with this wrapper's exit barrier. */
@@ -2982,6 +2984,15 @@ export type PresenceChildContext = {
      * exits with the nested boundary.
      */
     readonly propagated?: boolean
+    /**
+     * Set by a `usePresence()` call made inside a reactive context. The
+     * wrapper then keeps the pre-registration rule: an exit with nothing
+     * registered holds until the whole-wrapper `safeToRemove`.
+     *
+     * @returns `true` on the first call only, for a once-per-wrapper dev
+     *     warning.
+     */
+    markLegacyManual?: () => boolean
 }
 
 const PRESENCE_CHILD_CONTEXT = Symbol('presence-child-context')

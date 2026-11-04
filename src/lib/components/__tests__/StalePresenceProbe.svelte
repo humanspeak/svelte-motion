@@ -10,9 +10,9 @@
 </script>
 
 <script lang="ts">
-    import { usePresence } from '$lib/utils/usePresence'
+    import { usePresence } from '$lib/utils/usePresence.svelte'
 
-    const presence = $derived(usePresence())
+    const presence = usePresence()
 
     $effect(() => {
         const [, safeToRemove] = presence

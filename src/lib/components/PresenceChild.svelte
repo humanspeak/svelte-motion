@@ -19,19 +19,24 @@
     } from '$lib/utils/presence'
 
     /**
-     * Holds its `children` snippet rendered until the consumer signals the
-     * exit is complete via `safeToRemove()`, or all registered motion exits
-     * finish. Manual removal releases the entire wrapper. Lets a child run its own (non-
+     * Holds its `children` snippet rendered through an exit until every
+     * registered participant is done: motion exits, layout measurement,
+     * nested propagating boundaries and `usePresence()` consumers (each
+     * consumer's `safeToRemove()` completes only itself). With nothing
+     * registered it leaves at once, as Motion's `PresenceChild` does
+     * (PresenceChild.tsx:104-113 @ v14.7.1). Lets a child run its own (non-
      * `motion.*`) exit animation — fade via CSS transition, canvas effect,
      * GSAP, etc — while still participating in `AnimatePresence`'s
      * `onExitComplete` accounting and `mode='wait'` enter blocking.
      *
      * Children read `useIsPresent()` or `usePresence()` to observe the
-     * exit-phase flip.
+     * exit-phase flip. A deprecated reactive `$derived(usePresence())` call
+     * keeps the old manual hold: the wrapper then doesn't leave on its own
+     * when empty, and that call's `safeToRemove` releases the whole wrapper.
      *
      * @prop present Bind to the same boolean that conditionally rendered this
      *     wrapper. When it flips to `false`, the wrapper holds children
-     *     mounted with `isPresent = false` until `safeToRemove` fires.
+     *     mounted with `isPresent = false` until every participant is done.
      * @prop children Snippet rendered while present or held.
      */
     type Props = {
@@ -91,6 +96,10 @@
     let popTrackAttempts = 0
     // Set on destroy: a queued microtask or retry frame must not re-track.
     let destroyed = false
+    // Set by a legacy reactive `usePresence()` call (`$derived(usePresence())`):
+    // this wrapper keeps the pre-registration manual hold (plan 017). Sticky
+    // for the wrapper's lifetime.
+    let legacyManual = false
     const trackPopElement = () => {
         if (destroyed || animatePresence?.mode !== 'popLayout' || popTrackScheduled) return
         popTrackScheduled = true
@@ -287,6 +296,11 @@
         register: exitRegistry.register,
         get onExitComplete() {
             return completeDescendant
+        },
+        markLegacyManual() {
+            if (legacyManual) return false
+            legacyManual = true
+            return true
         }
     })
 
@@ -338,6 +352,21 @@
             currentSafeToRemove = mintSafeToRemove()
             completeDescendant = exitRegistry.begin(currentSafeToRemove)
             animatePresence?.notifyExitStart()
+            // Nothing registered → leave now, as upstream's post-commit effect
+            // does (PresenceChild.tsx:104-113 @ v14.7.1). A microtask runs after
+            // Svelte's synchronous flush, so every descendant that registers in
+            // this flush counts, and the start is always notified first.
+            const cycle = currentSafeToRemove
+            queueMicrotask(() => {
+                if (
+                    destroyed ||
+                    legacyManual ||
+                    currentSafeToRemove !== cycle ||
+                    phase !== 'holding'
+                )
+                    return
+                exitRegistry.completeIfEmpty()
+            })
         } else if (!prevPresent && current && currentPhase === 'holding') {
             // Re-entry mid-hold cancels the exit accounting. Replacing the
             // slot invalidates the cycle's `safeToRemove` for any consumer

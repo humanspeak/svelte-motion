@@ -93,8 +93,9 @@
         <li>
             <ScanEye />
             <span>
-                Inside the card, <code>usePresence()</code> returns
-                <code>[isPresent, safeToRemove]</code>. The effect listens for
+                Inside the card, <code>const presence = usePresence()</code> (called once) registers
+                the card with its wrapper and returns <code>[isPresent, safeToRemove]</code>
+                reactively. The effect listens for
                 <code>transitionend</code> on the card node and calls
                 <code>safeToRemove</code> once the CSS transition completes — fully custom exit under
                 the component's own control.

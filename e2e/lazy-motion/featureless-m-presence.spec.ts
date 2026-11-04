@@ -79,6 +79,38 @@ const waitEnterFrames = (page: Page) =>
 
 const show = (frames: unknown[]) => JSON.stringify(frames)
 
+type OwnedFrame = {
+    /** Elements with the bare owned leaver's `data-testid`. */
+    bare: number
+    /** Whether the owned control is painted (in the DOM, visible, opacity above 0). */
+    control: boolean
+}
+
+/** Clicks `toggle-owned`, then records the owned-exit card on each of the next `frames` frames. */
+const ownedFrames = (page: Page, frames: number) =>
+    page.evaluate(
+        (frames) =>
+            new Promise<OwnedFrame[]>((resolve) => {
+                const out: OwnedFrame[] = []
+                const step = () => {
+                    const control = document.querySelector<HTMLElement>(
+                        '[data-testid="owned-control"]'
+                    )
+                    const style = control ? getComputedStyle(control) : null
+                    out.push({
+                        bare: document.querySelectorAll('[data-testid="owned-bare"]').length,
+                        control:
+                            !!style && style.visibility !== 'hidden' && Number(style.opacity) > 0
+                    })
+                    if (out.length >= frames) resolve(out)
+                    else requestAnimationFrame(step)
+                }
+                document.querySelector<HTMLElement>('[data-testid="toggle-owned"]')!.click()
+                requestAnimationFrame(step)
+            }),
+        frames
+    )
+
 test.describe('LazyMotion: featureless m in AnimatePresence', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/tests/lazy-motion/featureless-m-presence?@isPlaywright=true')
@@ -154,5 +186,20 @@ test.describe('LazyMotion: featureless m in AnimatePresence', () => {
         expect(first.old, show(frames)).toBe(0)
         expect(first.present, show(frames)).toBe(true)
         expect(first.display, show(frames)).not.toBe('none')
+    })
+
+    // Plan 017. The owned form (`present` + `child`): nothing registers for
+    // the bare `m`, so its PresenceChild completes at once
+    // (`PresenceChild.tsx:104-113`).
+    test('an owned featureless m leaves at once', async ({ page }) => {
+        const frames = await ownedFrames(page, 30)
+        expect(
+            frames.every((frame) => frame.bare === 0),
+            show(frames)
+        ).toBe(true)
+        expect(frames.filter((frame) => frame.control).length, show(frames)).toBeGreaterThanOrEqual(
+            3
+        )
+        await expect(page.getByTestId('owned-bare-completions')).toHaveText('1')
     })
 })

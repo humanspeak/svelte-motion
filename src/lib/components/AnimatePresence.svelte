@@ -126,17 +126,10 @@
         // parent's participant. Its own registry tracks them, so it can
         // release the parent once they have all exited.
         const innerRegistry = createPresenceExitRegistry()
-        let liveParticipants = 0
         let completeInner: ReturnType<typeof innerRegistry.begin> = () => {}
         // motion-dom types the node as `any`; the registry takes a VisualElement.
-        const register: PresenceChildContext['register'] = (id, node?: VisualElement) => {
-            liveParticipants += 1
-            const unregister = innerRegistry.register(id, node)
-            return () => {
-                liveParticipants -= 1
-                unregister()
-            }
-        }
+        const register: PresenceChildContext['register'] = (id, node?: VisualElement) =>
+            innerRegistry.register(id, node)
         setPresenceChildContext({
             get isPresent() {
                 return parentPresence.isPresent
@@ -152,10 +145,10 @@
         $effect.pre(() => {
             const parentPresent = parentPresence.isPresent
             if (wasParentPresent && !parentPresent) {
-                // Nothing to exit: release at once (the registry keeps empty
-                // holds open by design, so it can't be relied on here).
-                if (liveParticipants === 0) releaseParent()
-                else completeInner = innerRegistry.begin(releaseParent)
+                // Nothing to exit: release at once, as upstream's post-commit
+                // effect does (PresenceChild.tsx:104-113 @ v14.7.1).
+                completeInner = innerRegistry.begin(releaseParent)
+                innerRegistry.completeIfEmpty()
             } else if (!wasParentPresent && parentPresent) {
                 innerRegistry.cancel()
                 completeInner = () => {}
