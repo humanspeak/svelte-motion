@@ -156,8 +156,8 @@
             action: { label: 'Remove second', run: removeSecond }
         },
         {
-            text: 'Switch to the centred list (translate(-50%, -50%)).',
-            expected: 'Four items centred in the window.',
+            text: 'Switch to the centred list (translate(-50%, -50%)). This also adds items until there are four again, so the next removal runs on the same list.',
+            expected: 'Four items centred in the window, one of them new.',
             action: { label: 'Centred', run: () => setScenario('center') }
         },
         {
