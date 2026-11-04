@@ -534,7 +534,9 @@ Divergences from upstream that this plan records rather than closes:
   document) that upstream would snap. Svelte has no component boundaries in the DOM. D also assumes normal flow.
 - **Unattributed ResizeObserver deliveries (m9).** A delivery caused by a completion, on a node that got no
   MutationObserver record (so no cause), animates where upstream snaps.
-- **Clone exits without `exit`** are removed immediately, so they read as plain removals.
+- **Clone exits without `exit`** that have no `layout` or `layoutId` are removed immediately, so they read as
+  plain removals. Since plan 012, `layout`/`layoutId` children are held instead: the clone appears (an
+  ordinary trigger), and its release is classified exit-complete, as upstream (012, "015b's maintenance line").
 - **Per-clone removal.** Upstream removes in a batch (`index.tsx:171-176`).
 - **`presenceAffectsLayout={false}`** isn't supported.
 - **Plain non-motion lists** never trigger D.

@@ -41,10 +41,10 @@
      * scroller that isn't `layoutScroll` scrolls, when the page scrolls under a
      * fixed list, and when the window resizes (upstream re-measures after its
      * resize block, 511-532). Then removing an item made its siblings jump by
-     * the scroll (or resize) distance. And an exit clone has no projection
-     * node, so it never followed the layout move its element would have
-     * animated: when a clamp moves the content, siblings slide but the clone
-     * jumped.
+     * the scroll (or resize) distance. And the exit clone jumped when a clamp
+     * moved the content, while its siblings slid. Since plan 012 the clone
+     * keeps its element's projection node, so it follows the layout move as
+     * upstream's exiting element does.
      *
      * Default layout: a 320px `#scroller` (`overflow: auto`) holding a 600px
      * spacer and a list of five `layout` items. Scroll it to the bottom and
