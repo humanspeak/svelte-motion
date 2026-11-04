@@ -114,6 +114,25 @@ function listen(ids: string[]) {
     return updates
 }
 
+/** The ids of the elements whose own snapshot was seeded from cache (plan 015c). */
+function spyOnCachedSnapshots() {
+    const ids: string[] = []
+    const original = Object.getOwnPropertyDescriptor(
+        MotionDomProjectionAdapter.prototype,
+        'seedOwnSnapshotFromCache'
+    )!.value as (
+        this: MotionDomProjectionAdapter
+    ) => ReturnType<MotionDomProjectionAdapter['seedOwnSnapshotFromCache']>
+    vi.spyOn(MotionDomProjectionAdapter.prototype, 'seedOwnSnapshotFromCache').mockImplementation(
+        function (this: MotionDomProjectionAdapter) {
+            const element = (this as unknown as { element: HTMLElement | null }).element
+            if (element?.id) ids.push(element.id)
+            return original.call(this)
+        }
+    )
+    return ids
+}
+
 type Props = Record<string, unknown>
 
 async function mount(props: Props) {
@@ -206,10 +225,26 @@ describe('layout siblings around AnimatePresence changes (plan 015b)', () => {
     it('4: owned popLayout, item 1 exits as item 0 is prepended: item 1 snapshots its pre-insert box', async () => {
         const { update } = await mount({ mode: 'popLayout', slow: true })
         const updates = listen(['item-1'])
+        const fromCache = spyOnCachedSnapshots()
 
         await update({ remove: [1], addFirst: true })
         await settle()
 
+        expect(updates['item-1'].length).toBeGreaterThan(0)
+        expect(updates['item-1'][0].snapshot).toBe(TOP)
+        expect(fromCache).toEqual(['item-1'])
+    })
+
+    // 4 (GUARD): with no structural change pending, the exit reads live.
+    it('4: owned popLayout, item 1 exits alone: its snapshot is read live, not from cache', async () => {
+        const { update } = await mount({ mode: 'popLayout', slow: true })
+        const updates = listen(['item-1'])
+        const fromCache = spyOnCachedSnapshots()
+
+        await update({ remove: [1] })
+        await settle()
+
+        expect(fromCache).toEqual([])
         expect(updates['item-1'].length).toBeGreaterThan(0)
         expect(updates['item-1'][0].snapshot).toBe(TOP)
     })

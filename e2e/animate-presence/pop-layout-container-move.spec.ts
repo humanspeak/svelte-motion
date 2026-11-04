@@ -119,14 +119,6 @@ for (const path of PATHS) {
         test('popLayout exiting item stays put when an item is added in the same render', async ({
             page
         }) => {
-            // Plan 015: the motion element's projection snapshot is taken after
-            // `{#each}` inserts the new item, so the owned item's layout
-            // animation starts ~70px off. The #2348 correction itself is right
-            // here (its pop rule stays at 0px). Removed in plan 015c Step 2.
-            test.fixme(
-                path === 'owned',
-                'Plan 015: the projection snapshot is taken after {#each} inserts the new item'
-            )
             await setup(page, path, '&fixed&anchor=bottom')
 
             const before = await readCentre(page, 0)

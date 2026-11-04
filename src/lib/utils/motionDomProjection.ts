@@ -19,7 +19,11 @@ import {
     type Transition,
     type VisualElement
 } from 'motion-dom'
-import type { LayoutChangeCause } from './layout'
+import {
+    clearAncestorChanged,
+    hasAncestorChangedSinceCache,
+    type LayoutChangeCause
+} from './layout'
 import {
     isResizeBlocked,
     onResizeSettled,
@@ -1497,6 +1501,8 @@ export class MotionDomProjectionAdapter {
     private copyLayoutToCache(): void {
         this.lastLayout = cloneMeasurements(this.projection.layout)
         this.lastLayoutBasis = this.layoutBasis
+        // The cache is current again for its ancestors' styles (plan 015c).
+        if (this.element) clearAncestorChanged(this.element)
     }
 
     /**
@@ -2500,6 +2506,63 @@ export class MotionDomProjectionAdapter {
         projection.snapshot = undefined
         projection.isLayoutDirty = false
         this.presenceSeeded = false
+    }
+
+    /**
+     * Whether this node's own snapshot can come from cache (plan 015c): it has
+     * a cached layout (or an on-screen target), no resize has happened or is
+     * settling since (`resizeEpoch` current, `!isResizeBlocked()`), the basis
+     * is reliable (no sticky node on its path), and no layout-affecting
+     * ancestor style or class change reached it since the cache was written.
+     * Reads no layout.
+     *
+     * @returns Whether {@link seedOwnSnapshotFromCache} may be used.
+     *
+     * @example
+     * ```ts
+     * if (adapter.ownCacheIsCurrent()) adapter.seedOwnSnapshotFromCache()
+     * ```
+     */
+    ownCacheIsCurrent(): boolean {
+        const element = this.element
+        const projection = this.projection
+        if (!element || !(this.layout || this.layoutId)) return false
+        if (isResizeBlocked() || projection.root?.isUpdateBlocked()) return false
+        if (hasAncestorChangedSinceCache(element)) return false
+        const onScreen = !!(projection.currentAnimation && projection.target)
+        if (!onScreen && !this.lastLayout) return false
+        // `scrollShift` is `null` for a sticky path or a resize since the read.
+        const basis = onScreen ? this.layoutBasis : this.lastLayoutBasis
+        return !basis || scrollShift(basis, this.isFoldedIn) !== null
+    }
+
+    /**
+     * Seed this node's own snapshot from its rebased cache instead of a live
+     * read, and snapshot its group's other members from theirs (plan 015c).
+     * Upstream snapshots in `getSnapshotBeforeUpdate`, before React commits
+     * anything (`MeasureLayout.tsx:149-204` @ v14.7.1); an owned element's
+     * pre-update effect runs after earlier blocks in the same flush already
+     * patched the DOM, so a live read would see their changes. Check
+     * {@link ownCacheIsCurrent} first.
+     *
+     * @returns The seeded snapshot's page-space rect, or `null` when nothing
+     *     was seeded (already layout-dirty, a box-size animation host).
+     *
+     * @example
+     * ```ts
+     * const rect = adapter.seedOwnSnapshotFromCache() ?? adapter.measurePageRect('snapshot')
+     * ```
+     */
+    seedOwnSnapshotFromCache(): RectLike | null {
+        const projection = this.projection
+        // `willUpdate()` would set it (MeasureLayout.tsx:90).
+        hasTakenAnySnapshot = true
+        const root = projection.root
+        if (root && !root.isUpdating) root.startUpdate()
+        const seeded = this.seedOwnOnScreenSnapshot()
+        this.seedCachedSnapshotsForGroup()
+        const snapshot = seeded ? projection.snapshot : undefined
+        return snapshot ? rectFromBox(snapshot.layoutBox) : null
     }
 
     /** Seed this node from {@link onScreenSnapshot} unless already dirty. */
