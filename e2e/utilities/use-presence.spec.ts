@@ -290,4 +290,19 @@ test.describe('usePresence', () => {
         ).toBe(true)
         await expect(page.getByTestId('mixed-completions')).toHaveText('1')
     })
+
+    // Plan 017. Every call site on the page uses `const presence = usePresence()`.
+    test('the page logs no legacy usePresence warning', async ({ page }) => {
+        const messages: string[] = []
+        page.on('console', (message) => messages.push(message.text()))
+        await page.goto('/tests/use-presence?@isPlaywright=true')
+        await expect(page.getByTestId('card')).toBeVisible()
+        await page.getByTestId('toggle-basic').click()
+        await page.getByTestId('toggle-mixed').click()
+        await page.waitForTimeout(1500)
+        expect(
+            messages.filter((text) => text.includes('inside a reactive context')),
+            JSON.stringify(messages)
+        ).toEqual([])
+    })
 })

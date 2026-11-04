@@ -4,7 +4,7 @@
     type Props = { label: string }
     const { label }: Props = $props()
 
-    const presence = $derived(usePresence())
+    const presence = usePresence()
     const isPresent = $derived(presence[0])
     let node: HTMLElement | undefined = $state()
 
