@@ -1,6 +1,6 @@
 import type { Box } from '$lib/utils/projection'
 import { describe, expect, it } from 'vitest'
-import { checkReorder, moveItem } from './checkReorder'
+import { checkReorder, keyTarget, moveItem } from './checkReorder'
 import type { ItemData } from './context'
 
 const box = (xMin: number, xMax: number, yMin: number, yMax: number): Box => ({
@@ -119,5 +119,61 @@ describe('checkReorder', () => {
     it('returns the same array for an unchanged xy position', () => {
         const order = gridOrder()
         expect(checkReorder(order, 'a', { x: 0, y: 0 }, { x: 0, y: 0 }, 'xy')).toBe(order)
+    })
+})
+
+/**
+ * Port of Motion 14.9.1 `Reorder/utils/__tests__/check-reorder.test.ts`
+ * (`keyTarget`). `key` is the arrow's index in Up, Left, Down, Right.
+ */
+describe('keyTarget', () => {
+    it('moves by the row drawn above or below, not the next in order', () => {
+        /*
+         * flex-wrap: wrap-reverse draws the first row at the bottom:
+         * c
+         * a b
+         */
+        const at = (x: number, y: number) => box(x, x + 100, y, y + 100)
+        const reversed = [item('a', at(0, 100)), item('b', at(100, 100)), item('c', at(0, 0))]
+        const move = (value: string, key: number) => {
+            const index = reversed.findIndex((entry) => entry.value === value)
+            const target = keyTarget(reversed, index, key, 'xy', false)
+            return (target < 0 ? reversed : moveItem(reversed, index, target))
+                .map((entry) => entry.value)
+                .join('')
+        }
+
+        // Up from a goes to c's row, Down from c to a's
+        expect(move('a', 0)).toBe('bca')
+        expect(move('c', 2)).toBe('cab')
+        // Nothing below a or above c
+        expect(move('a', 2)).toBe('abc')
+        expect(move('c', 0)).toBe('abc')
+    })
+
+    // Svelte port additions: the single-axis and RTL steps.
+
+    it('steps one place along the order, or -1 past either end', () => {
+        const order = verticalOrder()
+        expect(keyTarget(order, 0, 2, 'y', false)).toBe(1)
+        expect(keyTarget(order, 1, 0, 'y', false)).toBe(0)
+        expect(keyTarget(order, 0, 0, 'y', false)).toBe(-1)
+        expect(keyTarget(order, 2, 2, 'y', false)).toBe(-1)
+        expect(keyTarget(order, -1, 2, 'y', false)).toBe(-1)
+    })
+
+    it('swaps Left and Right, but not Up and Down, in RTL', () => {
+        const order = horizontalOrder()
+        expect(keyTarget(order, 1, 3, 'x', false)).toBe(2)
+        expect(keyTarget(order, 1, 3, 'x', true)).toBe(0)
+        expect(keyTarget(order, 1, 1, 'x', true)).toBe(2)
+        expect(keyTarget(verticalOrder(), 1, 2, 'y', true)).toBe(2)
+    })
+
+    it('goes to the item nearest across in the next row of a grid', () => {
+        const order = gridOrder()
+        expect(keyTarget(order, 1, 2, 'xy', false)).toBe(3)
+        expect(keyTarget(order, 2, 0, 'xy', false)).toBe(0)
+        expect(keyTarget(order, 0, 3, 'xy', false)).toBe(1)
     })
 })

@@ -5,8 +5,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import KeyboardHarness from './__tests__/KeyboardHarness.svelte'
 
 /**
- * Keyboard reordering (Motion 14.6.0, #2658). Port of upstream
- * `Reorder/__tests__/keyboard.test.tsx`, plus Svelte-specific cases for
+ * Keyboard reordering (Motion 14.6.0, #2658; roving tab stop, arrow focus and
+ * grid rows from Motion 14.9). Port of upstream
+ * `Reorder/__tests__/keyboard.test.tsx` at v14.9.1, plus Svelte-specific cases for
  * in-place `$state` mutation and move-blurs. Focus surviving a real DOM move
  * is covered by `e2e/reorder/keyboard.spec.ts` (jsdom doesn't blur moved
  * nodes).
@@ -61,6 +62,11 @@ const mount = async (props: HarnessProps = {}) => {
 
 const item = (id: string) => screen.getByTestId(id)
 
+const focused = () => document.activeElement?.getAttribute('data-testid')
+
+const tabIndexes = () =>
+    Array.from(screen.getByTestId('group').querySelectorAll('li')).map((li) => li.tabIndex)
+
 const order = () =>
     Array.from(screen.getByTestId('group').querySelectorAll('li')).map((li) =>
         li.getAttribute('data-testid')
@@ -82,10 +88,19 @@ const isGrabbed = (element: Element) =>
     !!visualElementStore.get(element)?.animationState?.getState().whileDrag.isActive
 
 describe('Reorder keyboard', () => {
-    it('makes items focusable', async () => {
+    it('puts one item in the tab order, the first until one is focused', async () => {
         await mount()
-        expect(item('a').tabIndex).toBe(0)
+        expect(tabIndexes()).toEqual([0, -1, -1])
         expect(item('a').getAttribute('tabindex')).toBe('0')
+
+        item('c').focus()
+        flushSync()
+        expect(tabIndexes()).toEqual([-1, -1, 0])
+
+        // Focus inside an item makes it the one in the tab order
+        item('b-input').focus()
+        flushSync()
+        expect(tabIndexes()).toEqual([-1, 0, -1])
     })
 
     it('lets items override tabindex', async () => {
@@ -93,12 +108,77 @@ describe('Reorder keyboard', () => {
         expect(item('a').tabIndex).toBe(-1)
     })
 
-    it('leaves arrows to the browser until an item is grabbed', async () => {
+    it('makes the first rendered item the tab stop', async () => {
+        // "a" isn't rendered (e.g. virtualized), and "new" isn't in values
+        const { rerender } = await mount({
+            values: ['a', 'b', 'c'],
+            rendered: ['b', 'c', 'new'],
+            apply: 'none'
+        })
+        expect(item('b').tabIndex).toBe(0)
+        expect(item('c').tabIndex).toBe(-1)
+        expect(item('new').tabIndex).toBe(0)
+
+        // The focused item stays the tab stop until it's unrendered
+        item('c').focus()
+        flushSync()
+        await rerender({ values: ['a', 'b', 'c', 'new'] })
+        expect(item('b').tabIndex).toBe(-1)
+        expect(item('c').tabIndex).toBe(0)
+        expect(item('new').tabIndex).toBe(-1)
+    })
+
+    it('moves the tab stop on when its item is unrendered below the group', async () => {
+        // `values` stays the same, so only the unrendered item can tell the group
+        const { rerender } = await mount({ rendered: ['a', 'b', 'c'] })
+        expect(item('a').tabIndex).toBe(0)
+        // Svelte port addition: one tab stop, before and after
+        expect(tabIndexes()).toEqual([0, -1, -1])
+
+        await rerender({ rendered: ['b', 'c'] })
+        expect(item('b').tabIndex).toBe(0)
+        expect(tabIndexes()).toEqual([0, -1])
+    })
+
+    it('keeps the tab stop when an item outside values is focused', async () => {
+        await mount({ values: ['a', 'b'], rendered: ['a', 'b', 'new'], apply: 'none' })
+        item('b').focus()
+        flushSync()
+        item('new').focus()
+        flushSync()
+        expect(item('a').tabIndex).toBe(-1)
+        expect(item('b').tabIndex).toBe(0)
+    })
+
+    it("moves focus past values that aren't rendered", async () => {
+        const { rerender } = await mount({ rendered: ['a', 'b', 'c'], apply: 'none' })
+        // b has been measured, then unrendered
+        await rerender({ rendered: ['a', 'c'] })
+        item('a').focus()
+        press(item('a'), 'ArrowDown')
+        expect(focused()).toBe('c')
+    })
+
+    it('moves focus with arrows until an item is grabbed', async () => {
         const onReorder = vi.fn()
         await mount({ onReorder })
+        item('a').focus()
+        flushSync()
 
-        expect(press(item('a'), 'ArrowDown')).toBe(true)
-        expect(press(item('b'), 'ArrowUp')).toBe(true)
+        expect(press(item('a'), 'ArrowDown')).toBe(false)
+        expect(focused()).toBe('b')
+        expect(item('b').tabIndex).toBe(0)
+        expect(item('a').tabIndex).toBe(-1)
+
+        press(item('b'), 'ArrowDown')
+        expect(focused()).toBe('c')
+        // Nothing past the end, and arrows across the axis are the browser's
+        expect(press(item('c'), 'ArrowDown')).toBe(false)
+        expect(focused()).toBe('c')
+        expect(press(item('c'), 'ArrowLeft')).toBe(true)
+
+        press(item('c'), 'ArrowUp')
+        expect(focused()).toBe('b')
         expect(onReorder).not.toHaveBeenCalled()
     })
 
@@ -127,8 +207,10 @@ describe('Reorder keyboard', () => {
         expect(isGrabbed(a)).toBe(false)
         expect(order()).toEqual(['b', 'a', 'c'])
 
-        // Dropped: arrows are the browser's again
-        expect(press(a, 'ArrowDown')).toBe(true)
+        // Dropped: arrows move focus again
+        a.focus()
+        press(a, 'ArrowDown')
+        expect(focused()).toBe('c')
         expect(order()).toEqual(['b', 'a', 'c'])
         expect(onReorder).toHaveBeenCalledTimes(3)
     })
@@ -177,7 +259,8 @@ describe('Reorder keyboard', () => {
         expect(order()).toEqual(['a', 'b', 'c'])
         expect(isGrabbed(a)).toBe(false)
 
-        expect(press(a, 'ArrowDown')).toBe(true)
+        // Dropped, so the arrow moves focus, not the item
+        press(a, 'ArrowDown')
         expect(order()).toEqual(['a', 'b', 'c'])
     })
 
@@ -229,7 +312,7 @@ describe('Reorder keyboard', () => {
         expect(order()).toEqual(['b', 'a', 'c'])
 
         a.focus()
-        expect(press(a, 'ArrowDown')).toBe(true)
+        press(a, 'ArrowDown')
         expect(order()).toEqual(['b', 'a', 'c'])
         expect(onReorder).toHaveBeenCalledTimes(1)
     })
@@ -316,6 +399,62 @@ describe('Reorder keyboard', () => {
         expect(order()).toEqual(['b', 'a', 'c'])
         press(a, 'ArrowLeft')
         expect(order()).toEqual(['a', 'b', 'c'])
+    })
+
+    it('moves up and down by row in a grid', async () => {
+        // Lay the items out three to a row, 100px squares, by their place
+        // in the DOM, as a CSS grid would.
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+            this: HTMLElement
+        ) {
+            if (this.tagName !== 'LI') return new DOMRect()
+            const index = Array.from(this.parentElement?.children ?? []).indexOf(this)
+            return new DOMRect((index % 3) * 100, Math.floor(index / 3) * 100, 100, 100)
+        })
+        await mount({ axis: 'xy', values: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] })
+        const e = item('e')
+        press(e, ' ')
+
+        /*
+         * a b c
+         * d e f
+         * g h
+         */
+        const steps: [string, string][] = [
+            // Up takes b's slot above, not d's beside
+            ['ArrowUp', 'aebcdfgh'],
+            // Nothing above the first row
+            ['ArrowUp', 'aebcdfgh'],
+            ['ArrowDown', 'abcdefgh'],
+            // Into the short last row, by the column it's nearest
+            ['ArrowDown', 'abcdfghe'],
+            // Nothing below the last row
+            ['ArrowDown', 'abcdfghe'],
+            // Left and Right still move one place
+            ['ArrowLeft', 'abcdfgeh'],
+            ['ArrowUp', 'abcedfgh']
+        ]
+
+        for (const [key, expected] of steps) {
+            // Items are measured after each move, before the next key
+            await vi.advanceTimersByTimeAsync(50)
+            press(e, key)
+            expect(order().join('')).toBe(expected)
+        }
+
+        // Dropped, the arrows move focus the same way
+        press(e, ' ')
+        await vi.advanceTimersByTimeAsync(50)
+        e.focus()
+        // a b c
+        // e d f
+        // g h
+        press(e, 'ArrowUp')
+        expect(focused()).toBe('a')
+        press(item('a'), 'ArrowDown')
+        expect(focused()).toBe('e')
+        press(e, 'ArrowDown')
+        expect(focused()).toBe('g')
     })
 
     it('ignores keys from inside the item', async () => {

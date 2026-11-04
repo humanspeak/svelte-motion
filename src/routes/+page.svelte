@@ -746,6 +746,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/keyboard-grid') + searchParams}
+                    >
+                        Reorder keyboard in a grid (one tab stop, rows as drawn, Motion 14.9)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/reorder/ref-constraints-scroll') + searchParams}
                     >
                         Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
