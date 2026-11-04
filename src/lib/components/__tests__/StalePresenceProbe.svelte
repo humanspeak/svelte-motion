@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-    import { usePresence } from '$lib/utils/usePresence'
+    import { usePresence } from '$lib/utils/usePresence.svelte'
 
     const presence = usePresence()
 

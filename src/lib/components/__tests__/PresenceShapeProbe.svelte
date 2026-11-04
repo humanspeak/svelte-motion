@@ -1,5 +1,5 @@
 <script lang="ts" module>
-    import { usePresence, type UsePresenceState } from '$lib/utils/usePresence'
+    import { usePresence, type UsePresenceState } from '$lib/utils/usePresence.svelte'
 
     // Module-scoped sinks (plan 017): the value `usePresence()` returned at
     // init, and one record per run of the destructuring `$effect`.

@@ -1,6 +1,6 @@
 <script lang="ts">
     // The deprecated reactive-call pattern; plan 017 keeps its behaviour.
-    import { useIsPresent, usePresence } from '$lib/utils/usePresence'
+    import { useIsPresent, usePresence } from '$lib/utils/usePresence.svelte'
 
     const isPresent = $derived(useIsPresent())
     const presence = $derived(usePresence())

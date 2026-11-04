@@ -91,6 +91,10 @@
     let popTrackAttempts = 0
     // Set on destroy: a queued microtask or retry frame must not re-track.
     let destroyed = false
+    // Set by a legacy reactive `usePresence()` call (`$derived(usePresence())`):
+    // this wrapper keeps the pre-registration manual hold (plan 017). Sticky
+    // for the wrapper's lifetime.
+    let legacyManual = false
     const trackPopElement = () => {
         if (destroyed || animatePresence?.mode !== 'popLayout' || popTrackScheduled) return
         popTrackScheduled = true
@@ -287,6 +291,11 @@
         register: exitRegistry.register,
         get onExitComplete() {
             return completeDescendant
+        },
+        markLegacyManual() {
+            if (legacyManual) return false
+            legacyManual = true
+            return true
         }
     })
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { useIsPresent } from '$lib/utils/usePresence'
+    import { useIsPresent } from '$lib/utils/usePresence.svelte'
 
     const isPresent = $derived(useIsPresent())
 </script>
