@@ -19,7 +19,7 @@ description: Load only the motion feature bundle your page needs
 
 # LazyMotion
 
-`LazyMotion` pairs with the `m` namespace to choose which runtime features are active for a subtree, like Motion's `LazyMotion`. `m` components get the features of the nearest `LazyMotion` bundle. `motion` components always have every feature and ignore `LazyMotion`.
+`LazyMotion` pairs with the `m` namespace to choose which runtime features are active for a subtree, like Motion's `LazyMotion`. `m` components get the features of the nearest `LazyMotion` bundle. `motion` components always have every feature and ignore `LazyMotion`. An `m` outside `LazyMotion` renders its `style` and `initial` and does nothing else.
 
 In svelte-motion, `LazyMotion` selects behaviour but does not yet reduce bundle size: every feature's code is bundled either way.
 
@@ -49,7 +49,7 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 
 ## Async loading
 
-`features` can also be a function returning a promise. The subtree renders with `domMin` first, then upgrades when the bundle resolves.
+`features` can also be a function returning a promise. Until the bundle resolves, the subtree's `m` components render their `initial` state and do nothing else. When it resolves they animate in. If the loader rejects, `m` components stay as they were rendered.
 
 ```svelte
 <script>
@@ -61,6 +61,15 @@ Use `domAnimation` for most interface motion. Use `domMin` for pages that only n
 <LazyMotion features={loadFeatures}>
     <m.button whileHover={{ scale: 1.08 }}>Hover me</m.button>
 </LazyMotion>
+```
+
+## Without LazyMotion
+
+An `m` with no `LazyMotion` above it has no animation runtime, as in Motion. It renders its `style`, `initial`, `tabindex` and drag styles, and runs no animation, gesture, drag, layout or exit animation. Inside `AnimatePresence` it is removed at once.
+
+```svelte
+<!-- Renders at opacity 0.5 and stays there. -->
+<m.div initial={{ opacity: 0.5 }} animate={{ opacity: 1 }} />
 ```
 
 ## Strict mode
@@ -77,7 +86,7 @@ The main `Reorder` renders `motion` components too, but you render `Reorder`, no
 
 ## Reorder with LazyMotion
 
-`Reorder` from the `@humanspeak/svelte-motion/m` entry renders `m` components, so it gets its features from `LazyMotion`. Reordering needs drag and layout, so give it `domMax`.
+`Reorder` from the `@humanspeak/svelte-motion/m` entry renders `m` components, so it gets its features from `LazyMotion`. Reordering needs drag and layout, so give it `domMax`. Without a `LazyMotion` that provides `domMax`, this `Reorder` does nothing.
 
 ```svelte
 <script>

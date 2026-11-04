@@ -10,8 +10,13 @@ import { MOTION_KIND_PROP, withMotionKind } from '$lib/utils/motionKind'
  * The namespace mirrors the `motion` object API (`m.div`, `m.button`,
  * `m.svg`, etc.), but its components get their features only from the
  * nearest `<LazyMotion>` (upstream `render/components/m/create.ts`), while
- * `motion` components always have every feature and ignore it. Outside any
- * `<LazyMotion>` an `m` component currently keeps every feature.
+ * `motion` components always have every feature and ignore it.
+ *
+ * Outside any `<LazyMotion>`, or while an async `features` bundle is still
+ * loading (or after it failed), an `m` component has no features, as in
+ * Motion: it renders its `style`, `initial`, `tabindex` and the drag styles,
+ * and runs no animation, gesture, drag, layout or exit. Once a bundle loads it
+ * animates in from `initial`.
  *
  * @example
  * ```svelte

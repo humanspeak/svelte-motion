@@ -262,7 +262,7 @@ default. This plan removes both writes, matching upstream.
 
 **In scope** (the only files you should modify):
 
-- `src/lib/utils/layout.ts` — delete `setCompositorHints` (lines 477-487) and its name in the header list
+- `src/lib/utils/layout.ts` — (A1) also `ancestorMutationsAffectLayout`'s style comparison. Delete `setCompositorHints` (lines 477-487) and its name in the header list
   (line 28).
 - `src/lib/utils/layout.spec.ts` — the `setCompositorHints: toggles styles` case (lines 300-306) and its import
   (line 9).
@@ -616,3 +616,16 @@ only in-scope files.
   `transformOrigin` / `willChange` lines when that path is reworked.
 - Reviewers: check that the cleanup still clears `transform` on observer restart (keyed moves restart the
   effect), and that `e2e/utilities/will-change.spec.ts` still passes unchanged.
+
+## Amendments
+
+### A1 (2026-10-28, operator-approved)
+
+- Removing the inline hints exposed a pre-existing bug in `ancestorMutationsAffectLayout` (`layout.ts`, ~661): it
+  compares the raw style `oldValue` text with the current text, so a serialisation-only difference (`#ddd` vs
+  `rgb(221, 221, 221)`) counts as a layout change. This broke 3 tests in `relative-child-measurements.spec.ts`.
+- In scope now: normalise both strings through one scratch element's `style.cssText` before comparing (no layout
+  reads), with a red unit test in `layout.spec.ts` first (same declarations, different serialisation → not a
+  layout change; a real geometric property change → still a layout change).
+- Done: the 3 `relative-child-measurements.spec.ts` tests pass with no assertion weakened, and the full gate passes.
+

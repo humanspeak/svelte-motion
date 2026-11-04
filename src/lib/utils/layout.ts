@@ -25,9 +25,8 @@
  * INTO the projection adapter — tracked as a follow-up, out of scope here.
  *
  * Pure helpers with live callers: `measureRect`, `computeFlipTransforms`,
- * `finishFlipAnimations`, `setCompositorHints`, `observeLayoutChanges`,
- * `selectLayoutDependencies`, `stripNonChildLayoutStyle`, and the two
- * size-correction events.
+ * `finishFlipAnimations`, `observeLayoutChanges`, `selectLayoutDependencies`,
+ * `stripNonChildLayoutStyle`, and the two size-correction events.
  */
 
 import {
@@ -243,6 +242,9 @@ const runBoxSizeAnimation = (
     }
 
     const writeBox = (progress: number) => {
+        // An offscreen completion cleans up at once, before the animation's
+        // own final update lands (plan 015b A2.2): never write after it.
+        if (cleanupRan) return
         el.style.width = roundedPx(mix(prevWidth, nextRect.width, progress))
         el.style.height = roundedPx(mix(prevHeight, nextRect.height, progress))
 
@@ -475,18 +477,6 @@ export const runLayoutSizeAnimation = (
 }
 
 /**
- * Toggle compositor hints for smoother transform animations.
- *
- * @param el Target element.
- * @param enabled Whether to enable compositor hints.
- */
-export const setCompositorHints = (el: HTMLElement, enabled: boolean): void => {
-    el.style.willChange = enabled ? 'transform' : ''
-    el.style.transformOrigin = enabled ? '0 0' : ''
-    if (!enabled) el.style.transform = ''
-}
-
-/**
  * Select the reactive dependencies that gate `layout` (FLIP) measurement.
  *
  * When `layoutDependency` is provided — any value, including falsy ones like
@@ -659,30 +649,308 @@ const SELF_ATTRIBUTE_INIT: MutationObserverInit = {
     attributeFilter: ['class', 'data-presence-layout-hold']
 }
 const CHILD_LIST_INIT: MutationObserverInit = { childList: true, subtree: true }
+/**
+ * A popLayout pop (plan 015b): `PresenceChild` marks the popped element with
+ * `data-motion-pop-id`, which takes it out of the flow its siblings share.
+ * `attributeFilter` implies `attributes: true` (DOM `observe()` step 3).
+ */
+const POP_ATTRIBUTE_INIT: MutationObserverInit = {
+    attributeFilter: ['data-motion-pop-id'],
+    subtree: true
+}
 const ANCESTOR_ATTRIBUTE_INIT: MutationObserverInit = {
     attributes: true,
     attributeFilter: ['style', 'class'],
     attributeOldValue: true
 }
 
+let styleScratch: HTMLElement | null = null
+
+/**
+ * Re-serialize inline style text through the CSSOM, so authored text
+ * (`background: #ddd`) and the browser's own serialization of the same
+ * declarations (`background: rgb(221, 221, 221)`) compare equal.
+ *
+ * Uses one detached scratch element: parsing `cssText` never reads layout.
+ *
+ * @param style Inline style text (may be empty).
+ * @returns The CSSOM serialization of the same declarations.
+ */
+const normalizeStyleText = (style: string): string => {
+    if (!style) return ''
+    styleScratch ??= document.createElement('div')
+    styleScratch.style.cssText = style
+    return styleScratch.style.cssText
+}
+
 /**
  * Whether an ancestor attribute mutation batch can re-slot children. Style
  * mutations that only touch animation channels (transforms / opacity /
  * will-change — written every frame by gesture and FLIP animations) never
- * re-slot children, so they are filtered out to avoid commit storms.
+ * re-slot children, so they are filtered out to avoid commit storms. Both
+ * sides are normalized first: the first CSSOM write re-serializes authored
+ * style text, which is not a layout change.
  */
 const ancestorMutationsAffectLayout = (mutations: MutationRecord[]): boolean => {
     for (const mutation of mutations) {
         if (mutation.attributeName === 'style') {
-            const before = stripNonChildLayoutStyle(mutation.oldValue ?? '')
+            const before = stripNonChildLayoutStyle(normalizeStyleText(mutation.oldValue ?? ''))
             const after = stripNonChildLayoutStyle(
-                (mutation.target as HTMLElement).getAttribute('style') ?? ''
+                normalizeStyleText((mutation.target as HTMLElement).getAttribute('style') ?? '')
             )
             if (before === after) continue
         }
         return true
     }
     return false
+}
+
+/** The class `AnimatePresence` renders its `display: contents` container with. */
+const presenceContainerClass = 'animate-presence-container'
+
+/**
+ * Whether `element` generates no box of its own, so its children are laid
+ * out by its parent: an `AnimatePresence` container (checked by class, as its
+ * `display: contents` is component CSS a test environment may not load), or
+ * any computed `display: contents` element.
+ */
+const isBoxless = (element: Element): boolean =>
+    element.classList.contains(presenceContainerClass) ||
+    (typeof getComputedStyle === 'function' && getComputedStyle(element).display === 'contents')
+
+/**
+ * The element whose children are laid out together with `element` (plan
+ * 015b): the nearest of `ancestors` that generates a box, skipping
+ * `AnimatePresence` containers and other `display: contents` wrappers, else
+ * the parent. On the owned path each item sits in its own `AnimatePresence`,
+ * so this is the list, where its siblings' changes happen.
+ *
+ * Reads computed style (never layout), only when the chain is (re)wired.
+ *
+ * @param element The observed element.
+ * @param ancestors Its ancestor chain, closest first.
+ * @returns The layout parent, or `null` when it has none.
+ */
+const findLayoutParent = (element: Element, ancestors: Element[]): Element | null =>
+    ancestors.find((ancestor) => !isBoxless(ancestor)) ?? element.parentElement
+
+/**
+ * The layout parent `observeLayoutChanges` watches for `element` (plan
+ * 015b): its nearest ancestor, within the observed chain, that generates a
+ * box, else its parent.
+ *
+ * @param element An element, or the slot an element was removed from when
+ *     `inclusive` is set.
+ * @param inclusive Start at `element` itself (for an exit clone's slot).
+ * @returns The layout parent, or `null` for a detached element.
+ *
+ * @example
+ * ```ts
+ * const followParent = layoutParentOf(element)
+ * ```
+ */
+export const layoutParentOf = (element: Element, inclusive = false): Element | null => {
+    const chain: Element[] = []
+    let current = inclusive ? element : element.parentElement
+    while (current && chain.length < MAX_OBSERVED_ANCESTORS) {
+        chain.push(current)
+        current = current.parentElement
+    }
+    return chain.find((ancestor) => !isBoxless(ancestor)) ?? chain[0] ?? null
+}
+
+/** Layout parents an earlier render already observed (plan 015b A1.1). */
+const settledLayoutParents = new WeakSet<Element>()
+
+/**
+ * Whether an earlier render already observed `parent` as a layout parent
+ * (plan 015b A1.1): a `layout` element mounting into it now is an add, not
+ * part of the initial render. A parent counts one microtask after its first
+ * observer is wired, so every element of one render sees it unobserved.
+ *
+ * @param parent A layout parent, from {@link layoutParentOf}.
+ * @returns `true` once an earlier render observed it.
+ *
+ * @example
+ * ```ts
+ * const isAdd = isObservedLayoutParent(layoutParentOf(element))
+ * ```
+ */
+export const isObservedLayoutParent = (parent: Element): boolean => settledLayoutParents.has(parent)
+
+/**
+ * Options for {@link observeLayoutChanges}.
+ */
+export interface ObserveLayoutChangesOptions {
+    /**
+     * Called once per mutation batch that changes the layout parent's own
+     * children (directly, or inside an `AnimatePresence` container in it) or
+     * pops one of them (plan 015b, part D): `layout` nodes after the layout
+     * parent, which see none of it, follow from this. `records` is the
+     * shared observer's batch, the same array for every subscriber.
+     */
+    onLayoutParentChange?: (
+        parent: Element,
+        records: MutationRecord[],
+        cause: LayoutChangeCause
+    ) => void
+}
+
+/**
+ * Where a completing exit re-renders, as upstream (plan 015b): its
+ * `AnimatePresence` (`AnimatePresence/index.tsx:244` @ v14.7.1, the other
+ * children through `PresenceChild.tsx:91-98` and `use-presence.ts:40-43`) and,
+ * through `forceRender`, its nearest `LayoutGroup` (`index.tsx:206`,
+ * `group.ts:26-33`).
+ */
+export interface ExitMarker {
+    /** The exiting element's `AnimatePresence` container, if any. */
+    boundary: Element | null
+    /** Its nearest `LayoutGroup`'s node group, if any. */
+    group?: object
+}
+
+/**
+ * Why `observeLayoutChanges` called back (plan 015b). `exit-complete` when the
+ * only DOM change was exiting elements (and their placeholders) leaving, so
+ * only nodes inside a marker's boundary or group re-render upstream; every
+ * other node snaps. A call with no cause (a resize, an attribute change) is
+ * neither.
+ */
+export type LayoutChangeCause =
+    { kind: 'change' } | { kind: 'add' } | { kind: 'exit-complete'; markers: ExitMarker[] }
+
+type ExitCompleteCause = Extract<LayoutChangeCause, { kind: 'exit-complete' }>
+
+/**
+ * Exiting elements, marked when their exit starts. Not a DOM attribute:
+ * Svelte removes the DOM before child teardowns run, and mutation callbacks
+ * run after both, so an attribute would be gone by the time a removal is
+ * classified.
+ */
+const exitingElements = new WeakMap<Element, ExitMarker>()
+
+/**
+ * Mark `element` as exiting, so its removal reads as a completed exit
+ * (plan 015b).
+ *
+ * @param element The exiting element (or its exit clone).
+ * @param marker Its `AnimatePresence` boundary and `LayoutGroup` node group.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * markExiting(element, { boundary: element.closest('.animate-presence-container') })
+ * ```
+ */
+export const markExiting = (element: Element, marker: ExitMarker): void => {
+    exitingElements.set(element, marker)
+}
+
+/**
+ * Clear an {@link markExiting} mark, for an element that re-enters.
+ *
+ * @param element The re-entering element.
+ * @returns Nothing.
+ *
+ * @example
+ * ```ts
+ * unmarkExiting(element)
+ * ```
+ */
+export const unmarkExiting = (element: Element): void => {
+    exitingElements.delete(element)
+}
+
+/**
+ * Merge the causes of coalesced callbacks: `exit-complete` only when every
+ * one was, with all their markers; no cause is neutral.
+ *
+ * @param a A cause, or none.
+ * @param b Another cause, or none.
+ * @returns The merged cause, or `undefined` when neither has one.
+ *
+ * @example
+ * ```ts
+ * pending = mergeLayoutCauses(pending, cause)
+ * ```
+ */
+export const mergeLayoutCauses = (
+    a: LayoutChangeCause | undefined,
+    b: LayoutChangeCause | undefined
+): LayoutChangeCause | undefined => {
+    if (!a) return b
+    if (!b) return a
+    if (a.kind === 'exit-complete' && b.kind === 'exit-complete') {
+        return { kind: 'exit-complete', markers: [...new Set([...a.markers, ...b.markers])] }
+    }
+    return { kind: 'change' }
+}
+
+/** A comment, or whitespace-only text: no box. */
+const isInertNode = (node: Node): boolean =>
+    node.nodeType === 8 || (node.nodeType === 3 && !node.textContent?.trim())
+
+/** Every marker on `node` or in its subtree, into `out`. */
+const collectMarkers = (node: Node, out: ExitMarker[]): boolean => {
+    if (!(node instanceof Element)) return false
+    const before = out.length
+    const own = exitingElements.get(node)
+    if (own) out.push(own)
+    for (const descendant of node.querySelectorAll('*')) {
+        const marker = exitingElements.get(descendant)
+        if (marker) out.push(marker)
+    }
+    return out.length > before
+}
+
+const popAttribute = 'data-motion-pop-id'
+
+/**
+ * Classify one mutation batch (plan 015b). `exit-complete` when it adds
+ * nothing, every removed node is a marked element, an exit placeholder, has a
+ * marked element in its subtree, or was removed from a marker's boundary, and
+ * no pop attribute changed except on a marked element.
+ *
+ * A marked element losing its pop attribute is its completion's `removePop`
+ * (`PresenceChild.svelte`), which runs a microtask before Svelte removes the
+ * element: the element is back in flow for that moment only, so a batch of
+ * nothing else returns `null` (no callback). The removal that follows is the
+ * completion.
+ */
+const classifyMutations = (records: MutationRecord[]): LayoutChangeCause | null => {
+    const markers: ExitMarker[] = []
+    const removals: Array<{ node: Node; target: Node; marked: boolean }> = []
+    let changed = false
+    let completedPop = false
+    for (const record of records) {
+        if (record.type === 'attributes') {
+            const target = record.target as Element
+            if (exitingElements.has(target) && !target.hasAttribute(popAttribute)) {
+                completedPop = true
+            } else {
+                changed = true
+            }
+            continue
+        }
+        for (const node of record.addedNodes) if (!isInertNode(node)) changed = true
+        for (const node of record.removedNodes) {
+            const marked = collectMarkers(node, markers)
+            if (!isInertNode(node)) removals.push({ node, target: record.target, marked })
+        }
+    }
+    if (changed) return { kind: 'change' }
+    if (!removals.length) return completedPop ? null : { kind: 'change' }
+    if (!markers.length) return { kind: 'change' }
+    const boundaries = new Set(markers.map((marker) => marker.boundary))
+    for (const { node, target, marked } of removals) {
+        const accounted =
+            marked ||
+            (node instanceof Element && node.hasAttribute('data-presence-placeholder')) ||
+            boundaries.has(target as Element)
+        if (!accounted) return { kind: 'change' }
+    }
+    return { kind: 'exit-complete', markers: [...new Set(markers)] }
 }
 
 /**
@@ -699,11 +967,43 @@ const ancestorMutationsAffectLayout = (mutations: MutationRecord[]): boolean => 
  * @param onChange Callback invoked when a relevant change is detected.
  * @return Cleanup function.
  */
-export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (() => void) => {
+export const observeLayoutChanges = (
+    el: HTMLElement,
+    onChange: (cause?: LayoutChangeCause) => void,
+    options: ObserveLayoutChangesOptions = {}
+): (() => void) => {
     let pendingRaf: number | null = null
     let releaseTimeout: ReturnType<typeof setTimeout> | null = null
+    // Every cause since the leading call, merged, for the trailing one.
+    let coalesced: LayoutChangeCause | undefined
+    // A completed exit's cause, which cause-less calls inherit for a double
+    // rAF: the trailing call, and a ResizeObserver delivery the completion
+    // caused (rAF runs before that frame's ResizeObserver delivery).
+    let inherited: ExitCompleteCause | null = null
+    let inheritRaf: number | null = null
+    const hasRaf =
+        typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+    const closeInherit = () => {
+        if (inheritRaf !== null && hasRaf) window.cancelAnimationFrame(inheritRaf)
+        inheritRaf = null
+        inherited = null
+    }
+    const openInherit = (cause: ExitCompleteCause) => {
+        closeInherit()
+        inherited = cause
+        if (!hasRaf) return
+        inheritRaf = window.requestAnimationFrame(() => {
+            inheritRaf = window.requestAnimationFrame(() => {
+                inheritRaf = null
+                inherited = null
+            })
+        })
+    }
 
-    const schedule = () => {
+    const schedule = (raw?: LayoutChangeCause) => {
+        if (raw?.kind === 'exit-complete') openInherit(raw)
+        else if (raw) closeInherit()
+        const cause = raw ?? inherited ?? undefined
         const sizeAnimationHost = el.closest(`[${layoutSizeAnimationAttribute}]`)
         if (sizeAnimationHost) {
             el.style.transform = ''
@@ -719,7 +1019,7 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             // one-frame phantom FLIP (the accumulated delta) on the child.
             // The host element ITSELF still short-circuits (its own commit is
             // guarded upstream), so its residual translate is untouched.
-            if (sizeAnimationHost !== el) onChange()
+            if (sizeAnimationHost !== el) onChange(cause)
             return
         }
         // Re-parenting (portal / imperative move) leaves the ancestor
@@ -728,22 +1028,34 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
         // swallowed — upstream never has a stale parent because it measures the
         // whole projection tree (`create-projection-node.ts`).
         rewireIfReparented()
+        // Merged before the throttle, so a dropped call's cause still counts.
+        coalesced = mergeLayoutCauses(coalesced, cause)
         if (pendingRaf !== null || releaseTimeout !== null) return
         // Leading-edge catches synchronous layout writes. The trailing read
         // catches Svelte presence DOM that finishes patching on the next frame
         // without polling throughout the active layout animation.
-        onChange()
-        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        onChange(cause)
+        const trail = () => {
+            const merged = coalesced ?? inherited ?? undefined
+            coalesced = undefined
+            onChange(merged)
+        }
+        if (hasRaf) {
             pendingRaf = window.requestAnimationFrame(() => {
                 pendingRaf = null
-                onChange()
+                trail()
             })
         } else {
             releaseTimeout = setTimeout(() => {
                 releaseTimeout = null
-                onChange()
+                trail()
             }, 50)
         }
+    }
+    /** Childlist and pop records: classified, or dropped (see `classifyMutations`). */
+    const onStructure: MutationHandler = (records) => {
+        const cause = classifyMutations(records)
+        if (cause) schedule(cause)
     }
     // The element's OWN observers: resize, class / presence-hold attributes,
     // and childList (subtree). Shared instances — see the registries above.
@@ -775,29 +1087,68 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
         if (ancestorMutationsAffectLayout(mutations)) schedule()
     }
     const wireAncestors = () => {
-        releaseAncestors = observedAncestors.flatMap((ancestor, index) => {
-            const releases: Array<() => void> = []
-            // Only the IMMEDIATE parent gets childList: `subtree: true` already
-            // covers sibling reorders/insertions that re-slot this element.
-            // Higher levels intentionally SKIP childList — a higher-level DOM
-            // insertion that re-slots us still changes some observed ancestor's
-            // rect, which surfaces on the attribute path; adding childList at
-            // every level only widens noise without catching a distinct case.
-            if (index === 0) {
-                releases.push(acquireMutationObserver(ancestor, CHILD_LIST_INIT, schedule))
+        // Only the LAYOUT PARENT gets childList (plan 015b): `subtree: true`
+        // covers sibling reorders/insertions that re-slot this element, and
+        // on the owned path its siblings sit in other `AnimatePresence`
+        // containers, which this skips. Higher levels intentionally SKIP
+        // childList — a higher-level DOM insertion that re-slots us still
+        // changes some observed ancestor's rect, which surfaces on the
+        // attribute path; adding childList at every level only widens noise
+        // without catching a distinct case. A sibling's popLayout pop takes
+        // it out of the shared flow without a childList record, so the
+        // layout parent's subtree is watched for the pop attribute too.
+        const layoutParent = findLayoutParent(el, observedAncestors)
+        if (layoutParent && !settledLayoutParents.has(layoutParent)) {
+            queueMicrotask(() => settledLayoutParents.add(layoutParent))
+        }
+        const { onLayoutParentChange } = options
+        // Part D: a batch that re-slots the layout parent's children (not a
+        // change deep inside one of them) also reaches the nodes after it.
+        const reslotsChildren = (record: MutationRecord) => {
+            if (record.type === 'attributes') return true
+            let target: Node | null = record.target
+            while (
+                target instanceof Element &&
+                target !== layoutParent &&
+                target.classList.contains(presenceContainerClass)
+            ) {
+                target = target.parentElement
             }
-            // An ANCESTOR's style/class change can re-slot this element (e.g.
-            // the classic toggle-switch: align-items flip on the track, or the
-            // same flip two levels up) with no childList or resize signal, and
-            // the Svelte-owned reactive path can't snapshot it — the ancestor
-            // patches before this element's effects run. Watch each observed
-            // ancestor's attributes and let the commit path diff against the
-            // cached rect.
-            releases.push(
-                acquireMutationObserver(ancestor, ANCESTOR_ATTRIBUTE_INIT, onAncestorAttributes)
-            )
-            return releases
-        })
+            return target === layoutParent
+        }
+        const onLayoutParentStructure: MutationHandler = (records) => {
+            const cause = classifyMutations(records)
+            if (!cause) return
+            // A popped element (plan 015b A1.3) is out of the flow these
+            // records change: upstream never re-snapshots it for its own pop
+            // or its list's changes, so it doesn't commit for them.
+            if (!el.hasAttribute(popAttribute)) schedule(cause)
+            if (onLayoutParentChange && layoutParent && records.some(reslotsChildren)) {
+                onLayoutParentChange(layoutParent, records, cause)
+            }
+        }
+        releaseAncestors = layoutParent
+            ? [
+                  acquireMutationObserver(layoutParent, CHILD_LIST_INIT, onLayoutParentStructure),
+                  acquireMutationObserver(layoutParent, POP_ATTRIBUTE_INIT, onLayoutParentStructure)
+              ]
+            : []
+        releaseAncestors.push(
+            ...observedAncestors.flatMap((ancestor) => {
+                const releases: Array<() => void> = []
+                // An ANCESTOR's style/class change can re-slot this element (e.g.
+                // the classic toggle-switch: align-items flip on the track, or the
+                // same flip two levels up) with no childList or resize signal, and
+                // the Svelte-owned reactive path can't snapshot it — the ancestor
+                // patches before this element's effects run. Watch each observed
+                // ancestor's attributes and let the commit path diff against the
+                // cached rect.
+                releases.push(
+                    acquireMutationObserver(ancestor, ANCESTOR_ATTRIBUTE_INIT, onAncestorAttributes)
+                )
+                return releases
+            })
+        )
     }
 
     /**
@@ -820,9 +1171,9 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
     // observer double that fires synchronously on `observe()` (used in tests)
     // would otherwise re-enter `schedule` → `rewireIfReparented` before those
     // closures exist. Real observers never fire on `observe()`.
-    releaseSelf.push(acquireResizeObserver(el, schedule))
-    releaseSelf.push(acquireMutationObserver(el, SELF_ATTRIBUTE_INIT, schedule))
-    releaseSelf.push(acquireMutationObserver(el, CHILD_LIST_INIT, schedule))
+    releaseSelf.push(acquireResizeObserver(el, () => schedule()))
+    releaseSelf.push(acquireMutationObserver(el, SELF_ATTRIBUTE_INIT, () => schedule()))
+    releaseSelf.push(acquireMutationObserver(el, CHILD_LIST_INIT, onStructure))
     wireAncestors()
 
     return () => {
@@ -837,5 +1188,6 @@ export const observeLayoutChanges = (el: HTMLElement, onChange: () => void): (()
             clearTimeout(releaseTimeout)
             releaseTimeout = null
         }
+        closeInherit()
     }
 }

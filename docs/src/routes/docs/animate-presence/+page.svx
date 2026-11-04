@@ -304,6 +304,93 @@ You can specify a custom transition for the exit animation:
 
 The exit transition takes precedence over the component's general `transition` prop.
 
+## popLayout positioning
+
+With `mode="popLayout"`, an exiting element is taken out of the layout straight away, so the elements around it reflow while it animates out. It is pinned with `position: absolute` exactly where it was.
+
+It stays there even when popping it moves its container: a list anchored to the bottom of the window (a toast stack), a list centred with `translate(-50%, -50%)`, a list inside a scaled ancestor, or a page whose scroll position is clamped because the content got shorter. Once the update is in the DOM, the element is measured again and offset back, before any layout animation measures it. This works for both the clone form and the owned `present` + `child` form.
+
+`anchorX` and `anchorY` choose which edges of its container the exiting element is pinned by. Use `anchorY="bottom"` for elements positioned with `bottom: 0`, and `anchorX="right"` for elements positioned with `right: 0` (in right-to-left text the two horizontal edges swap, as in Motion).
+
+```svelte
+<ul class="toasts">
+  <AnimatePresence mode="popLayout" anchorY="bottom">
+    {#each toasts as toast (toast.id)}
+      <motion.li
+        key={toast.id}
+        layout
+        exit={{ opacity: 0, scale: 0.8 }}
+      >
+        {toast.message}
+      </motion.li>
+    {/each}
+  </AnimatePresence>
+</ul>
+```
+
+The pin is a rule in an injected `<style>` element, appended to the head of the element's document. Pass `root` to append it elsewhere, for example to a shadow root, so the rule applies inside shadow DOM.
+
+### Nested exits with propagate
+
+A nested `AnimatePresence` is independent of its parent by default: when the parent's child exits, the nested boundary's children don't run their own exits. Pass `propagate` to make them exit with the parent. The parent's exit then waits for theirs to finish.
+
+```svelte
+<AnimatePresence present={open}>
+  {#snippet child()}
+    <motion.div exit={{ opacity: 0 }}>
+      <AnimatePresence propagate>
+        {#each items as item (item.id)}
+          <motion.div key={item.id} exit={{ x: -20, opacity: 0 }}>
+            {item.label}
+          </motion.div>
+        {/each}
+      </AnimatePresence>
+    </motion.div>
+  {/snippet}
+</AnimatePresence>
+```
+
+`propagate` needs an owned outer exit: a `present` + `child` boundary (as above) or a `PresenceChild`. When the outer exit is a clone (a `{#if}` or `{#each}` child of `AnimatePresence`), the subtree is replaced by a static copy, so there is nothing nested left to animate.
+
+## Shared layout
+
+An exiting child with a `layoutId` takes part in shared layout animations, as in Motion. When it leaves, it is relegated in its `layoutId`'s stack: the element that takes over (a newly mounted one, or an earlier one still on screen, such as the thumbnail a card opened from) animates from it, and the exiting element follows it and fades out while the new one fades in. It stays mounted until that animation ends, even without an `exit` prop (Motion's `MeasureLayout` holds it with `usePresence` until `safeToRemove`). Closing a card shrinks it back into the thumbnail it came from.
+
+Both forms work. A direct child keeps its projection node on its exit clone, nested `motion` children included; with `present` + `child`, the real element stays mounted.
+
+```svelte
+<AnimatePresence>
+  {#if open}
+    <motion.div key="card" layoutId={open} class="card" />
+  {/if}
+</AnimatePresence>
+```
+
+Exiting `layout` elements keep animating their layout during the exit too (for example when a `popLayout` exit clamps a scroll position), through the same projection node.
+
+### Latching props with `present` + `child`
+
+A snippet reads live state. While the `present` + `child` element is held for its exit, a prop that changed on the way out (`layoutId={open}` going `null`) reaches it, where Motion re-renders the exiting child with its last props. Read a value latched while it was present instead:
+
+```svelte
+<script>
+  import { AnimatePresence, motion } from '@humanspeak/svelte-motion'
+
+  let open = $state(null)
+  // The id the card was last shown with.
+  let shown = $state(null)
+  $effect.pre(() => {
+    if (open) shown = open
+  })
+</script>
+
+<AnimatePresence present={!!open}>
+  {#snippet child()}
+    <motion.div layoutId={shown} class="card" />
+  {/snippet}
+</AnimatePresence>
+```
+
 ## Props
 
 ### AnimatePresence
@@ -311,7 +398,13 @@ The exit transition takes precedence over the component's general `transition` p
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `initial` | `boolean` | `true` | When `false`, children skip their enter animation on initial mount |
+| `mode` | `'sync' \| 'wait' \| 'popLayout'` | `'sync'` | How entering and exiting children are coordinated |
+| `custom` | `unknown` | `undefined` | Data passed to exiting children's dynamic variants |
 | `onExitComplete` | `() => void` | `undefined` | Callback invoked once all exit animations complete |
+| `anchorX` | `'left' \| 'right'` | `'left'` | With `mode="popLayout"`, the horizontal edge an exiting element is pinned by |
+| `anchorY` | `'top' \| 'bottom'` | `'top'` | With `mode="popLayout"`, the vertical edge an exiting element is pinned by |
+| `root` | `HTMLElement \| ShadowRoot` | document head | With `mode="popLayout"`, where the pop `<style>` is appended (for example a shadow root) |
+| `propagate` | `boolean` | `false` | Exit this boundary's children when a parent presence exits (needs an owned outer exit) |
 
 ### Motion component props (for AnimatePresence)
 

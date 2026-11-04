@@ -482,3 +482,63 @@ changed file, `git diff --check`, and `git status` (only in-scope files).
   same lane): crossfades and relegation for elements exiting through `AnimatePresence`. 012 un-fixmes the six cases.
 - `layoutRoot` is creation-time only, as upstream. A consumer who toggles it must remount the element (e.g.
   `{#key}`). The docs page says so.
+
+## Amendments (operator-approved 2026-10-28)
+
+### A1: hand the departing lead's snapshot to motion-dom (fixes the Step 3 STOP)
+
+At Step 3, the five non-crossfade inside-the-root cases fail. The cause isn't the `layoutRoot` ancestor's snapshot.
+Svelte detaches the departing `layoutId` lead before its teardown, so its unmount-time `willUpdate()` measures a
+detached element. The zero box is thrown away, and `promote()` (`projection/shared/stack.ts:45-74` @v14.7.1) hands
+over no snapshot. The arriving node then falls back to its own snapshot, so `isShared` is false and #1935's shared
+branches never run. Three Svelte-side faults stack on top of that:
+
+- A moving list's observed commit runs `seedCachedSnapshotsForSubtree`, which overwrites the arriving underline's
+  snapshot with its cached new layout. There is no dirty or snapshot check for descendants.
+- The registry rect counts ancestor or own transforms twice, because the cached boxes are already visual and
+  `currentVisualPageRect` applies the transforms again. This affects translated roots and `innerX`.
+- `consumeLayoutIdHandoff` returns early for elements with `layout`, so `layout="position"` and `layout="size"` get no
+  handoff at all.
+
+Match upstream's data flow, where the departing lead is snapshotted while still attached and `promote()` hands it
+over with a foreign `source`. The operator's prototype is saved at `/tmp/sm007-prototype.diff`; re-derive it red first
+rather than pasting it.
+
+1. Widen the scope to `src/lib/utils/motionDomProjection.ts` `unmount()`, `mount()` and
+   `seedCachedSnapshotsForSubtree`, and to `_MotionContainer.svelte` `consumeLayoutIdHandoff` (about line 2972).
+2. **`unmount()`.** Before `visualElement.unmount()`, give a detached `layoutId` lead with no snapshot the snapshot
+   upstream would have taken:
+   - `measuredBox`: its on-screen box (`visualTargetBox() ?? latestLayoutBox ?? lastLayout.layoutBox`), with no
+     second `applyTransform`.
+   - `layoutBox`: `projection.removeTransform(measuredBox)`.
+   - `source`: its own id.
+   - Then run `root.startUpdate()` and `prepareSnapshotPath()`, and set `isLayoutDirty = true`.
+   - Cite `create-projection-node.ts` `unmount`, `willUpdate`, `updateSnapshot` and `measure`/`removeTransform`.
+3. **`mount()`.** After the projection mounts, set `mountedFromSharedSnapshot = !!resumeFrom?.snapshot`. When it is
+   set, run `prepareSnapshotPath()` and set `isLayoutDirty`, so the pass re-measures the arriving node with its path
+   transforms reset, as upstream's `update()` does.
+4. **`seedCachedSnapshotsForSubtree`.** Skip a non-committer descendant that is already layout-dirty or already
+   holds a snapshot.
+5. **`consumeLayoutIdHandoff`.** When `mountedFromSharedSnapshot` is set, only drop the registry entry, mirroring
+   `consumeLayoutIdHandoffAfterSwitch`. The registry stays the fallback when there is no `resumeFrom`. The early
+   return for `layout` elements must not stop that fallback when there is no shared snapshot.
+6. **Existing bug, red first.** With `layoutRoot=false` and `layout="position"` (or `"size"`), a `layoutId` element
+   that moves to a new tab doesn't animate at all. Add an e2e case to `layout-root.spec.ts` (variant
+   `?layoutRoot=false&layout=position`, plus `size`) that slides as upstream's does.
+7. **Out of scope (moved to plan 015a, 3o/3p).** `currentVisualPageRect` double-counts transforms on the registry
+   fallback (`layoutRoot=false&offset=true` starts at 500 instead of 400). Don't fix it here. If a 007 case still
+   depends on it after steps 2–5, STOP.
+8. **Red first.** Add unit cases in `motionDomProjection.spec.ts`, each shown failing before its fix:
+   - the detached-lead unmount seed hands a `promote()` snapshot with a foreign source (`isShared`);
+   - the subtree seed does not overwrite a descendant's existing snapshot;
+   - a mount from a shared snapshot drops the registry entry and doesn't double-animate.
+
+   Keep 006 A1's guards green (no extra pass on a plain mount, a registry handoff after a real removal, the
+   cached-box fallback).
+9. **Crossfade cases.** The six crossfade cases fail only because the old underline doesn't follow the new one (no
+   relegate on the exit clone). Mark them `test.fixme` with `// Plan 012: no relegate on the exit clone`, as the plan
+   already allows. In the `innerX` crossfade, the crossfade check runs before the slide check. Reorder it, or add a
+   separate slide-only assertion, so its slide path is verified.
+10. **Gate.** Run the full Done-criteria e2e set, plus `e2e/reorder`, `e2e/animate-presence`, `e2e/drag`,
+    `e2e/independent-transforms`, `e2e/animate-layout` and `e2e/projection`, and the unit suite. 006's
+    `e2e/layout-id` must stay green, with only its plan-012 `fixme` skipped.

@@ -145,6 +145,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Keep FLIP layout animations anchored when the parent container scrolls mid-animation.'
     },
+    'layout-root': {
+        title: 'layoutRoot & layoutAnchor',
+        description:
+            'A tab underline glides one tab while the whole tab bar jumps, and a centred child stays centred while its parent resizes.'
+    },
     'lazy-motion': {
         title: 'LazyMotion',
         description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
@@ -200,6 +205,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     rotate: {
         title: 'Rotate',
         description: 'Interactive Rotate animation example using Svelte Motion.'
+    },
+    'presence-crossfade': {
+        title: 'Presence Crossfade',
+        description:
+            'A card that closes back into its thumbnail: exiting layoutId elements crossfade with AnimatePresence.'
     },
     'scroll-progress': {
         title: 'Scroll Progress',

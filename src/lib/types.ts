@@ -769,6 +769,28 @@ export type MotionProps = {
      * Mirrors framer-motion's `onLayoutMeasure`.
      */
     onLayoutMeasure?: MotionOnLayoutMeasure
+    /**
+     * Called when this element's layout animation starts, as in Motion: the
+     * projection node passes it to the layout animation as `onPlay`
+     * (`create-projection-node.ts:586-589, 626-628 @ v14.7.1`).
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout onLayoutAnimationStart={() => (moving = true)} />
+     * ```
+     */
+    onLayoutAnimationStart?: () => void
+    /**
+     * Called when this element's layout animation completes, as in Motion:
+     * the projection node passes it to the layout animation as `onComplete`
+     * (`create-projection-node.ts:586-589, 626-628 @ v14.7.1`).
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout onLayoutAnimationComplete={() => (moving = false)} />
+     * ```
+     */
+    onLayoutAnimationComplete?: () => void
     /** Shared layout animation identifier. Elements with matching layoutId animate between positions. */
     layoutId?: string
     /**
@@ -787,6 +809,54 @@ export type MotionProps = {
      * ```
      */
     layoutScroll?: boolean
+    /**
+     * Make this element a "layout root": the layout animations of its
+     * descendants resolve relative to it. Since Motion 14.7.1 (#1935) that
+     * includes shared `layoutId` elements, which animate within the root when
+     * the previous element was also inside it. So a tab underline slides one
+     * tab across its list even when the list itself jumps in the same update.
+     *
+     * The root's own layout change is instant. Read when the element mounts,
+     * as upstream: changing it afterwards has no effect, so remount the element
+     * (e.g. with `{#key}`) to toggle it.
+     *
+     * Mirrors framer-motion's `layoutRoot`.
+     *
+     * @example
+     * ```svelte
+     * <motion.ul layout layoutRoot>
+     *   {#each tabs as tab (tab)}
+     *     <li>
+     *       {tab}
+     *       {#if tab === selected}
+     *         <motion.div layoutId="underline" class="underline" />
+     *       {/if}
+     *     </li>
+     *   {/each}
+     * </motion.ul>
+     * ```
+     */
+    layoutRoot?: boolean
+    /**
+     * The anchor point for relative layout projection: the point on the
+     * parent that this element's position is measured from while the parent's
+     * layout animates.
+     *
+     * - `{ x: 0, y: 0 }` (default) anchors to the parent's top-left corner.
+     * - `{ x: 0.5, y: 0.5 }` anchors to its centre, which keeps a child of a
+     *   centring (e.g. flexbox) parent centred while the parent resizes.
+     * - `false` turns relative projection off for this element.
+     *
+     * Mirrors framer-motion's `layoutAnchor`.
+     *
+     * @example
+     * ```svelte
+     * <motion.div layout style="display: flex; align-items: center; justify-content: center">
+     *   <motion.div layout layoutAnchor={{ x: 0.5, y: 0.5 }} />
+     * </motion.div>
+     * ```
+     */
+    layoutAnchor?: { x: number; y: number } | false
     /**
      * Gates `layout` measurement so FLIP only recomputes when this value
      * changes, instead of on every render that touches `class`, `style`,

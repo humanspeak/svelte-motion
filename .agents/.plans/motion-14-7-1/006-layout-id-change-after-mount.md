@@ -570,3 +570,37 @@ Any other failure in these suites: re-run that spec alone once. If it still fail
   plan 007 hit the same gap.
 - Plan 007 (same lane) adds `layoutRoot`/`layoutAnchor`/`layoutDependency` to the `setOptions` call that Step 2
   edits.
+
+## Amendments (operator-approved 2026-10-28)
+
+### A1: a mount-time update pass when the new node takes over a lead that is still on screen
+
+After Step 3 the three open-change e2e cases and unit cases 9 and 10 fail for one reason. A card mounts with
+`layoutId="one"` while thumbnail one is still attached. `NodeStack.add` → `promote` (motion-dom
+`projection/shared/stack.ts:30-65` @14.7.1) gives the card `resumeFrom` and copies thumbnail one's snapshot, but
+nothing in that Svelte update runs an update pass. The card appears at full size, and the copied snapshot stays on
+it until the next change, so it jumps to the thumbnail's box on Next. Upstream gets the pass because the parent
+re-render makes the prior lead call `willUpdate()` in `getSnapshotBeforeUpdate` and `componentDidUpdate` calls
+`root.didUpdate()`.
+
+1. Widen the `_MotionContainer.svelte` scope to include the MOUNT effect (planned-at `:1909-1940`, where
+   `motionDomProjection.mount(mountTarget)` and `didMount()` run), plus the adapter's `mount`/`didMount` in
+   `motionDomProjection.ts`.
+2. When a node mounts with a `layoutId` and its stack hands it a `resumeFrom` that is still present and attached
+   (`resumeFrom.instance?.isConnected`, `isPresent !== false`), make sure the prior lead's snapshot is taken from
+   its in-flow box before the card's mount moves anything, then run the update pass (`root.didUpdate()`), so the
+   card animates out of the thumbnail and the snapshot is consumed. Do it once per mount. Don't add a pass when
+   there is no live `resumeFrom` (a plain mount, or the registry handoff for a real removal), so that mounts with
+   no takeover behave exactly as today.
+3. It must not double-animate with the registry fallback (Step 3.2) or `seedCachedSnapshotsForGroup`. Keep the
+   existing STOP condition: two animations, or `onProjectionUpdate` firing twice for one change, means STOP.
+4. Cite the upstream lines you mirror (`stack.ts` `promote`, `MeasureLayout.tsx` `getSnapshotBeforeUpdate` and
+   `componentDidUpdate` @v14.7.1).
+5. Red first: unit cases 9 and 10 and the open-change cases are already red. Add one unit case that pins "a mount
+   with no live `resumeFrom` runs no extra update pass" (a guard that passes before and after).
+6. Re-run the whole Done criteria e2e set (`e2e/layout-id`, `e2e/layout`, `e2e/independent-transforms`,
+   `e2e/animate-layout`, `e2e/animate-presence`, `e2e/drag`, `e2e/reorder`) and the `MeasureLayout` mount tests in
+   `_MotionContainer.spec.ts`. Then continue with Steps 4–6.
+
+The wider gap, siblings that take no snapshot when presence or the tree changes, is plan 015's. Don't widen this
+pass to siblings.

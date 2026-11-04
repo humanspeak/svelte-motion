@@ -1,5 +1,9 @@
 import AnimatePresenceDataHarness from '$lib/components/__tests__/AnimatePresenceDataHarness.svelte'
 import MidHoldDestroyHarness from '$lib/components/__tests__/MidHoldDestroyHarness.svelte'
+import MountFlipPresenceHarness, {
+    getMountFlipMounts,
+    resetMountFlipMounts
+} from '$lib/components/__tests__/MountFlipPresenceHarness.svelte'
 import PresenceDataProbe from '$lib/components/__tests__/PresenceDataProbe.svelte'
 import PresenceHarness from '$lib/components/__tests__/PresenceHarness.svelte'
 import PresenceProbe from '$lib/components/__tests__/PresenceProbe.svelte'
@@ -67,6 +71,30 @@ describe('utils/usePresence', () => {
             expect(probe().getAttribute('data-is-present')).toBe('false')
             expect(probe().getAttribute('data-tuple-is-present')).toBe('false')
             expect(probe().getAttribute('data-tuple-has-callback')).toBe('true')
+        })
+
+        it('keeps the children through a present → false flip made from an onMount, before the phase effect (plan 012 A5)', async () => {
+            // Upstream's PresenceChild renders its children through the flip
+            // (PresenceChild.tsx:115-125 @ v14.7.1). A child destroyed and
+            // re-created already not present never relegated its layoutId
+            // node, which stayed the stack's present lead.
+            resetMountFlipMounts()
+            render(MountFlipPresenceHarness)
+            await tick()
+
+            expect(getMountFlipMounts()).toBe(1)
+            expect(screen.getByTestId('flip-child').dataset.mount).toBe('1')
+            expect(probe().getAttribute('data-is-present')).toBe('false')
+            expect(probe().getAttribute('data-tuple-has-callback')).toBe('true')
+        })
+
+        it('creates the children once when present stays true (plan 012 A5)', async () => {
+            resetMountFlipMounts()
+            render(MountFlipPresenceHarness, { props: { flipOnMount: false } })
+            await tick()
+
+            expect(getMountFlipMounts()).toBe(1)
+            expect(probe().getAttribute('data-is-present')).toBe('true')
         })
 
         it('safeToRemove unmounts the children', async () => {

@@ -8,7 +8,12 @@ import {
     visualElementStore
 } from 'motion-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MotionDomProjectionAdapter, layoutMeasureStats } from './motionDomProjection.js'
+import {
+    MotionDomProjectionAdapter,
+    layoutMeasureStats,
+    type ExitLayoutHold
+} from './motionDomProjection.js'
+import { readScrollBasis } from './scrollBasis.js'
 import { createMotionVisualElement } from './visualElementCore.js'
 
 /**
@@ -1252,6 +1257,97 @@ describe('MotionDomProjectionAdapter node-group gaps (plan 007 Step 4b)', () => 
 })
 
 /**
+ * An observed reflow mid a shared `layoutId` animation (plan 012 A5). The
+ * arriving node is drawn at its projection target, out of the previous
+ * lead's box; upstream's re-render snapshots that on-screen box
+ * (`willUpdate` → `updateSnapshot` → `measure`, create-projection-node.ts
+ * 967-979, 1080-1101 @ v14.7.1), so the restart continues from where it is
+ * painted instead of from its own (never drawn) slot.
+ */
+describe('MotionDomProjectionAdapter.commitObservedLayoutChange mid a shared animation (plan 012 A5)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layoutId: 'measurer' })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    /** Drawn 60px above its 100px slot, at the previous lead's box. */
+    const onScreenTarget = () => ({ x: { min: 10, max: 110 }, y: { min: 40, max: 90 } })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('seeds the committer from its on-screen target box, not its cached layout or the passed rect', async () => {
+        const previousLead = new MotionDomProjectionAdapter()
+        const arriving = new MotionDomProjectionAdapter()
+        mount(previousLead, 40)
+        const element = mount(arriving, 100)
+        const projection = arriving.projection
+        projection.resumingFrom = previousLead.projection as typeof projection.resumingFrom
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        // An unrelated reflow nudges the slot by 1px.
+        place(element, 101)
+        arriving.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        projection.resumingFrom = undefined
+        projection.currentAnimation = undefined
+        await flush()
+        arriving.unmount()
+        previousLead.unmount()
+    })
+
+    it('seeds a non-shared in-flight layout animation from its on-screen target box (plan 012 A6)', async () => {
+        // A plain `layout` node mid its own animation: upstream's
+        // `willUpdate()` measures where it is painted whatever the animation
+        // (create-projection-node.ts 967-979, 1080-1101 @ v14.7.1).
+        const sliding = new MotionDomProjectionAdapter()
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, 100)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        sliding.updateOptions({ layout: true })
+        sliding.mount(element)
+        const projection = sliding.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        place(element, 101)
+        sliding.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        projection.currentAnimation = undefined
+        await flush()
+        sliding.unmount()
+    })
+
+    it('seeds from the cached layout with no shared animation running', async () => {
+        const arriving = new MotionDomProjectionAdapter()
+        const element = mount(arriving, 100)
+        arriving.projection.target = onScreenTarget()
+
+        place(element, 101)
+        arriving.commitObservedLayoutChange()
+
+        expect(arriving.projection.snapshot?.layoutBox.y.min).toBe(100)
+        await flush()
+        arriving.unmount()
+    })
+})
+
+/**
  * LayoutGroup `forceRender` (plan 007 D7): `commitGroup` re-commits every
  * member of a node group from cached / on-screen snapshots.
  */
@@ -1543,5 +1639,1197 @@ describe('MotionDomProjectionAdapter.currentVisualPageRect (plan 008)', () => {
                 new MotionDomProjectionAdapter().isDrawnAt({ left: 0, top: 0, width: 1, height: 1 })
             ).toBe(false)
         })
+    })
+})
+
+describe('MotionDomProjectionAdapter.switchLayoutId (#1411)', () => {
+    // Port target: framer-motion `MeasureLayout.tsx:59-106 @ v14.7.1`.
+    type Switchable = MotionDomProjectionAdapter & {
+        switchLayoutId(layoutId: string | undefined): (() => void) | undefined
+    }
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (layoutId: string | undefined, left = 10) => {
+        const adapter = new MotionDomProjectionAdapter() as Switchable
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(left, 0, 100, 50))
+        adapter.updateOptions({ layoutId })
+        adapter.mount(element)
+        mounted.push(adapter)
+        return adapter
+    }
+    const stackOf = (adapter: MotionDomProjectionAdapter, id: string) =>
+        adapter.projection.root!.sharedNodes.get(id)
+
+    beforeEach(() => {
+        vi.useRealTimers()
+    })
+    afterEach(() => {
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('updateOptions does not move a mounted node to another layoutId', () => {
+        const adapter = mount('switch-a')
+        adapter.updateOptions({ layoutId: 'switch-b' })
+        expect(adapter.projection.options.layoutId).toBe('switch-a')
+    })
+
+    it("moves the node from the old layoutId's stack to lead the new one", () => {
+        const adapter = mount('switch-c')
+        adapter.switchLayoutId('switch-d')
+        expect(adapter.projection.options.layoutId).toBe('switch-d')
+        expect(
+            stackOf(adapter, 'switch-c')?.members.includes(adapter.projection as never) ?? false
+        ).toBe(false)
+        expect(stackOf(adapter, 'switch-d')?.lead === adapter.projection).toBe(true)
+    })
+
+    it('unlinks the lead that took over the old stack from the switching node', () => {
+        const other = mount('switch-e', 300)
+        const adapter = mount('switch-e')
+        const stack = stackOf(adapter, 'switch-e')!
+        expect(stack.lead === adapter.projection).toBe(true)
+        // As if the lead had been animating from the switching node.
+        other.projection.resumeFrom = adapter.projection as never
+        other.projection.currentAnimation = {} as never
+
+        adapter.switchLayoutId('switch-f')
+
+        expect(stack.lead === other.projection).toBe(true)
+        expect(other.projection.resumeFrom).toBeUndefined()
+        expect(other.projection.currentAnimation).toBeUndefined()
+        expect(adapter.projection.resumingFrom).toBeUndefined()
+    })
+
+    it('shows a node that loses its layoutId and returns no takeover', () => {
+        const adapter = mount('switch-g')
+        expect(adapter.switchLayoutId(undefined)).toBeUndefined()
+        expect(adapter.projection.needsShow).toBe(true)
+        expect(adapter.projection.options.layoutId).toBeUndefined()
+    })
+
+    it('takes over instantly from a lead that is still in the stack', () => {
+        const lead = mount('switch-h', 300)
+        const adapter = mount('switch-i')
+        const snapshot = { measuredBox: {} } as never
+        adapter.projection.snapshot = snapshot
+
+        const takeOver = adapter.switchLayoutId('switch-h')
+        expect(adapter.projection.resumeFrom === lead.projection).toBe(true)
+        takeOver?.()
+
+        expect(lead.projection.isVisible).toBe(false)
+        expect(adapter.projection.resumeFrom).toBeUndefined()
+        expect(adapter.projection.snapshot === snapshot).toBe(true)
+    })
+
+    it('animates from a lead that is no longer a member or is exiting', () => {
+        const gone = mount('switch-j', 300)
+        const adapter = mount('switch-k')
+        const takeOverGone = adapter.switchLayoutId('switch-j')
+        // The lead left the stack in the same update.
+        stackOf(adapter, 'switch-j')!.members.splice(
+            stackOf(adapter, 'switch-j')!.members.indexOf(gone.projection as never),
+            1
+        )
+        takeOverGone?.()
+        expect(gone.projection.isVisible).not.toBe(false)
+        expect(adapter.projection.resumeFrom === gone.projection).toBe(true)
+
+        const exiting = mount('switch-l', 300)
+        const other = mount('switch-m')
+        exiting.projection.isPresent = false
+        const takeOverExiting = other.switchLayoutId('switch-l')
+        takeOverExiting?.()
+        expect(exiting.projection.isVisible).not.toBe(false)
+        expect(other.projection.resumeFrom === exiting.projection).toBe(true)
+    })
+})
+
+describe('MotionDomProjectionAdapter mount-time takeover of a live lead (#1411 A1)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (layoutId: string, rect: DOMRect) => {
+        const adapter = new MotionDomProjectionAdapter()
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        rects.set(element, rect)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layoutId })
+        adapter.mount(element)
+        mounted.push(adapter)
+        return { adapter, element }
+    }
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+    afterEach(() => {
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    // A1.2, the other half: a registry handoff after a real removal. Svelte
+    // detaches the old holder before its teardown, so its node may still be
+    // in the stack when the new one mounts. That detached lead is not live:
+    // no mount-time update pass runs for it.
+    it('runs no extra update pass when the previous lead is detached', () => {
+        const { adapter: lead, element } = mount('a1-detached', new DOMRect(0, 0, 100, 50))
+        element.remove()
+        const { adapter } = mount('a1-detached', new DOMRect(300, 0, 100, 50))
+        expect(adapter.projection.resumeFrom === lead.projection).toBe(true)
+        const startUpdate = vi.spyOn(adapter.projection.root!, 'startUpdate')
+
+        adapter.didMount()
+
+        expect(startUpdate).not.toHaveBeenCalled()
+        expect(adapter.mountedFromLiveLead).toBe(false)
+    })
+
+    // A1.2: when the mount itself moved the lead, `promote`'s measurement is
+    // the moved box, so the lead's cached pre-mount box is used instead.
+    it('snapshots the lead from its cached box when the mount moved it', () => {
+        const { adapter: lead, element } = mount('a1-moved', new DOMRect(0, 0, 100, 50))
+        // The new element's insertion pushes the lead down 80px.
+        rects.set(element, new DOMRect(0, 80, 100, 50))
+        const { adapter } = mount('a1-moved', new DOMRect(300, 0, 100, 50))
+        expect(lead.projection.snapshot?.layoutBox.y.min).toBe(80)
+
+        adapter.didMount()
+
+        expect(adapter.mountedFromLiveLead).toBe(true)
+        expect(lead.projection.snapshot?.layoutBox.y.min).toBe(0)
+        expect(adapter.projection.snapshot === lead.projection.snapshot).toBe(true)
+        expect(adapter.projection.isLayoutDirty).toBe(true)
+    })
+})
+
+/**
+ * Plan 007 (Motion 14.7.1, #1935): `layoutRoot`, `layoutAnchor` and
+ * `layoutDependency` reach the projection node. Upstream passes `layoutRoot`
+ * at creation (`use-visual-element.ts:229-248 @ v14.7.1`) and syncs
+ * `layoutAnchor` / `layoutDependency` on every update (`MeasureLayout.tsx`
+ * `layoutOptions`, 43-52), port of "keeps layoutAnchor in sync"
+ * (`layout-id-change.test.tsx:102-112`).
+ */
+describe('MotionDomProjectionAdapter layout options sync (#1935)', () => {
+    it('forwards layoutRoot, layoutAnchor and layoutDependency to the projection node', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({
+            layout: true,
+            layoutRoot: true,
+            layoutAnchor: { x: 0, y: 0 },
+            layoutDependency: 1
+        })
+        expect(adapter.projection.options.layoutRoot).toBe(true)
+        expect(adapter.projection.options.layoutAnchor).toEqual({ x: 0, y: 0 })
+        expect(adapter.projection.options.layoutDependency).toBe(1)
+    })
+
+    it('keeps layoutAnchor and layoutDependency in sync, and a call without layoutRoot does not clear it', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({
+            layout: true,
+            layoutRoot: true,
+            layoutAnchor: { x: 0, y: 0 },
+            layoutDependency: 1
+        })
+        adapter.updateOptions({
+            layout: true,
+            layoutAnchor: { x: 1, y: 1 },
+            layoutDependency: 2
+        })
+        expect(adapter.projection.options.layoutAnchor).toEqual({ x: 1, y: 1 })
+        expect(adapter.projection.options.layoutDependency).toBe(2)
+        expect(adapter.projection.options.layoutRoot).toBe(true)
+    })
+
+    it('forwards layoutAnchor={false}', () => {
+        const adapter = new MotionDomProjectionAdapter()
+        adapter.updateOptions({ layout: true, layoutAnchor: false })
+        expect(adapter.projection.options.layoutAnchor).toBe(false)
+    })
+})
+
+/**
+ * Plan 007 amendment A1 (#1935): Svelte detaches a departing `layoutId` lead
+ * before its teardown, so its unmount-time `willUpdate()` would measure a
+ * detached element and drop the zero box. The adapter gives it the snapshot
+ * upstream takes while it is still attached (`create-projection-node.ts`
+ * `unmount` 668-678, `willUpdate`, `updateSnapshot` 967-979 and `measure`
+ * 1080-1103 @ v14.7.1), so `promote()` (`stack.ts:45-74`) hands it to the
+ * arriving node with a foreign `source`: a shared snapshot.
+ */
+describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (
+        options: { layoutId?: string; layout?: boolean; layoutScroll?: boolean },
+        rect: DOMRect,
+        parent?: MotionDomProjectionAdapter
+    ) => {
+        const adapter = new MotionDomProjectionAdapter(parent ? { parent } : {})
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        rects.set(element, rect)
+        // A detached element reads as an all-zero box, like a browser.
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            element.isConnected ? rects.get(element)! : new DOMRect()
+        )
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        mounted.push(adapter)
+        return { adapter, element }
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('hands a detached lead its pre-removal box as a shared snapshot through promote()', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-shared' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-shared' }, new DOMRect(300, 20, 100, 50))
+
+        const node = adapter.projection
+        expect(node.resumeFrom === lead.projection).toBe(true)
+        const snapshot = node.resumeFrom?.snapshot
+        expect(snapshot).toBeDefined()
+        expect(snapshot!.measuredBox.x.min).toBe(10)
+        expect(snapshot!.layoutBox.x.min).toBe(10)
+        // A foreign source: motion-dom's `isShared` (`notifyLayoutUpdate`).
+        expect(snapshot!.source).toBe(lead.projection.id)
+        expect(snapshot!.source).not.toBe(node.layout?.source)
+        expect((adapter as { mountedFromSharedSnapshot?: boolean }).mountedFromSharedSnapshot).toBe(
+            true
+        )
+        // Re-measured in the update pass with its path transforms reset.
+        expect(node.isLayoutDirty).toBe(true)
+    })
+
+    it('removes the transforms from the layout box but keeps them in the measured box', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-transform' },
+            new DOMRect(90, 20, 100, 50)
+        )
+        // Drawn 80px right of its layout slot by its own `x`.
+        lead.projection.latestValues.x = 80
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-transform' }, new DOMRect(300, 20, 100, 50))
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(90)
+        expect(snapshot?.layoutBox.x.min).toBe(10)
+    })
+
+    it('hands over a page-space measuredBox under a scrolled layoutScroll ancestor', () => {
+        // The scroller is scrolled 50px: the lead is drawn at page x 10, its
+        // layout (scroll removed, upstream `removeElementScroll`) is at 60.
+        const { adapter: scroller, element: scrollerElement } = mount(
+            { layoutScroll: true },
+            new DOMRect(0, 0, 300, 100)
+        )
+        Object.defineProperty(scrollerElement, 'scrollLeft', { configurable: true, value: 50 })
+        Object.defineProperty(scrollerElement, 'scrollTop', { configurable: true, value: 0 })
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-scroll' },
+            new DOMRect(10, 20, 100, 50),
+            scroller
+        )
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount(
+            { layoutId: 'a1-scroll' },
+            new DOMRect(300, 20, 100, 50),
+            scroller
+        )
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(10)
+        expect(snapshot?.layoutBox.x.min).toBe(60)
+    })
+
+    it("doesn't seed while the root's updates are blocked, as upstream willUpdate returns", () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-blocked' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        const root = lead.projection.root!
+        root.blockUpdate()
+        try {
+            element.remove()
+            lead.unmount()
+            expect(lead.projection.snapshot).toBeUndefined()
+        } finally {
+            root.unblockUpdate()
+        }
+    })
+
+    it('joins an update that is already running instead of starting another', () => {
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-updating' },
+            new DOMRect(10, 20, 100, 50)
+        )
+        const root = lead.projection.root!
+        root.startUpdate()
+        // The root is shared across specs, and `spyOn` reuses an existing spy
+        // with its call history: start from a clean count, restore after.
+        const startUpdate = vi.spyOn(root, 'startUpdate')
+        startUpdate.mockClear()
+        try {
+            element.remove()
+            lead.unmount()
+
+            expect(startUpdate).not.toHaveBeenCalled()
+            expect(lead.projection.snapshot?.animationId).toBe(root.animationId)
+        } finally {
+            startUpdate.mockRestore()
+        }
+    })
+
+    it('leaves a plain (non-layoutId) unmount without a snapshot', () => {
+        const { adapter, element } = mount({ layout: true }, new DOMRect(10, 20, 100, 50))
+        element.remove()
+        adapter.unmount()
+        expect(adapter.projection.snapshot).toBeUndefined()
+    })
+
+    it("an observed commit doesn't overwrite a descendant's existing snapshot", async () => {
+        const { adapter: parent, element: parentElement } = mount(
+            { layout: true },
+            new DOMRect(10, 0, 300, 50)
+        )
+        const { adapter: child } = mount(
+            { layoutId: 'a1-guard' },
+            new DOMRect(10, 0, 100, 50),
+            parent
+        )
+        const handed = {
+            animationId: 0,
+            measuredBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
+            layoutBox: { x: { min: 500, max: 600 }, y: { min: 0, max: 50 } },
+            latestValues: {},
+            source: child.projection.id
+        }
+        child.projection.snapshot = handed
+        let seen: unknown
+        child.projection.addEventListener('didUpdate', ({ snapshot }: { snapshot: unknown }) => {
+            seen = snapshot
+        })
+
+        rects.set(parentElement, new DOMRect(160, 0, 300, 50))
+        parent.commitObservedLayoutChange({ left: 10, top: 0, width: 300, height: 50 })
+        await flush()
+
+        expect(seen).toBe(handed)
+    })
+})
+
+describe('MotionDomProjectionAdapter scroll-rebased snapshots (plan 015a)', () => {
+    type RectLike = { left: number; top: number; width: number; height: number }
+    /** Content-space (unscrolled) rects; the viewport rect subtracts the scroller's scroll. */
+    const content = new Map<HTMLElement, { left: number; top: number }>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    let scroller: HTMLElement
+
+    const makeScroller = (style = 'overflow: auto') => {
+        const element = document.createElement('div')
+        element.setAttribute('style', style)
+        document.body.appendChild(element)
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 320))
+        // Drawn at its offset size: unscaled.
+        Object.defineProperty(element, 'offsetWidth', { configurable: true, value: 400 })
+        Object.defineProperty(element, 'offsetHeight', { configurable: true, value: 320 })
+        return element
+    }
+    const create = (parent: HTMLElement, top: number, style = '') => {
+        const element = document.createElement('div')
+        if (style) element.setAttribute('style', style)
+        parent.appendChild(element)
+        content.set(element, { left: 10, top })
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            const at = content.get(element)!
+            const scrolled = parent === scroller && !style.includes('sticky')
+            return new DOMRect(at.left, at.top - (scrolled ? scroller.scrollTop : 0), 100, 50)
+        })
+        return element
+    }
+    const mount = (
+        element: HTMLElement,
+        options: { layout?: boolean; layoutId?: string; layoutScroll?: boolean } = {
+            layout: true
+        },
+        extra: ConstructorParameters<typeof MotionDomProjectionAdapter>[0] = {}
+    ) => {
+        const adapter = new MotionDomProjectionAdapter(extra)
+        adapter.updateOptions(options)
+        adapter.mount(element)
+        mounted.push(adapter)
+        return adapter
+    }
+    /** Scroll and let the tracker see it, as a browser's `scroll` event would. */
+    const scrollTo = (element: HTMLElement, top: number) => {
+        element.scrollTop = top
+        element.dispatchEvent(new Event('scroll'))
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const topOf = (rect: RectLike | null | undefined) => rect?.top
+    /** Plan 015a's adapter API, typed here so these cases compile on their own. */
+    type Rebasing = {
+        lastReadScrollBasis?: unknown
+        commitObservedLayoutChange(previous?: RectLike, options?: { previousBasis?: unknown }): void
+    }
+    const rebasing = (adapter: MotionDomProjectionAdapter) => adapter as unknown as Rebasing
+    const foldedInFor = (element: Element) =>
+        (
+            MotionDomProjectionAdapter as unknown as {
+                foldedInFor(element: Element): ((container: Element) => boolean) & {
+                    wasRoot?: boolean
+                }
+            }
+        ).foldedInFor(element)
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        content.clear()
+        scroller = makeScroller()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+        document.body.innerHTML = ''
+        document.documentElement.scrollTop = 0
+    })
+
+    it('3a: commitGroup seeds the rebased snapshot after a scroller scrolls 0 → 500', () => {
+        const group = nodeGroup()
+        mount(create(scroller, 100), { layout: true }, { group })
+        const b = mount(create(scroller, 200), { layout: true }, { group })
+
+        scrollTo(scroller, 500)
+        MotionDomProjectionAdapter.commitGroup(group)
+
+        // Upstream's live willUpdate would measure 200 - 500.
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(-300)
+    })
+
+    it('3b: currentVisualPageRect is rebased after a scroller scrolls 0 → 500', () => {
+        const adapter = mount(create(scroller, 200), { layoutId: 'rebased' })
+
+        scrollTo(scroller, 500)
+
+        expect(topOf(adapter.currentVisualPageRect())).toBe(-300)
+        // A fresh read agrees.
+        expect(topOf(adapter.measurePageRect('measure', { silent: true }))).toBe(-300)
+    })
+
+    it('3c: commitObservedLayoutChange rebases a raw previous rect by its previousBasis', () => {
+        const adapter = mount(create(scroller, 200))
+        const previous = adapter.measurePageRect('measure', { silent: true })!
+        const previousBasis = rebasing(adapter).lastReadScrollBasis
+
+        scrollTo(scroller, 500)
+        rebasing(adapter).commitObservedLayoutChange(previous, { previousBasis })
+
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(-300)
+    })
+
+    it('3d: a fixed element is rebased by +300 after a window scroll of 300', () => {
+        const element = create(document.body, 100, 'position: fixed')
+        const adapter = mount(element, { layoutId: 'fixed' })
+        expect(topOf(adapter.currentVisualPageRect())).toBe(100)
+
+        // A fixed element's page box moves with the window scroll (upstream
+        // `measurePageBox` adds the root scroll to its fixed viewport box).
+        document.documentElement.scrollTop = 300
+        document.dispatchEvent(new Event('scroll'))
+
+        expect(topOf(adapter.currentVisualPageRect())).toBe(400)
+        expect(topOf(adapter.measurePageRect('measure', { silent: true }))).toBe(400)
+    })
+
+    it('3e: a post-clamp commit in the same task is not shifted (phantom tripwire)', async () => {
+        const aElement = create(scroller, 100)
+        const bElement = create(scroller, 200)
+        const a = mount(aElement)
+        const b = mount(bElement)
+        scrollTo(scroller, 500)
+        a.refreshLayout({ silent: true })
+        b.refreshLayout({ silent: true })
+        const starts = new Map<MotionDomProjectionAdapter, number>([
+            [a, 0],
+            [b, 0]
+        ])
+        for (const adapter of [a, b]) {
+            adapter.projection.addEventListener('animationStart', () =>
+                starts.set(adapter, starts.get(adapter)! + 1)
+            )
+        }
+
+        // Content shrank: the scroll position clamps with no scroll event yet.
+        scroller.scrollTop = 430
+        a.commitObservedLayoutChange()
+        const bRect = b.refreshLayout({ silent: true })!
+        b.commitObservedLayoutChange()
+
+        expect(b.projection.snapshot?.layoutBox.y.min).toBe(bRect.top)
+        await flush()
+        await flush()
+        expect(starts.get(a)).toBeLessThanOrEqual(1)
+        expect(starts.get(b)).toBeLessThanOrEqual(1)
+    })
+
+    it('3f: a node on a sticky path keeps its unrebased cache', () => {
+        const element = create(scroller, 0, 'position: sticky; top: 0')
+        const adapter = mount(element)
+        const cached = adapter.currentVisualPageRect()
+
+        scrollTo(scroller, 500)
+
+        expect(adapter.currentVisualPageRect()).toEqual(cached)
+        adapter.commitObservedLayoutChange()
+        expect(adapter.projection.snapshot?.layoutBox.y.min).toBe(cached!.top)
+    })
+
+    it('3g: a node with no scrollers keeps no scroll basis', () => {
+        const adapter = mount(create(document.body, 100))
+        adapter.measurePageRect('measure', { silent: true })
+
+        expect(rebasing(adapter).lastReadScrollBasis).toBeFalsy()
+    })
+
+    it('3n: foldedInFor folds in a mounted layoutScroll container, until it unmounts', () => {
+        const container = mount(scroller, { layoutScroll: true })
+        const inner = document.createElement('div')
+        scroller.appendChild(inner)
+
+        expect(foldedInFor(inner)(scroller)).toBe(true)
+        expect(foldedInFor(document.body)(scroller)).toBe(false)
+        container.unmount()
+        expect(foldedInFor(inner)(scroller)).toBe(false)
+        expect(foldedInFor(inner).wasRoot).toBe(false)
+    })
+
+    /**
+     * A browser-like rect: the layout box moved by every inline translate on
+     * the element and its ancestors.
+     */
+    const drawn = (element: HTMLElement, layoutLeft: number) =>
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            let left = layoutLeft
+            for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+                for (const [, name, args] of node.style.transform.matchAll(/(\w+)\(([^)]*)\)/g)) {
+                    if (/^translate(X|3d)?$/.test(name)) left += parseFloat(args)
+                }
+            }
+            return new DOMRect(left, 0, 100, 50)
+        })
+
+    it('3o: the handoff rect inside an ancestor drawn at translateX(100px) is its on-screen box', () => {
+        const parentElement = document.createElement('div')
+        document.body.appendChild(parentElement)
+        drawn(parentElement, 0)
+        const parent = mount(parentElement)
+        // The ancestor's `style={{ x: 100 }}`: rendered as translateX(100px).
+        parent.visualElement.latestValues.x = 100
+        parent.visualElement.render()
+        expect(parentElement.style.transform).toContain('translateX(100px)')
+
+        const element = document.createElement('div')
+        parentElement.appendChild(element)
+        drawn(element, 10)
+        const adapter = mount(element, { layoutId: 'ancestor-x' }, { parent })
+
+        expect(adapter.currentVisualPageRect()?.left).toBe(element.getBoundingClientRect().left)
+    })
+
+    it('3p: the handoff rect of an element with its own x: 100 is its on-screen box', () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        drawn(element, 10)
+        const adapter = mount(element, { layoutId: 'own-x' })
+        adapter.visualElement.latestValues.x = 100
+        adapter.visualElement.render()
+        expect(element.style.transform).toContain('translateX(100px)')
+        adapter.seedLayout()
+
+        expect(adapter.currentVisualPageRect()?.left).toBe(element.getBoundingClientRect().left)
+    })
+})
+
+/**
+ * Plan 015b part D: `layout` nodes that follow a list's layout parent but sit
+ * outside it (a footer after the list). Upstream re-renders them with the
+ * list's owner, so their `MeasureLayout` snapshots (`getSnapshotBeforeUpdate`
+ * → `willUpdate()`, MeasureLayout.tsx:149-204 @ v14.7.1). Here the change has
+ * already hit the DOM, so the picked nodes are seeded from their cached
+ * layouts, without a read; on a completed exit they are refreshed silently
+ * instead (the snap: upstream re-renders only that AnimatePresence,
+ * AnimatePresence/index.tsx:244).
+ *
+ * Read off the class so a missing method fails only these cases.
+ */
+describe('MotionDomProjectionAdapter.seedFollowingLayout (plan 015b)', () => {
+    type Cause = { kind: 'change' } | { kind: 'exit-complete'; markers: [] }
+    const seedFollowingLayout = (
+        parent: Element,
+        records: MutationRecord[] | null,
+        cause: Cause = { kind: 'change' }
+    ) =>
+        (
+            MotionDomProjectionAdapter as unknown as {
+                seedFollowingLayout: (
+                    parent: Element,
+                    records: MutationRecord[] | null,
+                    cause: Cause
+                ) => void
+            }
+        ).seedFollowingLayout(parent, records, cause)
+
+    const rects = new Map<HTMLElement, DOMRect>()
+    const reads = new Map<HTMLElement, number>()
+    const adapters: MotionDomProjectionAdapter[] = []
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    /** A `layout` node in its own wrapper `div` (like `#foot-wrap`) inside `host`. */
+    const mountIn = (
+        host: Element,
+        top: number,
+        options: { parent?: MotionDomProjectionAdapter; gated?: boolean; layoutId?: string } = {}
+    ) => {
+        const wrap = document.createElement('div')
+        const element = document.createElement('div')
+        wrap.append(element)
+        host.append(wrap)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => {
+            reads.set(element, (reads.get(element) ?? 0) + 1)
+            return rects.get(element)!
+        })
+        const adapter = new MotionDomProjectionAdapter({ parent: options.parent })
+        adapter.updateOptions({
+            layout: true,
+            layoutId: options.layoutId,
+            ...(options.gated ? { measurementGated: true } : {})
+        })
+        adapter.mount(element)
+        adapters.push(adapter)
+        return { adapter, element, wrap }
+    }
+    const list = (host: Element) => {
+        const parent = document.createElement('ul')
+        host.append(parent)
+        return parent
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const records = () => [] as MutationRecord[]
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+        reads.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of adapters.splice(0).reverse()) adapter.unmount()
+        document.body.innerHTML = ''
+    })
+
+    it('3h: seeds a following node from its cache, with no read, and it animates', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        // The list shrank: the footer is 70px higher.
+        place(footer.element, 230)
+        reads.clear()
+
+        seedFollowingLayout(parent, records())
+
+        expect(reads.get(footer.element) ?? 0).toBe(0)
+        expect(footer.adapter.projection.isLayoutDirty).toBe(true)
+        expect(footer.adapter.projection.snapshot?.layoutBox.y.min).toBe(300)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        expect(didUpdate.mock.calls[0][0].layout.y.min).toBe(230)
+    })
+
+    it("3i: prunes preceding subtrees and skips the parent's line, gated, dirty, unmounted, size-animating, unreliable and other-ancestor nodes", () => {
+        const outerHost = document.createElement('section')
+        document.body.append(outerHost)
+        const outer = mountIn(outerHost, 0)
+        const host = outer.element
+        const preceding = mountIn(host, 10, { parent: outer.adapter })
+        const precedingChild = mountIn(preceding.element, 15, { parent: preceding.adapter })
+        const parent = list(host)
+        const descendant = mountIn(parent, 20, { parent: outer.adapter })
+        const picked = mountIn(host, 100, { parent: outer.adapter })
+        const gated = mountIn(host, 110, { parent: outer.adapter, gated: true })
+        const dirty = mountIn(host, 120, { parent: outer.adapter })
+        const sticky = mountIn(host, 130, { parent: outer.adapter })
+        const stale = mountIn(host, 140, { parent: outer.adapter })
+        const sizeHost = document.createElement('div')
+        sizeHost.setAttribute('data-layout-size-animation', 'true')
+        host.append(sizeHost)
+        const sizing = mountIn(sizeHost, 150, { parent: outer.adapter })
+        // Follows the parent, but its nearest motion ancestor is the document.
+        const other = mountIn(document.body, 400)
+        const unmounted = new MotionDomProjectionAdapter({ parent: outer.adapter })
+        unmounted.updateOptions({ layout: true })
+
+        dirty.adapter.projection.isLayoutDirty = true
+        const internals = (adapter: MotionDomProjectionAdapter) =>
+            adapter as unknown as { lastLayoutBasis: unknown }
+        const basis = {
+            scrollers: [],
+            values: [],
+            epoch: 0,
+            resizeEpoch: readScrollBasis(sticky.element).resizeEpoch,
+            fixedRoot: null,
+            unreliable: false
+        }
+        internals(sticky.adapter).lastLayoutBasis = { ...basis, unreliable: true }
+        internals(stale.adapter).lastLayoutBasis = { ...basis, resizeEpoch: basis.resizeEpoch - 1 }
+        reads.clear()
+
+        seedFollowingLayout(parent, records())
+
+        expect(picked.adapter.projection.isLayoutDirty, 'picked').toBe(true)
+        expect(picked.adapter.projection.snapshot?.layoutBox.y.min).toBe(100)
+        for (const [name, skipped] of Object.entries({
+            outer,
+            preceding,
+            precedingChild,
+            descendant,
+            gated,
+            sticky,
+            stale,
+            sizing,
+            other
+        })) {
+            expect(skipped.adapter.projection.snapshot, name).toBeUndefined()
+            expect(skipped.adapter.projection.isLayoutDirty, name).toBe(false)
+        }
+        expect(dirty.adapter.projection.snapshot, 'dirty').toBeUndefined()
+        expect(unmounted.projection.snapshot, 'unmounted').toBeUndefined()
+        // Seeding reads nothing at all.
+        expect([...reads.values()].reduce((a, b) => a + b, 0)).toBe(0)
+        dirty.adapter.projection.isLayoutDirty = false
+    })
+
+    it('3j: runs once per records array', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        const batch = records()
+
+        seedFollowingLayout(parent, batch)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+
+        // Every sibling's observer hands over the same batch.
+        seedFollowingLayout(parent, batch)
+        expect(footer.adapter.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+
+        seedFollowingLayout(parent, records())
+        await flush()
+        expect(didUpdate).toHaveBeenCalledTimes(2)
+    })
+
+    it('3k: runs one root update for every picked node', () => {
+        const parent = list(document.body)
+        const a = mountIn(document.body, 300)
+        mountIn(document.body, 400)
+        const root = a.adapter.projection.root!
+        const didUpdate = vi.spyOn(root, 'didUpdate')
+
+        seedFollowingLayout(parent, records())
+
+        expect(didUpdate).toHaveBeenCalledTimes(1)
+        didUpdate.mockRestore()
+    })
+
+    it('3l: on a completed exit, refreshes silently and seeds nothing', async () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300)
+        const refresh = vi.spyOn(footer.adapter, 'refreshLayout')
+        const onCacheRefresh = vi.fn()
+        footer.adapter.onCacheRefresh(onCacheRefresh)
+        const didUpdate = vi.fn()
+        footer.adapter.projection.addEventListener('didUpdate', didUpdate)
+        place(footer.element, 230)
+        reads.clear()
+
+        seedFollowingLayout(parent, records(), { kind: 'exit-complete', markers: [] })
+
+        expect(refresh).toHaveBeenCalledTimes(1)
+        expect(refresh).toHaveBeenCalledWith({ silent: true })
+        expect(reads.get(footer.element)).toBe(1)
+        expect(onCacheRefresh).toHaveBeenCalledWith({ left: 10, top: 230, width: 100, height: 50 })
+        expect(footer.adapter.projection.snapshot).toBeUndefined()
+        expect(footer.adapter.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(didUpdate).not.toHaveBeenCalled()
+        expect(footer.adapter.lastMeasuredRect?.top).toBe(230)
+    })
+
+    it('3m: leaves resumeFrom and shared-layout stacks untouched', () => {
+        const parent = list(document.body)
+        const footer = mountIn(document.body, 300, { layoutId: 'footer-015b' })
+        const projection = footer.adapter.projection
+        const stack = projection.getStack()
+        const members = [...(stack?.members ?? [])]
+        const lead = stack?.lead
+        const resumeFrom = projection.resumeFrom
+
+        seedFollowingLayout(parent, records())
+
+        expect(projection.resumeFrom).toBe(resumeFrom)
+        expect(projection.getStack()).toBe(stack)
+        expect(stack?.lead).toBe(lead)
+        expect([...(stack?.members ?? [])]).toEqual(members)
+    })
+})
+
+/**
+ * Plan 015b A2.2: a group member that is running its own box-size animation
+ * (`data-layout-size-animation`, `runBoxSizeAnimation` in layout.ts) is drawn
+ * at a transient inline width. `commitGroup` seeding it measured that width,
+ * started a second (projection) animation on top, and wrote the transient
+ * rect into its cache, so when the size animation ended the observer saw a
+ * change from it and restarted the size animation from the origin (the
+ * layout-button wait-group shell: 79 → 86 → 80 → 93px).
+ */
+describe('MotionDomProjectionAdapter.commitGroup and size-animating members (plan 015b A2.2)', () => {
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+    })
+
+    it('leaves a member that runs its own box-size animation alone', async () => {
+        const group = nodeGroup()
+        const host = new MotionDomProjectionAdapter({ group })
+        const other = new MotionDomProjectionAdapter({ group })
+        const hostElement = document.createElement('div')
+        const otherElement = document.createElement('div')
+        document.body.append(hostElement, otherElement)
+        let hostWidth = 93
+        vi.spyOn(hostElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 0, hostWidth, 32)
+        )
+        vi.spyOn(otherElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 100, 100, 50)
+        )
+        for (const [adapter, element] of [
+            [host, hostElement],
+            [other, otherElement]
+        ] as const) {
+            adapter.updateOptions({ layout: true })
+            adapter.mount(element)
+        }
+        const hostCommit = vi.fn()
+        host.onProjectionCommit(hostCommit)
+        // Mid size animation: the inline width holds the box at 77px.
+        hostElement.setAttribute('data-layout-size-animation', 'true')
+        hostWidth = 77
+
+        MotionDomProjectionAdapter.commitGroup(group)
+
+        expect(host.projection.snapshot).toBeUndefined()
+        expect(host.projection.isLayoutDirty).toBe(false)
+        await flush()
+        expect(hostCommit).not.toHaveBeenCalled()
+        expect(host.projection.currentAnimation).toBeUndefined()
+        hostElement.removeAttribute('data-layout-size-animation')
+        other.unmount()
+        host.unmount()
+        hostElement.remove()
+        otherElement.remove()
+    })
+
+    it('a member seeded just before its own box-size animation starts keeps its cache and gets no projection animation', async () => {
+        const group = nodeGroup()
+        const host = new MotionDomProjectionAdapter({ group })
+        const other = new MotionDomProjectionAdapter({ group })
+        const hostElement = document.createElement('div')
+        const otherElement = document.createElement('div')
+        document.body.append(hostElement, otherElement)
+        let hostWidth = 77
+        let otherTop = 100
+        vi.spyOn(hostElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, 0, hostWidth, 32)
+        )
+        vi.spyOn(otherElement, 'getBoundingClientRect').mockImplementation(
+            () => new DOMRect(10, otherTop, 100, 50)
+        )
+        for (const [adapter, element] of [
+            [host, hostElement],
+            [other, otherElement]
+        ] as const) {
+            adapter.updateOptions({ layout: true })
+            adapter.mount(element)
+        }
+        const hostCommit = vi.fn()
+        host.onProjectionCommit(hostCommit)
+
+        // A group sibling's commit seeds the host (the wait-group release)...
+        otherTop = 120
+        other.commitObservedLayoutChange({ left: 10, top: 100, width: 100, height: 50 })
+        expect(host.projection.isLayoutDirty).toBe(true)
+        // ...then, in the same task, the host starts its own box-size
+        // animation, whose inline width holds it at 77px for now.
+        hostElement.setAttribute('data-layout-size-animation', 'true')
+        host.yieldToSizeAnimation()
+        await flush()
+
+        expect(hostCommit).not.toHaveBeenCalled()
+        expect(host.projection.currentAnimation).toBeUndefined()
+        hostWidth = 93
+        hostElement.removeAttribute('data-layout-size-animation')
+        other.unmount()
+        host.unmount()
+        hostElement.remove()
+        otherElement.remove()
+    })
+})
+
+/**
+ * Plan 012 (U9): exiting nodes take part in shared layout, as upstream
+ * `MeasureLayout` does (`getSnapshotBeforeUpdate` 149-204, `componentDidUpdate`
+ * 206-218, `safeToRemove` through `usePresence` @ v14.7.1). `setPresence` /
+ * `commitPresence` are the owned path's pre and post halves;
+ * `handOffToExitClone` re-points a departing node at its exit clone.
+ */
+describe('presence in shared layout (plan 012)', () => {
+    type ExitHold = ExitLayoutHold
+    const api = (adapter: MotionDomProjectionAdapter) => adapter
+    const rects = new Map<HTMLElement, DOMRect>()
+    const mounted: MotionDomProjectionAdapter[] = []
+    const mount = (layoutId: string | undefined, rect: DOMRect, layout?: boolean) => {
+        const visualElement = createMotionVisualElement({ props: {} })
+        const adapter = new MotionDomProjectionAdapter({ visualElement })
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        rects.set(element, rect)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            element.isConnected ? rects.get(element)! : new DOMRect()
+        )
+        adapter.updateOptions({ layoutId, layout, transition: { duration: 0.05 } as never })
+        adapter.mount(element)
+        mounted.push(adapter)
+        return { adapter, element }
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const frames = (n = 2) =>
+        new Promise<void>((resolve) => {
+            let left = n
+            const step = () => (--left <= 0 ? resolve() : frame.postRender(step))
+            frame.postRender(step)
+        })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+    afterEach(async () => {
+        await flush()
+        for (const adapter of mounted.splice(0)) adapter.unmount()
+    })
+
+    it('9a: an exiting lead relegates, promoting the earlier present member with its snapshot', () => {
+        const { adapter: b } = mount('p9a', new DOMRect(10, 0, 100, 50))
+        const { adapter: a } = mount('p9a', new DOMRect(300, 0, 100, 50))
+        const stack = a.projection.getStack()!
+        expect(stack.lead === a.projection).toBe(true)
+
+        api(a).setPresence(false, vi.fn())
+        api(a).commitPresence()
+
+        expect(stack.lead === b.projection).toBe(true)
+        expect(b.projection.resumeFrom === a.projection).toBe(true)
+        expect(a.projection.snapshot).toBeDefined()
+        expect(b.projection.snapshot === a.projection.snapshot).toBe(true)
+    })
+
+    it('9b: a lone exiting node is released once, by the microtask lead check', async () => {
+        const { adapter: a } = mount('p9b', new DOMRect(10, 0, 100, 50))
+        const release = vi.fn()
+
+        api(a).setPresence(false, release)
+        expect(release).not.toHaveBeenCalled()
+        api(a).commitPresence()
+        await flush()
+        await frames(3)
+
+        expect(release).toHaveBeenCalledTimes(1)
+    })
+
+    it('9c: held until the new lead animates in, released once per exit cycle', async () => {
+        const { adapter: a } = mount('p9c', new DOMRect(10, 0, 100, 50))
+        const release = vi.fn()
+
+        api(a).setPresence(false, release)
+        const { adapter: b } = mount('p9c', new DOMRect(300, 0, 100, 50))
+        api(a).commitPresence()
+        await flush()
+        await frames(2)
+        expect(b.projection.currentAnimation).toBeDefined()
+        expect(release).not.toHaveBeenCalled()
+
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        await frames(2)
+        expect(b.projection.currentAnimation).toBeUndefined()
+        expect(release).toHaveBeenCalledTimes(1)
+        // Every member's `onExitComplete` again: the latch holds.
+        a.projection.getStack()!.exitAnimationComplete()
+        expect(release).toHaveBeenCalledTimes(1)
+
+        // A new cycle re-arms it.
+        api(a).setPresence(true, release)
+        api(a).commitPresence()
+        api(a).setPresence(false, release)
+        api(a).commitPresence()
+        await flush()
+        await frames(3)
+        a.projection.getStack()!.exitAnimationComplete()
+        // The release runs in a microtask of its own (plan 012 A2).
+        await flush()
+        expect(release).toHaveBeenCalledTimes(2)
+    })
+
+    it('9d: hands a detached node off to its exit clone and defers its unmount', async () => {
+        const { adapter: a, element } = mount('p9d', new DOMRect(10, 0, 100, 50))
+        const visualElement = a.visualElement
+        const unmountVisualElement = vi.spyOn(visualElement, 'unmount')
+        element.remove()
+        const clone = element.cloneNode(true) as HTMLElement
+        rects.set(clone, new DOMRect(10, 0, 100, 50))
+        vi.spyOn(clone, 'getBoundingClientRect').mockImplementation(() =>
+            clone.isConnected ? rects.get(clone)! : new DOMRect()
+        )
+        document.body.appendChild(clone)
+        const held: { hold?: ExitHold } = {}
+        const release = vi.fn(() => held.hold?.finish())
+
+        const hold = api(a).handOffToExitClone(clone, release)
+        held.hold = hold
+
+        expect(hold).toBeDefined()
+        expect(a.projection.instance === clone).toBe(true)
+        expect(visualElement.current).toBe(clone)
+        expect(visualElementStore.get(clone)).toBe(visualElement)
+        expect(visualElementStore.get(element)).toBeUndefined()
+        expect(a.projection.isPresent).toBe(false)
+        expect(a.projection.snapshot).toBeDefined()
+        expect(api(a).isHandedOff).toBe(true)
+        // `byElement` follows the clone (E16).
+        expect(MotionDomProjectionAdapter.foldedInFor(clone)).not.toBe(
+            MotionDomProjectionAdapter.foldedInFor(element)
+        )
+
+        // The container's teardown: deferred.
+        a.unmount()
+        expect(unmountVisualElement).not.toHaveBeenCalled()
+
+        await flush()
+        await frames(3)
+        expect(release).toHaveBeenCalledTimes(1)
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(visualElementStore.get(clone)).toBeUndefined()
+        hold!.finish()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+    })
+
+    it('9e: cancelling the hold unmounts at once, and a later release is a no-op', async () => {
+        const { adapter: a, element } = mount('p9e', new DOMRect(10, 0, 100, 50))
+        const unmountVisualElement = vi.spyOn(a.visualElement, 'unmount')
+        element.remove()
+        const clone = element.cloneNode(true) as HTMLElement
+        document.body.appendChild(clone)
+        const release = vi.fn()
+        const hold = api(a).handOffToExitClone(clone, release)
+        a.unmount()
+
+        hold!.cancel()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(a.isMounted).toBe(false)
+
+        await flush()
+        await frames(3)
+        expect(release).not.toHaveBeenCalled()
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        clone.remove()
+    })
+
+    it('A2: a departing lead refreshed under a translated ancestor still hands over where it was drawn', () => {
+        // The ancestor is drawn 50px right by its own `x`; the lead sits in it.
+        const parentElement = document.createElement('div')
+        document.body.appendChild(parentElement)
+        vi.spyOn(parentElement, 'getBoundingClientRect').mockReturnValue(
+            new DOMRect(0, 0, 400, 100)
+        )
+        const parentAdapter = new MotionDomProjectionAdapter()
+        parentAdapter.updateOptions({ layout: true })
+        parentAdapter.mount(parentElement)
+        mounted.push(parentAdapter)
+        parentAdapter.projection.latestValues.x = 50
+        parentElement.style.transform = 'translateX(50px)'
+        const element = document.createElement('div')
+        parentElement.appendChild(element)
+        // Drawn with the ancestor's translate unless it is stripped.
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() =>
+            !element.isConnected
+                ? new DOMRect()
+                : new DOMRect(parentElement.style.transform === 'none' ? 100 : 150, 0, 100, 50)
+        )
+        const lead = new MotionDomProjectionAdapter({ parent: parentAdapter })
+        lead.updateOptions({ layoutId: 'a2-refresh' })
+        lead.mount(element)
+        mounted.push(lead)
+        // An own, stripped read (part D's exit-complete refresh does one).
+        lead.refreshLayout({ silent: true })
+        element.remove()
+        lead.unmount()
+
+        expect(lead.projection.snapshot?.measuredBox.x.min).toBe(150)
+        expect(lead.projection.snapshot?.layoutBox.x.min).toBe(100)
+    })
+
+    it('9f: an adapter never given a presence unmounts as before', () => {
+        const { adapter: a, element } = mount('p9f', new DOMRect(10, 0, 100, 50))
+        const unmountVisualElement = vi.spyOn(a.visualElement, 'unmount')
+        element.remove()
+
+        a.unmount()
+
+        expect(unmountVisualElement).toHaveBeenCalledTimes(1)
+        expect(a.isMounted).toBe(false)
+        expect(visualElementStore.get(element)).toBeUndefined()
+        // The departing-lead snapshot is still handed over (#1935 A1).
+        expect(a.projection.snapshot).toBeDefined()
     })
 })

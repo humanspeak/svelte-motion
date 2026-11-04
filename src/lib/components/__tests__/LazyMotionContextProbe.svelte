@@ -17,6 +17,6 @@
     data-returned-same={returned === context}
     data-read-same={read === context}
     data-strict={read?.strict}
-    data-gestures={read?.getFeatures().gestures}
+    data-gestures={read?.getFeatures()?.gestures}
     data-loaded={read?.getIsLoaded()}
 ></div>

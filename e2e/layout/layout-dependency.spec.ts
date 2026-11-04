@@ -290,9 +290,7 @@ test.describe('layoutDependency own-presence and wait-mode parent (upstream pari
         await expect.poll(readCount(page, 'self-presence-measures')).toBeGreaterThanOrEqual(1)
     })
 
-    test('gated wait-mode parent jumps on child swap; ungated parent animates size', async ({
-        page
-    }) => {
+    test('wait-mode parents jump on child swap, gated or not (as in Motion)', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 2200 })
         await page.goto(URL)
         await waitForMotionReady(page, 'wait-parent')
@@ -311,12 +309,16 @@ test.describe('layoutDependency own-presence and wait-mode parent (upstream pari
         ).toBe(false)
         await expect.poll(() => width('gated-wait-parent')).toBeGreaterThan(smallWidth)
 
-        // Ungated parent keeps the hold/release size animation.
+        // Ungated parent jumps too (plan 015b A3.1): the wait-mode exit's
+        // completion re-renders only the AnimatePresence
+        // (`AnimatePresence/index.tsx:244` @ v14.7.1), and this parent is in
+        // no LayoutGroup, so it takes no snapshot and snaps, as in Motion.
+        const largeWidth = await width('gated-wait-parent')
         expect(
             await sawFlipTransform(page, 'wait-parent', () =>
                 page.getByTestId('swap-wait-child').click()
             )
-        ).toBe(true)
-        await expect.poll(() => width('wait-parent')).toBeGreaterThan(smallWidth)
+        ).toBe(false)
+        await expect.poll(() => width('wait-parent')).toBe(largeWidth)
     })
 })

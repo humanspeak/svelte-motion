@@ -1,0 +1,120 @@
+---
+title: 'layoutRoot & layoutAnchor'
+description: 'Animate shared layoutId elements relative to a layout root, and choose the anchor point of relative layout projection.'
+---
+
+<script>
+  import Example from '$lib/components/general/Example.svelte';
+  import SidebarTabs from '$lib/examples/layout-root/demos/SidebarTabs.svelte';
+  import CenteredAnchor from '$lib/examples/layout-root/demos/CenteredAnchor.svelte';
+  import { getSeoContext } from '$lib/components/contexts/Seo/Seo.context'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'layoutRoot & layoutAnchor | Docs | Svelte Motion'
+      seo.description = 'Use layoutRoot so shared layoutId animations move relative to a layout root, and layoutAnchor to keep a centred child centred while its parent resizes, in Svelte.'
+      seo.ogTitle = 'layoutRoot & layoutAnchor'
+      seo.ogTagline = 'Animate relative to the right box'
+      seo.ogFeatures = ['Layout Animations', 'Shared Layout', 'layoutId', 'Motion Parity']
+      seo.ogSlug = 'docs-layout-root'
+  }
+</script>
+
+# layoutRoot & layoutAnchor
+
+Two props control which box a layout animation is measured against.
+
+- `layoutRoot` makes an element a **layout root**: the layout animations of its descendants resolve relative to it.
+- `layoutAnchor` picks the **point on the parent** a child's relative layout projection is anchored to.
+
+## What a layout root is
+
+A `layout` child normally follows its nearest projecting parent. `layoutRoot` makes an element that parent for
+everything inside it, so descendants animate within it rather than across the page. The root's own layout change is
+instant: it jumps to its new place, and its children animate inside it.
+
+```svelte
+<script lang="ts">
+  import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.ul layout layoutRoot>
+  <!-- tabs whose layout animations resolve relative to the list -->
+</motion.ul>
+```
+
+`layoutRoot` is read when the element mounts, as in Motion. Changing it afterwards has no effect. To toggle it,
+remount the element, for example with `{#key}`:
+
+```svelte
+{#key isRoot}
+  <motion.ul layout={isRoot} layoutRoot={isRoot}>…</motion.ul>
+{/key}
+```
+
+## Shared `layoutId` inside a root
+
+Since Motion 14.7.1 this includes shared `layoutId` animations. When the element that previously held the
+`layoutId` was **inside the root too**, the new one animates relative to the root. Take a tab bar in a centred
+window: selecting a tab opens a sidebar, so the whole bar jumps left in the same update as the underline moves.
+With `layoutRoot` on the list, the underline glides exactly one tab. Without it, it flies in from where the old tab
+used to be on the page.
+
+<Example isSmall exampleUrl="/examples/layout-root">
+  <SidebarTabs />
+</Example>
+
+```svelte
+<motion.ul layout layoutRoot>
+  {#each tabs as tab (tab)}
+    <li>
+      <button onclick={() => (selected = tab)}>{tab}</button>
+      <AnimatePresence>
+        {#if tab === selected}
+          <motion.div key="underline" layoutId="underline" class="underline" />
+        {/if}
+      </AnimatePresence>
+    </li>
+  {/each}
+</motion.ul>
+```
+
+If the previous element was **outside** the root, the new one still animates from its page position: the root
+can't describe where it came from.
+
+## `layoutAnchor`
+
+While a parent's layout animates, a `layout` child follows it through relative projection: its position is measured
+from a point on the parent. `layoutAnchor` picks that point.
+
+- **Default, `{ x: 0, y: 0 }`**: the parent's top-left corner. The child keeps its offset from that corner.
+- **`{ x: 0.5, y: 0.5 }`**: the parent's centre. A child of a centring (for example flexbox) parent stays centred
+  while the parent resizes.
+- **`false`**: no relative projection. The child animates in page space on its own.
+
+<Example isSmall exampleUrl="/examples/layout-root">
+  <CenteredAnchor />
+</Example>
+
+```svelte
+<motion.div layout style="display: flex; align-items: center; justify-content: center">
+  <motion.div layout layoutAnchor={{ x: 0.5, y: 0.5 }} />
+</motion.div>
+```
+
+Unlike `layoutRoot`, `layoutAnchor` follows every update.
+
+## API Reference
+
+| Prop | Type | Description |
+|---|---|---|
+| `layoutRoot` | `boolean` | Make this element a layout root. Descendants' layout animations, including shared `layoutId` ones whose previous element was inside it too, resolve relative to it. Its own layout change is instant. Read at mount. |
+| `layoutAnchor` | `{ x: number; y: number } \| false` | The point on the parent that relative layout projection is anchored to. Defaults to the top-left corner. `false` turns relative projection off. |
+
+## Not yet supported
+
+A shared `layoutId` crossfade with an element that is still exiting (an `exit` animation on the old underline) doesn't
+follow the root yet: the exiting element stays where it was while the new one animates. Without `exit`, the handoff
+works as described above.
+
+Based on Motion's [`layoutRoot`](https://motion.dev/docs/react-layout-animations#layoutroot) and `layoutAnchor` props.
