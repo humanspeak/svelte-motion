@@ -497,7 +497,8 @@ const anchoringSuppressions = new WeakMap<HTMLElement, { count: number; inline: 
  * (plan 012 A6): `overflow-anchor: none` on `element` until the second
  * animation frame, so the first frame's layout after the swap makes no
  * adjustment. Overlapping calls share one hold; the element's own inline
- * value comes back when the last one ends.
+ * value comes back when the last one ends, unless the app wrote its own
+ * value in the meantime.
  *
  * Upstream keeps the real element in place, so its clamp of a scrolled
  * container is the only scroll change an exit makes. The clone path removes
@@ -530,7 +531,8 @@ export const suppressScrollAnchoring = (element: HTMLElement): void => {
         const hold = anchoringSuppressions.get(element)
         if (!hold || --hold.count > 0) return
         anchoringSuppressions.delete(element)
-        element.style.overflowAnchor = hold.inline
+        // A value the app wrote during the hold is its own; keep it.
+        if (element.style.overflowAnchor === 'none') element.style.overflowAnchor = hold.inline
     }
     if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(() => requestAnimationFrame(release))

@@ -123,6 +123,19 @@ describe('suppressScrollAnchoring (plan 012 A6)', () => {
         expect(list.style.overflowAnchor).toBe('')
         vi.restoreAllMocks()
     })
+
+    it('keeps an inline value the app writes during the hold', () => {
+        const nextFrame = frames()
+        const list = document.createElement('ul')
+        list.style.overflowAnchor = 'auto'
+
+        suppressScrollAnchoring(list)
+        list.style.overflowAnchor = 'revert'
+        nextFrame()
+        nextFrame()
+        expect(list.style.overflowAnchor).toBe('revert')
+        vi.restoreAllMocks()
+    })
 })
 
 describe('presence context', () => {
