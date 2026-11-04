@@ -34,6 +34,26 @@
 > change. Tester UI stays hidden under `?@isPlaywright=true`. Visual claims are verified on every painted frame
 > (in-page `requestAnimationFrame` loops), never by sampling rects.
 
+> **Revision 2026-11-04 (guard, operator-approved, after the first Step 1 run).** The executor stopped in Step 1:
+> O2b and M1 passed at baseline. Cause: at baseline a `const presence = usePresence()` made at init returns a
+> `[true, null]` snapshot that never updates, so the consumer never gets a `safeToRemove`, the motion exits hold
+> the wrapper, and both tests pass vacuously ("whole-wrapper release today" only happens with the legacy
+> `$derived` probe). Amendments:
+> 1. **O2b** first asserts the probe received a callback once the exit starts
+>    (`expect(probe.dataset.tupleHasCallback).toBe('true')`, or the probe's equivalent attribute) before clicking
+>    `probe`. That precondition is what fails at baseline.
+> 2. **M1** adds (d): `MixedExit.svelte`'s CSS consumer sets `data-released="true"` on `mixed-css` when it calls
+>    its `safeToRemove`, and the frame log records it. Assert some frame shows `mixed-css` with
+>    `data-released="true"` (the consumer got and used its callback) before the removal frame. (d) is what fails at
+>    baseline. (a)-(c) stay.
+> 3. **`pnpm check` in Steps 1 and 2** may report exactly the 7 errors in `presenceExitRegistry.spec.ts` from R1/R2
+>    calling `completeIfEmpty`, which Step 3 adds. They are red tests too: no cast to hide them. Any other error is
+>    a failure. From Step 3 on, 0 errors.
+> 4. **Accepted executor choices:** the `shape` prop on `PresenceHarness.svelte` (P3-P5), arrow-wrapped
+>    `register`/`markLegacyManual` props in `FakePresenceContextHarness.svelte`, E3's two un-awaited `rerender`
+>    calls, and L2's `console.warn` spy. The lane merge `10a6d91f` was amended (message only) with
+>    `--no-verify`; accepted.
+
 ## Status
 
 - **Priority**: P1 (operator ruling: ships in 2.7.0 together with 016)
@@ -618,7 +638,7 @@ today `usePresence()` returns a snapshot that never updates:
   → exactly the RED cases above fail (R1, R2; the five listed existing usePresence cases, P1-P6, L1, L3, E1, E2;
   O2, O2b, O2c; U13). Every GUARD passes. `PW_PORT=4220 pnpm exec playwright test e2e/lazy-motion/featureless-m-presence.spec.ts e2e/utilities/use-presence.spec.ts`
   → only O4 and M1 fail.
-- `pnpm check` → 0 errors (the Fake harness casts).
+- `pnpm check` → 0 errors apart from the 7 `completeIfEmpty` errors in `presenceExitRegistry.spec.ts` (Revision 3).
 - Commit `test(presence): red, empty owned wrappers leave and usePresence registers (plan 017)`.
 
 ### Step 2: `usePresence()` registers once; the legacy path
@@ -663,7 +683,7 @@ today `usePresence()` returns a snapshot that never updates:
 
 **Verify**: `pnpm exec vitest run src/lib/utils/usePresence.spec.ts src/lib/html/_MotionContainer.spec.ts`
 → P1-P6, L1, L3, the five existing usePresence REDs, O2, O2b and O2c pass. E1 and E2 still fail (Step 3). Every
-GUARD passes. `pnpm check` → 0 errors. Commit `feat(presence): usePresence registers its own participant; legacy
+GUARD passes. `pnpm check` → only the 7 `completeIfEmpty` errors (Revision 3). Commit `feat(presence): usePresence registers its own participant; legacy
 reactive calls keep the old hold (plan 017)`.
 
 ### Step 3: An empty owned wrapper leaves at once
