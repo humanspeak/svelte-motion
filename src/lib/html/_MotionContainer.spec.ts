@@ -49,9 +49,9 @@ const animateValueMock = vi.hoisted(() =>
 )
 
 // Mock 'motion' before importing the Svelte component (hoisted)
-vi.mock('motion', () => {
+vi.mock('motion', async (importOriginal) => {
     const animateMock = vi.fn(() => ({ finished: Promise.resolve() }))
-    return { animate: animateMock }
+    return { ...(await importOriginal<typeof import('motion')>()), animate: animateMock }
 })
 const { animate: animateMock } = (await import('motion')) as unknown as {
     animate: ReturnType<typeof vi.fn> & {

@@ -1438,6 +1438,15 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion-reexports') + searchParams}
+                    >
+                        Motion re-exports — createScopedAnimate, inertia, animateMini,
+                        resolveElements
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animation-controls') + searchParams}
                     >
                         useAnimationControls

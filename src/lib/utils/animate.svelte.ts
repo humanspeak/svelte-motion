@@ -1,11 +1,7 @@
 import { getMotionConfig } from '$lib/components/motionConfig.context.js'
 import type { MotionConfigProps } from '$lib/types.js'
-import { createScopedAnimate } from 'motion'
-import type {
-    AnimationPlaybackControlsWithThen,
-    AnimationScope as MotionAnimationScope
-} from 'motion-dom'
-import type { SvelteMotionAnimate } from './animateValue.js'
+import type { AnimationPlaybackControlsWithThen } from 'motion-dom'
+import { createScopedAnimate, type SvelteMotionAnimate } from './animateValue.js'
 
 /**
  * The scope returned by {@link useAnimate}. Functions as a Svelte 5
@@ -176,10 +172,10 @@ export const useAnimate = <T extends Element = HTMLElement>(): [
             cachedReduce = reduceMotion
             // Upstream passes both keys even when `undefined`; createScopedAnimate ignores it.
             cachedScoped = createScopedAnimate({
-                scope: scope as MotionAnimationScope<T>,
+                scope,
                 reduceMotion,
                 skipAnimations
-            }) as SvelteMotionAnimate
+            })
         }
         return cachedScoped!
     }
