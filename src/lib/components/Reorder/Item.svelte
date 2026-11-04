@@ -9,6 +9,8 @@
      * update mid-gesture. While dragging, the item floats above its
      * siblings via a transform-driven `zIndex`. Keyboard reorderable
      * (Motion 14.6.0): Space grabs and drops, arrows move, Escape restores.
+     * The group is one tab stop and arrows move focus between items
+     * (Motion 14.9).
      *
      * @prop as - Element to render. Defaults to `'li'`.
      * @prop value - The entry in the group's `values` this item represents.
@@ -35,6 +37,7 @@
         onDrag,
         onDragEnd,
         onkeydown,
+        onfocusin,
         onblur,
         layout = true,
         ref = $bindable(),
@@ -95,13 +98,46 @@
         onDragEnd?.(event, info)
     }
 
+    /**
+     * This item's element, kept for the group to focus and forwarded to
+     * the consumer's `ref` (upstream `Item.tsx` `element` + combined ref).
+     * Separate from the `ref` prop: an unbound `$bindable` resets to the
+     * parent's value whenever the parent's props are re-spread, which would
+     * lose the element. The group reads it lazily, so its tab-stop check is
+     * reactive to the element appearing.
+     */
+    let element = $state<HTMLElement | null | undefined>(undefined)
+    const setElement = (node: HTMLElement | null | undefined) => {
+        element = node
+        ref = node
+    }
+    // svelte-ignore state_referenced_locally
+    context.elements.set(value, () => element)
+
     $effect(() => {
-        return () => context.unregisterItem(value)
+        return () => {
+            context.unregisterItem(value)
+            // The tab stop may have been this item (Motion 14.9.1 `Item.tsx`).
+            context.checkTabStop()
+        }
     })
 
     // Typed here: `HTMLElementProps` only declares an `unknown` index signature.
     const userKeyDown = $derived(onkeydown as KeyboardEventHandler<HTMLElement> | null | undefined)
     const userBlur = $derived(onblur as FocusEventHandler<HTMLElement> | null | undefined)
+    const userFocusIn = $derived(onfocusin as FocusEventHandler<HTMLElement> | null | undefined)
+
+    /**
+     * The item focused last, or holding focus, is the group's tab stop
+     * (Motion 14.9.1 `Item.tsx` `onFocus`). React's `onFocus` bubbles, so
+     * the Svelte equivalent is `focusin`: focus inside the item counts too.
+     * A consumer's `onfocus` still runs first, as `focus` fires before
+     * `focusin`.
+     */
+    const handleFocusIn: FocusEventHandler<HTMLElement> = (event) => {
+        userFocusIn?.(event)
+        context.setActive(value)
+    }
 
     /** The values when this item was grabbed by keyboard, or `undefined`. */
     let grabbedFrom = $state<V[] | undefined>(undefined)
@@ -170,16 +206,18 @@
 <!--
     Prop order mirrors upstream Item.tsx: `drag` and `tabindex` before the
     spread so a consumer's `drag` prop can unlock both axes and a
-    consumer's `tabindex={-1}` removes the Tab stop; everything after the
-    spread is enforced by Reorder and wraps or overrides consumer props.
+    consumer's `tabindex` overrides the group's roving tab stop; everything
+    after the spread is enforced by Reorder and wraps or overrides consumer
+    props.
 -->
 <MotionContainer
-    bind:ref
+    bind:ref={() => element, setElement}
     tag={as}
     drag={itemDrag}
-    tabindex={0}
+    tabindex={context.isTabStop(value) ? 0 : -1}
     {...rest}
     onkeydown={handleKeyDown}
+    onfocusin={handleFocusIn}
     onblur={handleBlur}
     dragSnapToOrigin
     style={itemStyle}

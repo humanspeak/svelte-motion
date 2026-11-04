@@ -393,8 +393,13 @@ describe('Reorder keyboard', () => {
         press(a, ' ')
         press(a, 'ArrowRight')
         expect(order()).toEqual(['b', 'a', 'c'])
+        // Svelte port: since 14.9 Up and Down on `xy` go by the rows as drawn,
+        // so let the items re-measure after each move (upstream's jsdom has
+        // no layout at all, so every item is its own row in order).
+        await vi.advanceTimersByTimeAsync(50)
         press(a, 'ArrowDown')
         expect(order()).toEqual(['b', 'c', 'a'])
+        await vi.advanceTimersByTimeAsync(50)
         press(a, 'ArrowUp')
         expect(order()).toEqual(['b', 'a', 'c'])
         press(a, 'ArrowLeft')
