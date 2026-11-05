@@ -208,7 +208,14 @@ const propagateAccelerate = <O>(
 ): void => {
     if (!isMotionValue(source)) return
     const inputAccelerate = (source as MotionValue<number>).accelerate
-    if (!inputAccelerate || inputAccelerate.isTransformed || options?.clamp === false) return
+    // WAAPI can't call a mixer (motion 62842dc4b, framer-motion use-transform.ts:221-233 @ v14.9.1).
+    if (
+        !inputAccelerate ||
+        inputAccelerate.isTransformed ||
+        options?.clamp === false ||
+        options?.mixer
+    )
+        return
     if (output.length === 0 || !isMonotonicUnitRange(input)) return
 
     const ease = options?.ease

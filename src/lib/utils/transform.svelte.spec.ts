@@ -348,6 +348,27 @@ describe('useTransform accelerate propagation', () => {
         })
     })
 
+    it("doesn't accelerate with a mixer, as WAAPI can't call it", () => {
+        inRoot(() => {
+            const out = useTransform(accelerated(), [0, 1], ['blur(0px)', 'blur(10px)'], {
+                mixer: () => () => 'blur(5px)'
+            })
+            expect(out.accelerate).toBeUndefined()
+        })
+    })
+
+    it("multi-output map form doesn't accelerate with a mixer", () => {
+        inRoot(() => {
+            const out = useTransform(
+                accelerated(),
+                [0, 1],
+                { filter: ['blur(0px)', 'blur(10px)'] },
+                { mixer: () => () => 'blur(5px)' }
+            )
+            expect(out.filter.accelerate).toBeUndefined()
+        })
+    })
+
     it('chained transform does not accelerate', () => {
         inRoot(() => {
             const first = useTransform(accelerated(), [0, 1], [1, 0.5])
