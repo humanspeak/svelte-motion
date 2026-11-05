@@ -968,7 +968,6 @@ describe('_MotionContainer', () => {
         const lateMount = vi
             .spyOn(ExitAnimationFeature.prototype, 'mount')
             .mockImplementation(function (this: InstanceType<typeof ExitAnimationFeature>) {
-                mount.call(this)
                 const state = this.node.animationState!
                 const original = state.setActive.bind(state)
                 vi.spyOn(state, 'setActive').mockImplementation((type, active, options) => {
@@ -977,6 +976,7 @@ describe('_MotionContainer', () => {
                         ? animation.then(() => late.promise)
                         : animation
                 })
+                mount.call(this)
             })
         try {
             await group.update({ present: false, fastPresent: true })

@@ -218,7 +218,7 @@ describe('ExitAnimationFeature', () => {
         return { element, ve, setActive, animateChanges, reset }
     }
 
-    it('registers with the presence context on mount and reports the previous occupant', () => {
+    it('registers with the presence context on mount without reporting completion', () => {
         const onExitComplete = vi.fn()
         const unregister = vi.fn()
         const register = vi.fn(() => unregister)
@@ -229,9 +229,9 @@ describe('ExitAnimationFeature', () => {
             onExitComplete
         })
 
-        // Upstream `exit.ts:74-84`: report completion for whoever held this id,
-        // then register and keep the unregister as the feature's unmount.
-        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        // Upstream `exit.ts` @ v14.9.1 (#4049): register and keep the
+        // unregister as the feature's unmount; no completion on mount.
+        expect(onExitComplete).not.toHaveBeenCalled()
         expect(register).toHaveBeenCalledTimes(1)
         // Upstream `exit.ts:81` @ v14.5.0 (#2503): the node rides along so
         // popLayout can find the outermost motion element.
@@ -267,27 +267,6 @@ describe('ExitAnimationFeature', () => {
         await Promise.resolve()
         expect(onExitComplete).toHaveBeenCalledTimes(1)
 
-        ve.unmount()
-        visualElementStore.delete(element)
-    })
-
-    it('starts one exit for a descendant mounted into an already absent context', async () => {
-        const onExitComplete = vi.fn()
-        const absent = { id: 'late', isPresent: false, register: () => () => {}, onExitComplete }
-        const { ve, element, setActive } = mountWithExit(absent)
-        onExitComplete.mockClear()
-        const pending = Promise.withResolvers<void>()
-        setActive.mockReturnValue(pending.promise)
-        ve.update(ve.getProps(), absent)
-        ve.updateFeatures()
-        ve.updateFeatures()
-        expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
-        expect(onExitComplete).not.toHaveBeenCalled()
-        pending.resolve()
-        await pending.promise
-        expect(onExitComplete).toHaveBeenCalledTimes(1)
-        ve.updateFeatures()
-        expect(setActive).toHaveBeenCalledTimes(1)
         ve.unmount()
         visualElementStore.delete(element)
     })
@@ -368,6 +347,28 @@ describe('ExitAnimationFeature', () => {
 
         expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
 
+        ve.unmount()
+        visualElementStore.delete(element)
+    })
+
+    it('starts one exit for a descendant mounted into an already absent context', async () => {
+        const onExitComplete = vi.fn()
+        const absent = { id: 'late', isPresent: false, register: () => () => {}, onExitComplete }
+        const { ve, element, setActive } = createWithSpiedExit(absent)
+        const pending = Promise.withResolvers<void>()
+        setActive.mockReturnValue(pending.promise)
+        // The exit starts from mount(); later updates must not restart it.
+        ve.updateFeatures()
+        ve.update(ve.getProps(), absent)
+        ve.updateFeatures()
+        ve.updateFeatures()
+        expect(setActive).toHaveBeenCalledExactlyOnceWith('exit', true)
+        expect(onExitComplete).not.toHaveBeenCalled()
+        pending.resolve()
+        await pending.promise
+        expect(onExitComplete).toHaveBeenCalledTimes(1)
+        ve.updateFeatures()
+        expect(setActive).toHaveBeenCalledTimes(1)
         ve.unmount()
         visualElementStore.delete(element)
     })
