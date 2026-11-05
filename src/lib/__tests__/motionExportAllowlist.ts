@@ -54,6 +54,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'visualElementStore',
 
     // [b] Projection and layout internals (boxes, deltas, projection nodes, layout builders)
+    'acquireProjectionNode',
     'addScaleCorrector',
     'applyAxisDelta',
     'applyBoxDelta',
@@ -90,6 +91,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'DocumentProjectionNode',
     'eachAxis',
     'FlatTree',
+    'flushLayoutSnapshots',
     'globalProjectionState',
     'has2DTranslate',
     'hasScale',

@@ -125,6 +125,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/accelerated-remount') + searchParams}
+                    >
+                        Remount during an accelerated animation (#4027)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion-value-children') + searchParams}
                     >
                         MotionValue children
@@ -1165,6 +1173,14 @@
                         href={resolve('/tests/layout-id/scrolled') + searchParams}
                     >
                         layoutId — scrolled-page handoff (plain {'{#if}'} + AnimatePresence)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/card-switch') + searchParams}
+                    >
+                        layoutId — an open card that switches item still exits (#4042)
                     </a>
                 </li>
                 <li>
