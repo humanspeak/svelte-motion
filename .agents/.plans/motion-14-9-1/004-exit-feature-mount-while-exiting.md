@@ -2,6 +2,8 @@
 
 > **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving on. If a STOP condition occurs, stop and report. Do not edit the batch `README.md`.
 >
+> **Revision 2026-11-04 (operator-approved):** After the Step 2 port, `src/lib/html/_MotionContainer.spec.ts:961` ("a motion descendant mounted during owned descendant exits joins the current barrier") fails with `expected null to be truthy` at `:985`. Its harness wraps `ExitAnimationFeature.prototype.mount`, calls `mount.call(this)` and only then installs its `setActive` spy, but under 14.9.1 `mount()` starts the exit itself. **In scope now:** in that one test, move the `setActive` spy so it is installed *before* `mount.call(this)`. Change nothing else in `_MotionContainer.spec.ts`. The `pop-layout-scroll-siblings` 9-vs-10 frame-count failures are being checked against the baseline by the guard; don't act on them.
+>
 > **Drift check (run first)**: `git diff --stat fb9ed218..HEAD -- src/lib/utils/visualElementCore.ts src/lib/utils/visualElementCore.spec.ts`. Expect no output. Otherwise compare the excerpts below with the live code and STOP on a mismatch.
 
 ## Status
@@ -105,10 +107,11 @@ Never use port 4198, never set `PW_REUSE_SERVER`, never `git stash`.
 **In scope:**
 - `src/lib/utils/visualElementCore.ts`: `ExitAnimationFeature` and its JSDoc only
 - `src/lib/utils/visualElementCore.spec.ts`
+- `src/lib/html/_MotionContainer.spec.ts`: the `:961` harness spy order only (see the revision note)
 - `.changeset/exit-feature-mount-while-exiting.md` (create)
 
 **Out of scope:**
-- `presence.ts`, `PresenceChild.svelte`, `presenceExitRegistry.ts`, `_MotionContainer.svelte`. If a test only passes with a change there, STOP.
+- `presence.ts`, `PresenceChild.svelte`, `presenceExitRegistry.ts`, `_MotionContainer.svelte` (the component; its spec's `:961` harness is the one exception). If a test only passes with a change there, STOP.
 - Our extras beyond upstream: keep the `custom` argument to `resolveVariant` and the `null`/`undefined` skip when rewinding (upstream's typing allows them; they don't change behaviour for valid input).
 
 ## Git workflow
