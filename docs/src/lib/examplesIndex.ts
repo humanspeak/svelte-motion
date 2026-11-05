@@ -253,6 +253,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Scaled Drag Board',
         description: 'A zoomable constrained board whose draggable tile stays under the pointer.'
     },
+    'transition-mixer': {
+        title: 'transition.mixer',
+        description:
+            'Morph SVG paths with different numbers of points by blending them with a custom transition.mixer.'
+    },
     'transition-out': {
         title: 'transition.out',
         description:

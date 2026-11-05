@@ -374,6 +374,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/transition-mixer') + searchParams}
+                    >
+                        transition.mixer (SVG path morph)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/animate-transform-persist') + searchParams}
                     >
                         Transform persistence (#377)

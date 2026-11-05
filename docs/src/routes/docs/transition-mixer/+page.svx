@@ -1,0 +1,141 @@
+---
+title: 'transition.mixer'
+description: 'Blend values Motion cannot blend by default, such as SVG paths with different numbers of points.'
+---
+
+<script>
+  import Example from '#lib/components/general/Example.svelte';
+  import TransitionMixerExample from '#lib/examples/transition-mixer/demos/Default.svelte';
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'transition.mixer | Docs | Svelte Motion'
+      seo.description = 'Use transition.mixer to blend values Motion cannot blend by default, such as morphing SVG paths with different numbers of points.'
+      seo.ogTitle = 'transition.mixer'
+      seo.ogTagline = 'Blend anything'
+      seo.ogFeatures = ['SVG Path Morphing', 'Custom Blending', 'Sequences', 'Motion Parity']
+      seo.ogSlug = 'docs-transition-mixer'
+  }
+</script>
+
+# transition.mixer
+
+Motion blends numbers, colors and strings that share the same shape, such as
+two paths with the same commands. `transition.mixer` (Motion 14.8) lets you
+blend the rest yourself. The typical case is morphing SVG paths with different
+numbers of points.
+
+```svelte
+<motion.path
+  animate={{ d }}
+  transition={{ mixer: morph }}
+/>
+```
+
+<Example isSmall exampleUrl="/examples/transition-mixer">
+  <TransitionMixerExample />
+</Example>
+
+## What a mixer is
+
+A mixer is a function that takes the value an animation starts from and the
+value it goes to. It returns either a function that maps progress to a value,
+or `undefined` to blend them as usual.
+
+Progress runs from `0` to `1`, and can go beyond them with springs and
+overshooting easing.
+
+```ts
+mixer?: (from: any, to: any) => ((progress: number) => any) | undefined
+```
+
+It works anywhere a transition does: `motion.*` components, `animate()`
+(including sequences) and `useAnimate()`.
+
+## Morphing SVG paths
+
+This mixer slides a square's last corner out of a triangle's. The default mixer
+can't do it, as the two paths have different numbers of points:
+
+```svelte
+<script>
+  import { motion } from '@humanspeak/svelte-motion'
+
+  const triangle = 'M10 10L90 10L90 90Z'
+  const square = 'M10 10L90 10L90 90L10 90Z'
+
+  const corner = () => (p) =>
+    p >= 1 ? square : `M10 10L90 10L90 90L${90 - 80 * p} 90Z`
+</script>
+
+<svg viewBox="0 0 100 100">
+  <motion.path
+    d={triangle}
+    animate={{ d: square }}
+    transition={{ duration: 1, mixer: corner }}
+  />
+</svg>
+```
+
+For arbitrary shapes, a library like [flubber](https://github.com/veltman/flubber)
+can be the mixer:
+
+```ts
+import { interpolate } from 'flubber'
+
+const morph = (from: string, to: string) => interpolate(from, to)
+```
+
+Path data is written to the `d` attribute. Setting `d` to `undefined` removes
+the attribute.
+
+## Return `undefined` to blend as usual
+
+A mixer can choose which values it handles. When it returns `undefined`, Motion
+blends that pair the way it would without a mixer:
+
+```ts
+const mixer = (from, to) =>
+  typeof from === 'string' && from.startsWith('M') ? morph(from, to) : undefined
+```
+
+## Numbers still blend normally
+
+Animations between numbers, like `opacity` or `x`, never call the mixer. They
+run exactly as they would without it.
+
+## Where it runs
+
+Animations whose mixer returns a function for at least one pair run on the main
+thread, because the browser can't call a JavaScript mixer. The rest, including
+numbers and pairs where the mixer returns `undefined`, run as they would
+without it, so they can still be hardware accelerated.
+
+Animations that only run in the browser, like those from `animateMini`
+(Motion's `motion/mini`), don't use a mixer.
+
+> **Tip**: a mixer can be asked for the same pair more than once, so keep any
+> costly setup inside the function it returns, for when that function is first
+> called:
+>
+> ```ts
+> const morph = (from: string, to: string) => {
+>   let mix: ReturnType<typeof interpolate> | undefined
+>   return (progress: number) => {
+>     mix ??= interpolate(from, to)
+>     return mix(progress)
+>   }
+> }
+> ```
+
+## API Reference
+
+```ts
+type Transition = {
+  // ...
+  mixer?: (from: any, to: any) => ((progress: number) => any) | undefined
+}
+```
+
+Based on Motion's `transition.mixer` (Motion 14.8).
