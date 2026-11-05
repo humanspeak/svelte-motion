@@ -7,8 +7,9 @@ import { expect, test, type Page } from '@playwright/test'
  * really leaves. Only a real browser checks either: jsdom doesn't blur an
  * element when it's moved.
  *
- * Port of upstream `tests/react/issue-2658.spec.ts`; the last two tests are
- * Svelte-specific additions.
+ * Port of upstream `tests/react/issue-2658.spec.ts` at Motion 14.9.1, where
+ * the group became one tab stop and arrows move focus until an item is
+ * grabbed; the last two tests are Svelte-specific additions.
  */
 const order = (page: Page) => page.locator('#order').textContent()
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.id)
@@ -36,27 +37,22 @@ const open = async (page: Page, query = '') => {
 }
 
 test.describe('reorder/keyboard (#2658)', () => {
-    test('arrows scroll until Space grabs, then move until Space drops', async ({ page }) => {
+    test('arrows move focus until Space grabs, then move until Space drops', async ({ page }) => {
         await open(page)
         await page.focus('#before')
         await press(page, 'Tab')
         expect(await focused(page)).toBe('a')
+        // Svelte port: this app's layout centres the fixture in a 3000px
+        // flex column, so focusing it scrolls; later keys mustn't scroll more.
+        const scrolled = await scrollY(page)
 
-        // Not grabbed: the arrow is the page's
+        // Not grabbed: the arrows move focus (Motion 14.9; they used to
+        // scroll the page while every item was its own tab stop)
         await press(page, 'ArrowDown')
+        expect(await focused(page)).toBe('b')
+        await press(page, 'ArrowUp')
+        expect(await focused(page)).toBe('a')
         expect(await order(page)).toBe('a,b,c,d')
-        await expect.poll(() => scrollY(page)).toBeGreaterThan(0)
-        // Svelte port addition: Chromium's smooth keyboard scroll keeps
-        // running after `scrollTo(0, 0)` and drifts the page back down, so
-        // let it finish before resetting (otherwise the final check races it).
-        await expect
-            .poll(async () => {
-                const before = await scrollY(page)
-                await page.waitForTimeout(100)
-                return (await scrollY(page)) === before
-            })
-            .toBe(true)
-        await page.evaluate(() => window.scrollTo(0, 0))
 
         await press(page, 'Space')
         await expect.poll(() => grabbed(page)).toBe('a')
@@ -88,10 +84,11 @@ test.describe('reorder/keyboard (#2658)', () => {
         await expect.poll(() => grabbed(page)).toBe('')
         await press(page, 'ArrowUp')
         expect(await order(page)).toBe('b,c,a,d')
+        expect(await focused(page)).toBe('c')
 
-        // Neither Space nor the moving arrows scrolled the page
+        // Neither Space nor the arrows scrolled the page
         await page.waitForTimeout(200)
-        expect(await scrollY(page)).toBe(0)
+        expect(await scrollY(page)).toBe(scrolled)
     })
 
     test("Enter doesn't grab", async ({ page }) => {

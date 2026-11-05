@@ -114,6 +114,54 @@ export const checkReorder = <V>(
     return order
 }
 
+/**
+ * The index an arrow key takes `order[index]` to, or -1 if there's nowhere
+ * to go. Left and Right go along the order (swapped in RTL). On the `xy`
+ * axis, Up and Down go to the row drawn above or below, to the item there
+ * nearest across; otherwise they too go along the order.
+ *
+ * Port of Motion 14.9.1 `Reorder/utils/check-reorder.ts` `keyTarget`.
+ *
+ * @param order - The group's measured items, in `values` order.
+ * @param index - The index in `order` of the item the key was pressed on.
+ * @param key - The arrow's index in Up, Left, Down, Right.
+ * @param axis - The group's reorder axis.
+ * @param isRTL - Whether Left and Right are swapped (a horizontal key in an RTL group).
+ * @returns The target index in `order`, or -1.
+ */
+export const keyTarget = <V>(
+    order: ItemData<V>[],
+    index: number,
+    key: number,
+    axis: ReorderAxis,
+    isRTL: boolean
+): number => {
+    const step = key > 1 !== !!(key % 2 && isRTL) ? 1 : -1
+    let target = index + step
+
+    if (axis === 'xy' && !(key % 2) && index > -1) {
+        // Rows top to bottom as drawn, which isn't their order with
+        // flex-wrap: wrap-reverse.
+        const lines = getLines(order).sort((a, b) => a.min - b.min)
+        const line = lines[lines.findIndex(({ items }) => items.includes(order[index])) + step]
+        const distance = (item: ItemData<V>) =>
+            Math.abs(center(item.layout.x) - center(order[index].layout.x))
+
+        target = line
+            ? order.indexOf(
+                  line.items.reduce((nearest, item) =>
+                      distance(item) < distance(nearest) ? item : nearest
+                  )
+              )
+            : -1
+    }
+
+    return index > -1 && order[target] ? target : -1
+}
+
+/** The midpoint of an axis range (upstream `check-reorder.ts` `center`). */
+const center = ({ min, max }: { min: number; max: number }): number => mixNumber(min, max, 0.5)
+
 interface Line<V> {
     items: ItemData<V>[]
     min: number
