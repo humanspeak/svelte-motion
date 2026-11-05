@@ -1,7 +1,12 @@
 import type { MotionValueChild } from '$lib/utils/motionValueChild'
 import type { MotionStyle, MotionStyleValue, TransformTemplate } from '$lib/utils/style'
 import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
-import type { DragControlOptions, ResolvedValues, VisualElementDragControls } from 'motion-dom'
+import type {
+    DragConstraintsFunction,
+    DragControlOptions,
+    ResolvedValues,
+    VisualElementDragControls
+} from 'motion-dom'
 import type { Snippet } from 'svelte'
 
 /**
@@ -528,14 +533,18 @@ export type LayoutMeasurePayload = {
 export type MotionOnLayoutMeasure = ((box: LayoutMeasurePayload) => void) | undefined
 
 export type DragAxis = boolean | 'x' | 'y'
+/**
+ * Where a draggable element may go (motion-dom `dragConstraints` @ 14.9.1):
+ * a box in pixels relative to the element's origin, an element (or a ref
+ * to one) to stay inside, `false` for none, or a function called when each
+ * drag starts that returns a point the drag moves itself.
+ */
 export type DragConstraints =
-    | {
-          top?: number
-          left?: number
-          right?: number
-          bottom?: number
-      }
-    | HTMLElement
+    | false
+    | { top?: number; left?: number; right?: number; bottom?: number }
+    | Element
+    | { current: Element | null }
+    | DragConstraintsFunction
 /**
  * Controls how far a draggable element can stretch beyond its constraints
  * before release.

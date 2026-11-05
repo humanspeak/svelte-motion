@@ -17,7 +17,7 @@
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { Box } from '$lib/utils/projection'
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
-    import { checkReorder, moveItem } from './checkReorder'
+    import { checkReorder, keyTarget, moveItem } from './checkReorder'
     import { setReorderContext, type ItemData } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
@@ -56,6 +56,35 @@
     const itemLayouts = new Map<V, Box>()
     let detectedAxis = $state<ReorderAxis>('y')
     const axis = $derived(axisOverride ?? detectedAxis)
+
+    /**
+     * Each item's element getter, for arrow keys to focus. Registered by the
+     * items, pruned with `itemLayouts` when a value leaves `values`. Plain
+     * `Map` like `itemLayouts`: the getters read the items' reactive `ref`,
+     * which is what the tab-stop effect needs to track.
+     */
+
+    const elements = new Map<V, () => HTMLElement | null | undefined>()
+
+    /** The item focused last, the group's tab stop while it's in `values`. */
+    let active = $state<V>()
+    const valuesSet = $derived(new Set(values))
+    const tabStop = $derived(valuesSet.has(active as V) ? active : values[0])
+    const isRendered = (value?: V): boolean => !!elements.get(value as V)?.()?.isConnected
+
+    /** Only values in `values` can be the tab stop. */
+    const activate = (value?: V): void => {
+        if (valuesSet.has(value as V)) active = value
+    }
+
+    /**
+     * If the tab stop isn't rendered (e.g. it's virtualized), the first
+     * rendered item takes its place. Items check again when they unmount
+     * (Motion 14.9.1 `Reorder/Group.tsx` `checkTabStop`).
+     */
+    const checkTabStop = (): void => {
+        if (!isRendered(tabStop)) activate(values.find(isRendered))
+    }
 
     const getMeasuredOrder = (): ItemData<V>[] =>
         values.flatMap((value) => {
@@ -132,7 +161,11 @@
         clearReordered: () => {
             hasReordered = false
         },
-        // Motion 14.6.0 `Reorder/Group.tsx` `onKeyDown`, line for line, except
+        isTabStop: (value) => value === tabStop || !valuesSet.has(value),
+        setActive: activate,
+        checkTabStop,
+        elements,
+        // Motion 14.9.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
         // that the grab snapshot is a copy (`values` may be mutated in place)
         // and it reports whether it committed a new order.
         onKeyDown: (event, item, from, grab) => {
@@ -152,9 +185,7 @@
             let committed = false
             if (key === ' ') {
                 if (!event.repeat) grab(currentTarget, from ? undefined : [...values])
-            } else if (!from) {
-                return false
-            } else if (key === 'Escape') {
+            } else if (key === 'Escape' && from) {
                 // Values added since the grab keep their slots.
                 const kept = from.flatMap((value) => order.filter((data) => data.value === value))
                 committed = commit(
@@ -166,10 +197,13 @@
             } else if (keyIndex < 0 || (axis !== 'xy' && axis !== (isX ? 'x' : 'y'))) {
                 return false
             } else {
-                const index = order.findIndex(({ value }) => value === item)
-                const target = index + (keyIndex > 1 !== !!(isX && isRTL()) ? 1 : -1)
-                if (index > -1 && order[target]) {
-                    committed = commit(order, moveItem(order, index, target), item)
+                // Focus only moves between rendered items.
+                const list = from ? order : order.filter(({ value }) => isRendered(value))
+                const index = list.findIndex(({ value }) => value === item)
+                const target = keyTarget(list, index, keyIndex, axis, !!isX && isRTL())
+                if (target > -1) {
+                    if (from) committed = commit(order, moveItem(order, index, target), item)
+                    else elements.get(list[target].value)?.()?.focus()
                 }
             }
             event.preventDefault()
@@ -180,12 +214,20 @@
     })
 
     $effect(() => {
-        const valuesSet = new Set(values)
-        itemLayouts.forEach((_, value) => {
-            if (!valuesSet.has(value)) itemLayouts.delete(value)
-        })
+        for (const map of [itemLayouts, elements]) {
+            map.forEach((_, value) => {
+                if (!valuesSet.has(value)) map.delete(value)
+            })
+        }
         updateDetectedAxis()
     })
+
+    /**
+     * Upstream runs `checkTabStop` after every render. Here it re-runs when
+     * `values`, the active item or a tab-stop item's element changes (the
+     * element getters read the items' `ref`).
+     */
+    $effect(checkTabStop)
 
     /**
      * Only clear the guard once the new order has been rendered. Releasing on
