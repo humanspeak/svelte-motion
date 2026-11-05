@@ -43,7 +43,12 @@ export {
     transform
 } from 'motion'
 
-export type { DragOptions } from 'motion-dom'
+export type {
+    DragConstraintsContext,
+    DragConstraintsFunction,
+    DragOptions,
+    DragPointConstraint
+} from 'motion-dom'
 
 // `animate` and the element effects re-typed to accept both raw and
 // Svelte-augmented motion values (runtime passthrough to motion's
