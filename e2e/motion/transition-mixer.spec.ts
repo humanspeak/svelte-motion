@@ -70,3 +70,29 @@ test('unsetting path data removes the d attribute', async ({ page }) => {
     await page.locator('#unset-button').click()
     await expect(path).not.toHaveAttribute('d')
 })
+
+test('the opacity box never paints at full opacity before it fades in', async ({ page }) => {
+    // Upstream's animate-mixer.html is built in the browser, so the box's
+    // first painted frame is already the 0 keyframe. A server-rendered page
+    // shows the box with no opacity (like framer-motion's SSR output) until
+    // it hydrates, which reads as "on, snaps off, then fades in".
+    await page.addInitScript(() => {
+        const frames: string[] = []
+        ;(window as unknown as { opacityFrames: string[] }).opacityFrames = frames
+        const start = performance.now()
+        const sample = () => {
+            const element = document.getElementById('opacity')
+            if (element) frames.push(getComputedStyle(element).opacity)
+            if (performance.now() - start < 1500) requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+    })
+    await page.goto(URL)
+    await page.waitForTimeout(1600)
+
+    const frames = await page.evaluate(
+        () => (window as unknown as { opacityFrames: string[] }).opacityFrames
+    )
+    expect(frames.length).toBeGreaterThan(0)
+    expect(frames.filter((opacity) => opacity === '1')).toEqual([])
+})
