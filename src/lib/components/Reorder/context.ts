@@ -65,10 +65,34 @@ export interface ReorderContextProps<V> {
     /** Ends the reorder-click guard; called from Reorder.Item's onDragEnd, a frame after the release's click. */
     clearReordered: () => void
     /**
+     * Whether an item is in the tab order. Only one in `values` is: the
+     * last focused, or the first rendered. Items outside `values` always are.
+     *
+     * @param item - The item's value.
+     * @returns Whether the item should render `tabindex="0"`.
+     */
+    isTabStop: (item: V) => boolean
+    /**
+     * Make a focused item the group's tab stop. Ignored for values outside
+     * `values`.
+     *
+     * @param item - The focused item's value.
+     */
+    setActive: (item: V) => void
+    /**
+     * If the tab stop isn't rendered, make the first rendered item the tab
+     * stop. Items call it when they unmount.
+     */
+    checkTabStop: () => void
+    /** Each item's element getter, for arrow keys to focus. */
+    elements: Map<V, () => HTMLElement | null | undefined>
+    /**
      * Handle a key on an item: Space grabs and drops, arrows along `axis`
-     * move the grabbed item one place (Left and Right swap in RTL) and
-     * Escape restores the order in `from`, the values when it was grabbed.
-     * Mirrors Motion 14.6.0 `Reorder/Group.tsx` `onKeyDown`.
+     * move the grabbed item one place, or a row in a grid (see
+     * `keyTarget`), or move focus that way if it isn't grabbed (Left and
+     * Right swap in RTL), and Escape restores the order in `from`, the
+     * values when it was grabbed. Mirrors Motion 14.9.1
+     * `Reorder/Group.tsx` `onKeyDown`.
      *
      * @param event - The item's keydown event.
      * @param item - The item's value.
