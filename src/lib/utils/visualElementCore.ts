@@ -163,24 +163,28 @@ let exitFeatureId = 0
 /**
  * The exit feature: turns presence changes into `setActive('exit', …)`.
  *
- * Port of `framer-motion/src/motion/features/animation/exit.ts`. Exit is the
- * HIGHEST priority entry in `variantPriorityOrder`, so routing it through the
- * animationState gives it the same protected-keys semantics as every other
- * variant type instead of a bespoke sequence.
+ * Port of `framer-motion/src/motion/features/animation/exit.ts` @ v14.9.1
+ * (#4049). Exit is the HIGHEST priority entry in `variantPriorityOrder`, so
+ * routing it through the animationState gives it the same protected-keys
+ * semantics as every other variant type instead of a bespoke sequence.
  *
  * Three behaviours, all upstream's:
- * - `mount()` reports completion for the previous occupant of this id and
- *   registers with the presence context (`exit.ts:74-84`).
+ * - `mount()` registers with the presence context, then runs `update()` so an
+ *   element that mounts already exiting starts its exit straight away.
  * - leaving (`isPresent` false) → `setActive('exit', true)`, and
- *   `onExitComplete(id)` once that promise resolves (`exit.ts:64-72`).
+ *   `onExitComplete(id)` once that promise resolves.
  * - re-entering after a COMPLETED exit → jump values to the resolved `initial`,
  *   `animationState.reset()`, `animateChanges()`; re-entering mid-exit just
- *   deactivates exit (`exit.ts:19-62`).
+ *   deactivates exit.
+ *
+ * Presence is compared with the feature's own exit state, not the previous
+ * presence context, so repeated updates while absent never restart the exit.
  */
 export class ExitAnimationFeature extends Feature<unknown> {
     private id: number = exitFeatureId++
-    private isExitComplete = false
-    private exitAnimation?: Promise<unknown>
+
+    /** The running exit animation, or `true` once it has completed. */
+    private exit?: Promise<unknown> | true
 
     /**
      * React to a presence flip.
@@ -188,23 +192,23 @@ export class ExitAnimationFeature extends Feature<unknown> {
      * @returns Nothing.
      */
     update(): void {
-        const presenceContext = this.node.presenceContext
-        if (!presenceContext) return
+        const { presenceContext, animationState } = this.node
+
+        if (!presenceContext || !animationState) return
 
         const { isPresent, onExitComplete } = presenceContext
-        const { isPresent: prevIsPresent } = this.node.prevPresenceContext ?? {}
 
-        if (!this.node.animationState) return
-        // A descendant mounted during an active exit starts absent. Its first
-        // update must still start an exit after registration; later updates
-        // must not restart the same promise.
-        if (isPresent === prevIsPresent && (isPresent || this.exitAnimation)) return
+        // framer-motion exit.ts @ v14.9.1 (#4049): compare presence with our
+        // own exit, not the previous presence context. An element can mount
+        // already exiting (e.g. first rendered inside an exiting child), and
+        // then both contexts have isPresent: false.
+        if (isPresent === !this.exit) return
 
-        if (isPresent && prevIsPresent === false) {
+        if (isPresent) {
             // Re-entering. If the exit already finished the element sits at the
             // exit target, so rewind to `initial` before replaying the enter —
             // otherwise the enter animates from the exited position.
-            if (this.isExitComplete) {
+            if (this.exit === true) {
                 const { initial, custom } = this.node.getProps() as {
                     initial?: unknown
                     custom?: unknown
@@ -228,44 +232,44 @@ export class ExitAnimationFeature extends Feature<unknown> {
                 // Match upstream: a retained child re-entering after exit is
                 // no longer an initial child, even when initial was false.
                 this.node.blockInitialAnimation = false
-                this.node.animationState.reset()
-                void this.node.animationState.animateChanges()
+                animationState.reset()
+                void animationState.animateChanges()
             } else {
-                void this.node.animationState.setActive('exit', false)
+                void animationState.setActive('exit', false)
             }
 
-            this.isExitComplete = false
-            this.exitAnimation = undefined
+            this.exit = undefined
             return
         }
 
-        const exitAnimation = (this.exitAnimation = this.node.animationState.setActive(
-            'exit',
-            !isPresent
-        ))
+        const exit = (this.exit = animationState.setActive('exit', true))
 
-        if (onExitComplete && !isPresent) {
-            void exitAnimation.then(() => {
-                // Match motion a47d6f25f: stopped exits can settle after re-entry.
-                // Only the current promise may complete this presence cycle.
-                if (this.exitAnimation !== exitAnimation) return
-                this.isExitComplete = true
+        if (onExitComplete) {
+            void exit.then(() => {
+                // An exit can resolve after the element has re-entered, e.g.
+                // when its final tick lands in the stop() of the enter. Only
+                // the current promise may complete this presence cycle.
+                if (this.exit !== exit) return
+                this.exit = true
                 onExitComplete(this.id)
             })
         }
     }
 
     /**
-     * Register with the presence context.
+     * Register with the presence context, then start the exit of an element
+     * that mounts already exiting.
      *
      * @returns Nothing.
      */
     mount(): void {
-        const { register, onExitComplete } = this.node.presenceContext ?? {}
-        if (onExitComplete) onExitComplete(this.id)
-        // framer-motion motion/features/animation/exit.ts:81 @ v14.5.0 (#2503):
+        const { register } = this.node.presenceContext ?? {}
+        // framer-motion motion/features/animation/exit.ts @ v14.5.0 (#2503):
         // pass the node so popLayout can find the outermost motion element.
         if (register) this.unmount = register(this.id, this.node)
+        // framer-motion exit.ts @ v14.9.1 (#4049): start the exit of an
+        // element that mounts already exiting.
+        this.update()
     }
 
     /**
