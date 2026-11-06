@@ -8,6 +8,7 @@ import {
     Clock,
     Code,
     Columns2,
+    Columns3,
     Compass,
     Eye,
     Gauge,
@@ -71,7 +72,8 @@ export const docsSections: NavSection[] = [
             },
             { title: 'LazyMotion', href: '/docs/lazy-motion', icon: Zap },
             { title: 'MotionConfig', href: '/docs/motion-config', icon: Settings },
-            { title: 'Reorder', href: '/docs/reorder', icon: ArrowUpDown }
+            { title: 'Reorder', href: '/docs/reorder', icon: ArrowUpDown },
+            { title: 'Reorder.Board', href: '/docs/reorder-board', icon: Columns3 }
         ]
     },
     {

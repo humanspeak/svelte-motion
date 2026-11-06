@@ -188,6 +188,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Drag-to-reorder lists with Reorder.Group and Reorder.Item — FLIP siblings and edge auto-scroll.'
     },
+    'reorder-board': {
+        title: 'Reorder.Board',
+        description:
+            'Drag cards between kanban columns with Reorder.Board, with a canMove WIP limit and auto-scrolling columns.'
+    },
     'vanilla-values': {
         title: 'Vanilla Values',
         description:

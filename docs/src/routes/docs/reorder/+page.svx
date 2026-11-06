@@ -215,6 +215,10 @@ To turn keyboard reordering off for an item, call `preventDefault()` in its `onk
 
 A `tabindex` on an item overrides the group's roving tab stop. `tabindex={-1}` only removes the item's Tab stop: a click, an arrow key or `focus()` still focuses it, and Space then grabs it.
 
+## Moving items between groups
+
+To drag items from one group into another, such as kanban columns, wrap the groups in `Reorder.Board` (Motion 14.10). See [Reorder.Board](/docs/reorder-board) for `canMove`, keyboard moves between groups and scrolling.
+
 ## Notes
 
 - One-dimensional reordering moves values only while the pointer moves — a swap fires when the dragged item's edge crosses the midpoint of its neighbor.
@@ -266,8 +270,15 @@ All other motion props are forwarded to the underlying motion element.
 
 All other motion props — including every drag prop and callback — are forwarded to the underlying motion element.
 
+### Reorder.Board
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `canMove` | `(value: V, from: V[], to: V[]) => boolean` | — | Whether `value` may move from the group with values `from` to the group with values `to`. See [Reorder.Board](/docs/reorder-board) |
+
 ## Related
 
+- [Reorder.Board](/docs/reorder-board) — Drag items between groups
 - [Drag](/docs/drag) — The gesture system Reorder builds on
 - [Layout Animations](/docs/layout-animations) — How siblings FLIP between slots
 - [Motion values](/docs/motion-values) — Observe the live drag offset
