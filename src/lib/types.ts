@@ -594,7 +594,9 @@ export type DragControls = {
      *
      * @param event The pointer event that starts the drag.
      * @param options `snapToCursor` centres the element on the pointer;
-     *     `distanceThreshold` sets how far the pointer must travel before the drag starts.
+     *     `distanceThreshold` sets how far the pointer must travel before the drag starts;
+     *     `immediate` starts the drag at once, without waiting for the pointer to move
+     *     (Motion 14.10), for example to carry a drag on from another element.
      */
     start: (event: PointerEvent, options?: DragControlOptions) => void
     /** Cancel the active drag gesture on every subscribed element (no momentum). */

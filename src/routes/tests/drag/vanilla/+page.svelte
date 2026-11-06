@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { animate, drag, motion, type DragInfo } from '$lib'
+    import { animate, drag, motion, motionValue, type DragInfo } from '$lib'
     import { visualElementStore } from 'motion-dom'
     import { onMount } from 'svelte'
     import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
@@ -18,17 +18,27 @@
      *   `drag()` has no guard; it attaches a second controller, but Motion's
      *   global drag lock and the shared `x` motion value keep a 100px drag at
      *   ~100px, not 200px.
+     * - `headless`: Motion 14.10's `x` option. `drag(dial, { axis: 'x', x })`
+     *   writes the drag into this library's `motionValue(0)` instead of moving
+     *   the dial; an `x.on('change')` turns that into the needle's `rotate`.
+     *   `headless-x` shows the value. The dial's own translateX stays 0.
      *
      * The `data-testid`s are what `e2e/drag/vanilla.spec.ts` drives; keep them
      * stable.
      */
-    type Id = 'axis' | 'handoff' | 'container' | 'motion-plus-drag'
+    type Id = 'axis' | 'handoff' | 'container' | 'motion-plus-drag' | 'headless'
 
     let axisEl = $state<HTMLElement | null>(null)
     let handoffEl = $state<HTMLElement | null>(null)
     let containerBox = $state<HTMLElement | null>(null)
     let containerEl = $state<HTMLElement | null>(null)
     let motionPlusDragEl = $state<HTMLElement | null>(null)
+    let headlessEl = $state<HTMLElement | null>(null)
+    let needleEl = $state<HTMLElement | null>(null)
+
+    /** Headless drag target: the dial never moves, this value does. */
+    const headlessX = motionValue(0)
+    let headlessXValue = $state(0)
 
     let handoffReady = $state(false)
     let motionPlusDragAttached = $state(false)
@@ -132,6 +142,31 @@
             )
         }
 
+        if (headlessEl) {
+            const el = headlessEl
+            stops.push(
+                headlessX.on('change', (v) => {
+                    headlessXValue = v
+                    if (needleEl) needleEl.style.rotate = `${v}deg`
+                })
+            )
+            stops.push(
+                drag(el, {
+                    axis: 'x',
+                    x: headlessX,
+                    onEnd: () =>
+                        setTimeout(() => {
+                            const ownX = readX(el)
+                            const value = headlessX.get()
+                            verdicts.headless = {
+                                ok: Math.abs(ownX) < 1 && Math.abs(value) > 10,
+                                detail: `value = ${value.toFixed(0)}, dial x = ${ownX.toFixed(0)}`
+                            }
+                        }, 600)
+                })
+            )
+        }
+
         // Attach once the motion.div's projection node is mounted, so drag()
         // reuses it instead of creating an imperative one: the same check as
         // upstream acquireProjectionNode (motion-dom
@@ -171,6 +206,11 @@
             text: 'Drag the "motion + drag()" box (a motion.div with drag="x", also passed to drag()) about 100px to the right.',
             expected:
                 'It follows the pointer 1:1 (it does not run ahead at double speed). The chip reads PASS.'
+        },
+        {
+            text: 'Drag the "headless" dial left and right.',
+            expected:
+                'The dial stays where it is; its needle turns and the readout changes. The chip reads PASS.'
         }
     ]
 </script>
@@ -262,13 +302,26 @@
             </p>
             {@render verdict('motion-plus-drag')}
         </section>
+
+        <section class="card">
+            <h2>headless · <code>{"drag(dial, { axis: 'x', x })"}</code> (Motion 14.10)</h2>
+            <div class="track">
+                <div class="box dial" bind:this={headlessEl} data-testid="vanilla-headless">
+                    <span class="needle" bind:this={needleEl}></span>
+                </div>
+            </div>
+            <p class="status">
+                x = <span data-testid="headless-x">{headlessXValue.toFixed(0)}</span>
+            </p>
+            {@render verdict('headless')}
+        </section>
     </div>
 </main>
 
 <TesterPanel
     eyebrow="drag() (Motion 14.4)"
     title="Plain elements drag; motion.* + drag() moves once"
-    status="Expected to pass on this build: all four chips read PASS."
+    status="Expected to pass on this build: all five chips read PASS."
     {steps}
 >
     {#snippet checks()}
@@ -353,6 +406,23 @@
         font-size: 12px;
         font-weight: 600;
         cursor: grab;
+    }
+
+    .dial {
+        position: relative;
+        border-radius: 50%;
+        background: #fbbf24;
+    }
+
+    .needle {
+        position: absolute;
+        top: 6px;
+        left: 28px;
+        width: 4px;
+        height: 24px;
+        border-radius: 2px;
+        background: #0f1115;
+        transform-origin: 2px 24px;
     }
 
     .status {

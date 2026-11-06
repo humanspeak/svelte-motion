@@ -308,4 +308,27 @@ test.describe('drag/controls', () => {
         }
         await expect(el).toHaveAttribute('data-drag-start-count', '3')
     })
+
+    test('immediate: a press and release without moving still starts and ends the drag', async ({
+        page
+    }) => {
+        await page.goto('/tests/drag/controls?@isPlaywright=true')
+        const el = page.getByTestId('drag-controls-immediate')
+        const handle = page.getByTestId('immediate-handle')
+        await el.waitFor({ state: 'visible' })
+        await handle.scrollIntoViewIfNeeded()
+        await waitForAnimationFrames(page)
+        await expect(page.getByTestId('immediate-start')).toHaveText('0')
+        await expect(page.getByTestId('immediate-end')).toHaveText('0')
+
+        const h = await handle.boundingBox()
+        if (!h) throw new Error('no h')
+        await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+        await page.mouse.down()
+        await waitForAnimationFrames(page)
+        await page.mouse.up()
+
+        await expect(page.getByTestId('immediate-start')).toHaveText('1')
+        await expect(page.getByTestId('immediate-end')).toHaveText('1')
+    })
 })

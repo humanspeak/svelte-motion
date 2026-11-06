@@ -19,7 +19,7 @@ export { motion } from '$lib/motion'
 export { Reorder } from '$lib/reorder'
 
 // Re-export core animation functions plus the vanilla (component-free)
-// layer — element effects, gestures (including Motion 14.4's `drag()`), the
+// layer — element effects, gestures (`drag()` is re-typed below), the
 // frameloop scheduler, `processFrame` (Motion 14.6) for driving the frameloop
 // from a loop other than `requestAnimationFrame`, generators, global config —
 // straight from motion.
@@ -27,7 +27,6 @@ export {
     MotionGlobalConfig,
     cancelFrame,
     delay,
-    drag,
     frame,
     frameData,
     hover,
@@ -64,6 +63,8 @@ export type {
 export { animate } from '$lib/utils/animateValue'
 export { attrEffect, propEffect, styleEffect, svgEffect } from '$lib/utils/effects'
 export type { EffectValues } from '$lib/utils/effects'
+export { drag } from '$lib/utils/vanillaDrag'
+export type { SvelteDragOptions } from '$lib/utils/vanillaDrag'
 // Motion 14.7: animate() returns a mutable Timeline. Type-only upstream too.
 export type {
     AnimationSequence,

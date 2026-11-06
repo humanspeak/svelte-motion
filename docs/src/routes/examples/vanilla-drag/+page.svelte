@@ -5,10 +5,11 @@
         type ExampleSection,
         formatSheetLabel
     } from '@humanspeak/docs-kit'
-    import { Hand, MoveHorizontal, RotateCcw } from '@lucide/svelte'
+    import { Gauge, Hand, MoveHorizontal, RotateCcw, RotateCw } from '@lucide/svelte'
     import { demoCodeSample } from '#lib/demo-loaders.js'
     import { getBreadcrumbContext } from '#lib/components/contexts/Breadcrumb/Breadcrumb.context.js'
     import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+    import VanillaDragDial from '#lib/examples/vanilla-drag/demos/Dial.svelte'
     import VanillaDragSliderKnob from '#lib/examples/vanilla-drag/demos/SliderKnob.svelte'
 
     const breadcrumbs = getBreadcrumbContext()
@@ -45,6 +46,18 @@
             notes: sliderNotes,
             barCells: [{ k: 'constraints', v: 'track' }],
             sourceUrl: `${SOURCE_URL}vanilla-drag/demos/SliderKnob.svelte`
+        },
+        {
+            figId: 'FIG-002',
+            tag: 'HEADLESS',
+            title: { prefix: 'a dial driven by a ', accent: 'motion value', end: '.' },
+            description:
+                'Motion 14.10 lets drag() write into x/y motion values instead of moving the element. The dial stays where it is; a horizontal drag turns it, and a flick spins it with momentum.',
+            snippet: dialSection,
+            codeSnippet: dialCode,
+            notes: dialNotes,
+            barCells: [{ k: 'x', v: 'motionValue(0)' }],
+            sourceUrl: `${SOURCE_URL}vanilla-drag/demos/Dial.svelte`
         }
     ]
 </script>
@@ -86,6 +99,37 @@
                 'vanilla-drag-slider-knob',
                 'SliderKnob.svelte'
             )
+        ]}
+        columns={1}
+    />
+{/snippet}
+
+{#snippet dialSection()}
+    <VanillaDragDial />
+{/snippet}
+{#snippet dialNotes()}
+    <ul>
+        <li>
+            <Gauge />
+            <span>
+                <code>drag(dial, &#123; axis: 'x', x &#125;)</code> writes the drag into
+                <code>x</code>, not the dial's own transform, so the dial never moves.
+            </span>
+        </li>
+        <li>
+            <RotateCw />
+            <span>
+                <code>x.on('change')</code> turns the value into the dial's <code>rotate</code>.
+                Release with some speed and momentum keeps writing to <code>x</code>, so the dial
+                spins down.
+            </span>
+        </li>
+    </ul>
+{/snippet}
+{#snippet dialCode()}
+    <CodeReferenceV2
+        samples={[
+            demoCodeSample('vanilla-drag/demos/Dial.svelte', 'vanilla-drag-dial', 'Dial.svelte')
         ]}
         columns={1}
     />

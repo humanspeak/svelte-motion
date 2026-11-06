@@ -2,6 +2,7 @@
     import { motion, createDragControls } from '$lib'
     const controls = createDragControls()
     const initialControls = createDragControls()
+    const immediateControls = createDragControls()
     // onDragStart/onDragEnd mirrors for the e2e drag-start signal.
     let dragStarts = $state(0)
     let dragging = $state(false)
@@ -12,6 +13,14 @@
     }
     function startInitial(e: PointerEvent) {
         initialControls.start(e, { snapToCursor: true })
+    }
+    // `immediate` mode (Motion 14.10): the drag starts on pointerdown, without
+    // waiting for the pointer to move, so a press and release with no move
+    // still fires onDragStart and onDragEnd once each.
+    let immediateStarts = $state(0)
+    let immediateEnds = $state(0)
+    function startImmediate(e: PointerEvent) {
+        immediateControls.start(e, { immediate: true })
     }
 </script>
 
@@ -55,3 +64,25 @@
         />
     </section>
 </div>
+<!-- Fixed, out of flow: the pixel-exact layout of the two sections above must not move. -->
+<section
+    style="position: fixed; left: 16px; bottom: 16px; display: grid; place-items: center; gap: 8px;"
+>
+    <button onpointerdown={startImmediate} data-testid="immediate-handle">
+        Start Immediate Drag
+    </button>
+    <motion.div
+        drag="x"
+        dragControls={immediateControls}
+        dragListener={false}
+        dragMomentum={false}
+        onDragStart={() => (immediateStarts += 1)}
+        onDragEnd={() => (immediateEnds += 1)}
+        data-testid="drag-controls-immediate"
+        style="width:60px;height:60px;background:#a3e635;border-radius:8px;"
+    />
+    <p>
+        starts: <span data-testid="immediate-start">{immediateStarts}</span> · ends:
+        <span data-testid="immediate-end">{immediateEnds}</span>
+    </p>
+</section>

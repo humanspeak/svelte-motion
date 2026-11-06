@@ -81,6 +81,41 @@ Pass an element reference to constrain dragging within that element's bounding b
   <DragConstraintsExample />
 </Example>
 
+### Function constraints
+
+`dragConstraints` can also be a function. This is an advanced hook: instead of bounding the drag, the function takes over moving the element. It's called when each drag starts and receives:
+
+- `visualElement`: the element's visual element.
+- `originPoint`: the `x`/`y` the drag started from.
+- `elastic`: the resolved per-axis, per-side elastic.
+- `getAxisMotionValue(axis)`: the `x` or `y` motion value the drag writes to.
+- `getProps()`: the drag's options, e.g. `drag` for the axes it moves (Motion 14.10).
+
+It returns a point. As the pointer moves, drag writes the pointer's position into the point's `x`/`y` and calls `move()`, which decides where the element goes. On release it calls `release(velocity, transition)` and waits for the promise it returns.
+
+```svelte
+<script lang="ts">
+    import { motion, type DragConstraintsFunction, type DragPointConstraint } from '@humanspeak/svelte-motion'
+
+    const followPointer: DragConstraintsFunction = (ctx) => {
+        const axes = ctx.getProps().drag // 'x' here
+        const x = ctx.getAxisMotionValue('x')
+        const point: DragPointConstraint = {
+            ...ctx.originPoint,
+            move() {
+                x.set(point.x)
+            },
+            release() {
+                return Promise.resolve()
+            }
+        }
+        return point
+    }
+</script>
+
+<motion.div drag="x" dragConstraints={followPointer} />
+```
+
 ## Elastic
 
 By default, dragging beyond constraints has an elastic feel. Control this with `dragElastic`:
@@ -169,6 +204,16 @@ The `start` method accepts an optional options object:
 
 ```ts
 controls.start(event, { snapToCursor: true })
+```
+
+| Option | Description |
+|--------|-------------|
+| `snapToCursor` | Centre the element on the pointer when the drag starts |
+| `distanceThreshold` | How far, in pixels, the pointer must travel before the drag starts |
+| `immediate` | Start the drag at once, without waiting for the pointer to move (Motion 14.10). Useful to carry a drag on from another element. A press and release with no move still fires `onDragStart` and `onDragEnd` |
+
+```ts
+controls.start(event, { immediate: true })
 ```
 
 ## While dragging
@@ -267,6 +312,34 @@ While attached, `drag()` sets `user-select: none`, `touch-action` (`none`, or `p
 | `onDirectionLock` | `(axis: 'x' \| 'y') => void` | — | Fires when `directionLock` picks an axis |
 | `onTransitionEnd` | `() => void` | — | Fires when the release animation settles |
 | `onMeasureConstraints` | `(constraints) => constraints \| void` | — | Called when element constraints are measured; return a box to override them |
+| `x` | `MotionValue<number>` | — | Write the drag to these motion values instead of moving the element |
+| `y` | `MotionValue<number>` | — | Write the drag to these motion values instead of moving the element |
+
+### Headless drag
+
+Pass `x` and/or `y` motion values (Motion 14.10) and `drag()` writes the gesture into them instead of moving the element. The element stays put, so a drag can drive anything, like a dial's rotation. Values from this library's `motionValue()` and `useMotionValue()` both work:
+
+```svelte
+<script lang="ts">
+    import { drag, motionValue } from '@humanspeak/svelte-motion'
+
+    let dial = $state<HTMLElement | null>(null)
+    const x = motionValue(0)
+
+    $effect(() => {
+        if (!dial) return
+        const el = dial
+        const unsubscribe = x.on('change', (v) => (el.style.rotate = `${v}deg`))
+        const stop = drag(el, { axis: 'x', x })
+        return () => {
+            unsubscribe()
+            stop()
+        }
+    })
+</script>
+
+<div bind:this={dial}></div>
+```
 
 ### With animate() and animateLayout()
 

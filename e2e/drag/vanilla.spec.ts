@@ -105,6 +105,22 @@ test.describe('drag/vanilla', () => {
         expect(x).toBeGreaterThan(70)
         expect(x).toBeLessThan(140)
     })
+
+    test('x option: drives the motion value without moving the element', async ({ page }) => {
+        await page.goto(URL)
+        const el = page.getByTestId('vanilla-headless')
+        await expect(el).toHaveAttribute('draggable', 'false')
+
+        await dragBy(page, el, 100, 0)
+
+        await expect
+            .poll(async () => Number(await page.getByTestId('headless-x').textContent()), {
+                timeout: 4000
+            })
+            .toBeGreaterThan(60)
+        const { x } = await readTranslate(el)
+        expect(Math.abs(x)).toBeLessThan(1)
+    })
 })
 
 test.describe('drag/vanilla tester verdicts', () => {
