@@ -3,7 +3,9 @@
 > **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving to the next step. If anything in "STOP conditions" occurs, stop and report; do not improvise. Do not edit the batch `README.md`, because the dispatcher maintains it.
 >
 > **Drift check (run first)**: `git diff --stat f93a1d92..HEAD -- docs/src/routes/docs/reorder docs/src/routes/docs/reorder-board docs/src/routes/examples/reorder-board docs/src/lib/examples/reorder-board docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts docs/src/lib/compare-data.ts`
-> Expected changes: plan 003 (the Keyboard section of `docs/src/routes/docs/reorder/+page.svx`) and plan 002 (one entry each in `docsNav.ts`/`examplesIndex.ts` for tap-options). Nothing else. On a surprise, STOP.
+> Expected changes: plan 003 (the Keyboard section of `docs/src/routes/docs/reorder/+page.svx`), plan 002 (one `examplesIndex.ts` entry for tap-options, a subsection of `docs/gestures/+page.svx`, and a `docs/src/routes/examples/tap-options` route) and plan 005 (the drag docs and the vanilla-drag example). Nothing else. On a surprise, STOP.
+>
+> Revision 2026-11-06 (guard pre-flight): updated the drift note to what plans 002, 003 and 005 actually changed (002 added no `docsNav.ts` entry). Plan 006 merged as `5011a60a`, and `Reorder.Board` is exported from `Reorder` in both `src/lib/reorder.ts` and `src/lib/m.ts`.
 
 ## Status
 

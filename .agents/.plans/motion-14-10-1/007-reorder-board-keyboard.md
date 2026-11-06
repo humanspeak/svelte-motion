@@ -2,7 +2,9 @@
 
 > **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving to the next step. If anything in "STOP conditions" occurs, stop and report; do not improvise. Do not edit the batch `README.md`, because the dispatcher maintains it.
 >
-> **Drift check (run first)**: `git log --oneline -5 -- src/lib/components/Reorder/board.ts` must show plan 006's commits. Then run `git diff --stat <plan-006 merge SHA>..HEAD -- src/lib/components/Reorder src/routes/tests/reorder/board e2e/reorder/board.spec.ts`. If anything changed after 006, compare it against the excerpts below. On a mismatch, STOP.
+> **Drift check (run first)**: `git log --oneline -5 -- src/lib/components/Reorder/board.ts` must show plan 006's commits. Then run `git diff --stat 5011a60a..HEAD -- src/lib/components/Reorder src/routes/tests/reorder/board e2e/reorder/board.spec.ts`. If anything changed after 006, compare it against the excerpts below. On a mismatch, STOP.
+>
+> Revision 2026-11-06 (guard pre-flight): Plan 006 merged as `5011a60a`, which is the drift baseline. Plan 006 as built matches the shapes below: the context object is the group identity, the handoff stores `visualElement`, `Item.svelte` has a one-shot receive `$effect` and an `isContinued` flag, and `Group.svelte` publishes `const context` and runs `$effect(() => board?.add(context))`. This repo has no Firefox Playwright project (`--project=firefox --list` errors), so the Firefox runs in Step 5 are skipped; say so in the report.
 
 ## Status
 
