@@ -37,6 +37,9 @@ export interface ItemData<V> {
  * - `trackOrder` exists because Svelte doesn't restore focus after a
  *   keyed-each move the way React does: the item refocuses itself once
  *   `values` changes.
+ * - `markReordered` replaces a `Reorder.Board` setting upstream's
+ *   `hasReordered` ref, and items' elements are in `elements` rather than
+ *   in `getOrder()`'s data.
  */
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
@@ -112,6 +115,96 @@ export interface ReorderContextProps<V> {
      * item can refocus itself after the list it belongs to is re-rendered.
      */
     trackOrder: () => void
+    /**
+     * The group's latest `values`, for a `Reorder.Board` to move items
+     * between groups (Motion 14.10.1 `Reorder/types.ts`
+     * `ReorderContextProps.values`).
+     */
+    readonly values: V[]
+    /**
+     * Call the group's `onReorder`, for a `Reorder.Board` moving an item
+     * into or out of it (Motion 14.10.1 `ReorderContextProps.onReorder`).
+     *
+     * @param newOrder - The group's new values.
+     * @param moved - The value that moved.
+     */
+    onReorder: (newOrder: V[], moved: V) => void
+    /**
+     * The measured items, in `values` order (Motion 14.10.1
+     * `ReorderContextProps.getOrder`). Unmounted items aren't measured, so
+     * they're not here; a board finds the items' elements in `elements`.
+     *
+     * @returns The measured order.
+     */
+    getOrder: () => ItemData<V>[]
+    /**
+     * Mark the group as reordered by a drag, so it swallows the release's
+     * click. A `Reorder.Board` calls it on the group an item moved into,
+     * where the release lands (upstream `to.hasReordered.current = true`).
+     */
+    markReordered: () => void
+}
+
+/**
+ * Lets the `Reorder.Group`s in a `Reorder.Board` move items between them.
+ * Mirrors the pointer half of Motion 14.10.1 `Reorder/types.ts`
+ * `ReorderBoardContextProps`. A group is identified by its context object.
+ */
+export interface ReorderBoardContextProps {
+    /**
+     * Register a group's context.
+     *
+     * @param group - The group's context.
+     * @returns A function that removes it.
+     */
+    add: (group: ReorderContextProps<unknown>) => () => void
+    /**
+     * Move an item being dragged into the group under its centre.
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param event - The latest drag event.
+     * @returns Whether it moved, or is moving, so `group` shouldn't reorder it too.
+     */
+    drag: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        event: MouseEvent | TouchEvent | PointerEvent
+    ) => boolean
+    /**
+     * The drag of `value` ended, so drop any move of it that its new group
+     * hasn't picked up, e.g. because the groups refused it.
+     *
+     * @param value - The item's value.
+     */
+    end: (value: unknown) => void
+    /**
+     * Called by a mounting item, to continue the drag that moved it here
+     * from another group.
+     *
+     * @param group - The item's (new) group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param grab - Sets or clears the item's keyboard grab.
+     * @returns Whether it continues a drag, whose `onDragStart` has already been called.
+     */
+    receive: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        grab: (element: HTMLElement, from?: unknown[]) => void
+    ) => boolean
+    /**
+     * The outermost element around `group` that holds none of the other
+     * groups, like its column. Dragging across groups scrolls the
+     * containers around it, rather than the column.
+     *
+     * @param group - The item's group.
+     * @returns That element, or `null` without one.
+     */
+    column: (group: ReorderContextProps<unknown>) => Element | null
 }
 
 const REORDER_CONTEXT_KEY = Symbol('reorder-group')

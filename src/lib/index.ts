@@ -6,6 +6,7 @@ import PresenceChild from '$lib/components/PresenceChild.svelte'
 
 export type {
     ReorderAxis,
+    ReorderBoardProps,
     ReorderElementTag,
     ReorderGroupProps,
     ReorderItemProps

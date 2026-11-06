@@ -783,6 +783,14 @@
                         Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/board') + searchParams}
+                    >
+                        Reorder: Board, drag items between groups (Motion 14.10)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

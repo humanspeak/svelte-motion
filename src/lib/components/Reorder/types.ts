@@ -1,5 +1,6 @@
 import type { HTMLElementProps } from '$lib/types'
 import type { MotionKind } from '$lib/utils/motionKind'
+import type { Snippet } from 'svelte'
 import type { MouseEventHandler, PointerEventHandler, SvelteHTMLElements } from 'svelte/elements'
 
 /** Element tags a Reorder component can render as, via the `as` prop. */
@@ -66,4 +67,28 @@ export type ReorderItemProps<V> = HTMLElementProps & {
      * @default true
      */
     layout?: true | 'position'
+}
+
+/**
+ * Props for `Reorder.Board`. Mirrors framer-motion's `Reorder.Board`
+ * (`Reorder/Board.tsx` `Props`, Motion 14.10).
+ */
+export type ReorderBoardProps<V> = {
+    /**
+     * Whether `value` can move between two groups, from the group whose
+     * values are `from` to the group whose values are `to`. It's called
+     * before either group's `onReorder`. Return `false` to leave the item
+     * where it is: a dragged item stays in its group until it's dragged
+     * over another.
+     *
+     * While a dragged item is over a group it refuses, it's called every
+     * frame, so keep it fast and free of side effects.
+     *
+     * ```svelte
+     * <Reorder.Board canMove={(card, from, to) => to.length < 5}>
+     * ```
+     */
+    canMove?: (value: V, from: V[], to: V[]) => boolean
+    /** The groups, and anything around them. */
+    children?: Snippet
 }

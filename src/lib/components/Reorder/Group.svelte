@@ -17,8 +17,9 @@
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { Box } from '$lib/utils/projection'
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
+    import { getReorderBoardContext } from './board'
     import { checkReorder, keyTarget, moveItem } from './checkReorder'
-    import { setReorderContext, type ItemData } from './context'
+    import { setReorderContext, type ItemData, type ReorderContextProps } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
     import type { MouseEventHandler, PointerEventHandler } from 'svelte/elements'
@@ -128,7 +129,7 @@
      */
     let hasReordered = false
 
-    setReorderContext<V>({
+    const context: ReorderContextProps<V> = {
         get axis() {
             return axis
         },
@@ -217,8 +218,25 @@
             return committed
         },
         // Track identity and contents so in-place $state mutations count too.
-        trackOrder: () => values.forEach(() => {})
-    })
+        trackOrder: () => values.forEach(() => {}),
+        // For a `Reorder.Board` (Motion 14.10.1 `Reorder/Group.tsx`).
+        get values() {
+            return values
+        },
+        onReorder: (newOrder, moved) => onReorder(newOrder, moved),
+        getOrder: getMeasuredOrder,
+        markReordered: () => {
+            hasReordered = true
+        }
+    }
+    setReorderContext<V>(context)
+
+    /**
+     * Inside a `Reorder.Board`, register with it so its items can move
+     * between groups (Motion 14.10.1 `Reorder/Group.tsx` `board?.add`).
+     */
+    const board = getReorderBoardContext()
+    $effect(() => board?.add(context as ReorderContextProps<unknown>))
 
     $effect(() => {
         for (const map of [itemLayouts, elements]) {
