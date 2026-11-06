@@ -50,6 +50,14 @@ export type {
     DragPointConstraint
 } from 'motion-dom'
 
+// Motion 14.10: press() count/hold/repeat options and handlers.
+export type {
+    OnPressStartEvent,
+    PointerEventOptions,
+    PressHandlers,
+    PressOptions
+} from 'motion-dom'
+
 // `animate` and the element effects re-typed to accept both raw and
 // Svelte-augmented motion values (runtime passthrough to motion's
 // implementations — no behavior change, only widened types).
