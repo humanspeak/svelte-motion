@@ -165,7 +165,7 @@
         setActive: activate,
         checkTabStop,
         elements,
-        // Motion 14.9.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
+        // Motion 14.10.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
         // that the grab snapshot is a copy (`values` may be mutated in place)
         // and it reports whether it committed a new order.
         onKeyDown: (event, item, from, grab) => {
@@ -180,7 +180,8 @@
                 return false
             }
             const order = getMeasuredOrder()
-            const keyIndex = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].indexOf(key)
+            const keys = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Home', 'End']
+            const keyIndex = keys.indexOf(key)
             const isX = keyIndex % 2
             let committed = false
             if (key === ' ') {
@@ -194,16 +195,22 @@
                     item
                 )
                 grab(currentTarget)
-            } else if (keyIndex < 0 || (axis !== 'xy' && axis !== (isX ? 'x' : 'y'))) {
+            } else if (keyIndex < 0) {
                 return false
             } else {
+                // Home and End work on every axis; arrows across it are the page's.
+                const isAlongAxis = keyIndex > 3 || axis === 'xy' || axis === (isX ? 'x' : 'y')
                 // Focus only moves between rendered items.
                 const list = from ? order : order.filter(({ value }) => isRendered(value))
                 const index = list.findIndex(({ value }) => value === item)
-                const target = keyTarget(list, index, keyIndex, axis, !!isX && isRTL())
+                const target = isAlongAxis
+                    ? keyTarget(list, index, keyIndex, axis, !!isX && isRTL())
+                    : -1
                 if (target > -1) {
                     if (from) committed = commit(order, moveItem(order, index, target), item)
                     else elements.get(list[target].value)?.()?.focus()
+                } else if (!isAlongAxis) {
+                    return false
                 }
             }
             event.preventDefault()

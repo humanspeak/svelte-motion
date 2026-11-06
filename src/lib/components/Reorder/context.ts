@@ -90,9 +90,10 @@ export interface ReorderContextProps<V> {
      * Handle a key on an item: Space grabs and drops, arrows along `axis`
      * move the grabbed item one place, or a row in a grid (see
      * `keyTarget`), or move focus that way if it isn't grabbed (Left and
-     * Right swap in RTL), and Escape restores the order in `from`, the
-     * values when it was grabbed. Mirrors Motion 14.9.1
-     * `Reorder/Group.tsx` `onKeyDown`.
+     * Right swap in RTL), Home and End do the same to either end on every
+     * axis, and Escape restores the order in `from`, the values when it was
+     * grabbed. Arrows across `axis` are left to the browser. Mirrors Motion
+     * 14.10.1 `Reorder/Group.tsx` `onKeyDown`.
      *
      * @param event - The item's keydown event.
      * @param item - The item's value.

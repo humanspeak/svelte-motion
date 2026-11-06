@@ -123,8 +123,8 @@ describe('checkReorder', () => {
 })
 
 /**
- * Port of Motion 14.9.1 `Reorder/utils/__tests__/check-reorder.test.ts`
- * (`keyTarget`). `key` is the arrow's index in Up, Left, Down, Right.
+ * Port of Motion 14.10.1 `Reorder/utils/__tests__/check-reorder.test.ts`
+ * (`keyTarget`). `key` is the key's index in Up, Left, Down, Right, Home, End.
  */
 describe('keyTarget', () => {
     it('moves by the row drawn above or below, not the next in order', () => {
@@ -175,5 +175,23 @@ describe('keyTarget', () => {
         expect(keyTarget(order, 1, 2, 'xy', false)).toBe(3)
         expect(keyTarget(order, 2, 0, 'xy', false)).toBe(0)
         expect(keyTarget(order, 0, 3, 'xy', false)).toBe(1)
+    })
+
+    // Motion 14.10: key 4 is Home and key 5 is End.
+
+    it('Home and End go to either end', () => {
+        const order = [...verticalOrder(), item('d', box(0, 100, 300, 400))]
+        expect(keyTarget(order, 1, 4, 'y', false)).toBe(0)
+        expect(keyTarget(order, 1, 5, 'y', false)).toBe(3)
+        // Along the order on a grid too, not by row
+        const grid = gridOrder()
+        expect(keyTarget(grid, 1, 4, 'xy', false)).toBe(0)
+        expect(keyTarget(grid, 1, 5, 'xy', false)).toBe(3)
+    })
+
+    it('Home on the first item and End on the last are -1', () => {
+        const order = [...verticalOrder(), item('d', box(0, 100, 300, 400))]
+        expect(keyTarget(order, 0, 4, 'y', false)).toBe(-1)
+        expect(keyTarget(order, 3, 5, 'y', false)).toBe(-1)
     })
 })
