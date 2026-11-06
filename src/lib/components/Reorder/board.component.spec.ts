@@ -15,11 +15,16 @@
  *   cleanup": React callback refs have no Svelte equivalent, so the third
  *   case binds each item's `ref` instead.
  *
- * Skipped: none of the pointer tests. The "Reorder.Board keyboard" block is
- * plan 007's.
+ * "Reorder.Board keyboard" ports all 15 upstream keyboard tests. Upstream's
+ * `act()` around one key is `press` (dispatch, then `flushSync`); several
+ * keys in one `act()` ("before React renders") are `send`s with no flush
+ * between them, so Svelte hasn't rendered the first when the next lands.
+ *
+ * Skipped: none.
  */
 import { render, screen } from '@testing-library/svelte'
 import { visualElementStore } from 'motion-dom'
+import { flushSync } from 'svelte'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import BoardHarness from './__tests__/BoardHarness.svelte'
 import type { ReorderContextProps } from './context'
@@ -643,5 +648,364 @@ describe('Reorder with unmounted (e.g. virtualized) items', () => {
         expect(detached).toEqual([])
         const stale = [...context.elements.values()].filter((get) => get()?.isConnected === false)
         expect(stale).toEqual([])
+    })
+})
+
+describe('Reorder.Board keyboard', () => {
+    /**
+     * Dispatch a keydown and flush Svelte's updates (upstream `act()`).
+     * Returns whether the key was left to the browser (not prevented).
+     */
+    const press = (element: Element, key: string) => {
+        const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        element.dispatchEvent(event)
+        flushSync()
+        return !event.defaultPrevented
+    }
+
+    /**
+     * Dispatch a keydown without flushing: Svelte renders on a microtask, so
+     * keys sent back to back all land before it renders (upstream: several
+     * `fireEvent`s in one `act()`).
+     */
+    const send = (element: Element, key: string) =>
+        element.dispatchEvent(
+            new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        )
+
+    const focus = (element: HTMLElement) => {
+        element.focus()
+        flushSync()
+    }
+
+    const keyboardSetup = (initial: Lists = { A: ['a', 'b'], B: ['c', 'd'] }) => {
+        const onReorder = vi.fn()
+        return setup({
+            initial,
+            onReorder,
+            whileDrag: { opacity: 0.5 },
+            /**
+             * Without layout animations: a keyboard move lands by where
+             * the items are drawn, so an item still animating into its
+             * slot would make the slot depend on timing.
+             *
+             * Svelte: `layout: false` as well. With only `type: false`, a
+             * sibling's FLIP transform (after the item leaves its group)
+             * can stay at its starting delta in jsdom, depending on which
+             * tests ran first in the worker, and the next move lands by
+             * that stale position. Items still measure their slots.
+             */
+            transition: { type: false },
+            layout: false
+        }).then((result) => ({ onReorder, ...result }))
+    }
+
+    it('moves a grabbed item to the next group across its axis', async () => {
+        const { container } = await keyboardSetup()
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+
+        expect(press(a, 'ArrowRight')).toBe(false)
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['a', 'c', 'd'] })
+
+        // Focus and the grab move with it
+        const moved = byId('a')
+        expect(moved.closest('ul')).toBe(byId('B'))
+        expect(document.activeElement).toBe(moved)
+        expect(isGrabbed(moved)).toBe(true)
+
+        // Arrows along the axis now move it within its new group
+        press(moved, 'ArrowDown')
+        expect(lists(container)).toEqual({ A: ['b'], B: ['c', 'a', 'd'] })
+
+        press(moved, 'ArrowLeft')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b', 'a'], B: ['c', 'd'] })
+        expect(document.activeElement).toBe(byId('a'))
+
+        // Space drops it
+        press(byId('a'), ' ')
+        expect(isGrabbed(byId('a'))).toBe(false)
+    })
+
+    it('moves to another group on an arrow sent before Svelte renders the grab', async () => {
+        const { container } = await keyboardSetup()
+
+        const a = byId('a')
+        focus(a)
+        // As Playwright can send them: both keys before Svelte renders
+        send(a, ' ')
+        send(a, 'ArrowRight')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['a', 'c', 'd'] })
+        expect(document.activeElement).toBe(byId('a'))
+        expect(isGrabbed(byId('a'))).toBe(true)
+    })
+
+    it("leaves arrows to the browser where there's no group", async () => {
+        const { onReorder } = await keyboardSetup()
+
+        const a = byId('a')
+        press(a, ' ')
+        expect(press(a, 'ArrowLeft')).toBe(true)
+        expect(onReorder).not.toHaveBeenCalled()
+    })
+
+    it('restores the item to the group and slot it was grabbed from on Escape', async () => {
+        const { container } = await keyboardSetup()
+
+        const b = byId('b')
+        focus(b)
+        press(b, ' ')
+        press(b, 'ArrowRight')
+        await nextFrame()
+        press(byId('b'), 'ArrowDown')
+        expect(lists(container)).toEqual({ A: ['a'], B: ['c', 'd', 'b'] })
+
+        expect(press(byId('b'), 'Escape')).toBe(false)
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c', 'd'] })
+        expect(document.activeElement).toBe(byId('b'))
+        expect(isGrabbed(byId('b'))).toBe(false)
+    })
+
+    it("doesn't move a grabbed item into a hidden group", async () => {
+        const { container } = await setup({
+            initial: { H: ['h'], A: ['a'], B: ['b'] },
+            hidden: 'H',
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        expect(press(a, 'ArrowLeft')).toBe(true)
+        expect(lists(container)).toEqual({ H: ['h'], A: ['a'], B: ['b'] })
+        expect(document.activeElement).toBe(a)
+    })
+
+    it('forgets a refused move once the item is dropped', async () => {
+        let refuse = true
+        const { container, component } = await setup({
+            initial: { A: ['a', 'b'], B: ['c'] },
+            reject: () => refuse,
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        press(a, 'ArrowRight')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c'] })
+        press(a, ' ')
+        focus(byId('c'))
+
+        // Later, the app moves it itself
+        refuse = false
+        component.setLists((latest: Lists) => ({ A: ['b'], B: ['a', ...latest.B] }))
+        flushSync()
+        await nextFrame()
+
+        expect(document.activeElement).toBe(byId('c'))
+        expect(isGrabbed(byId('a'))).toBe(false)
+    })
+
+    it('skips a group that canMove refuses for the next one that way', async () => {
+        const { container } = await setup({
+            initial: { A: ['a'], B: ['b', 'c'], C: [], D: ['d', 'e'] },
+            // Up to two items in a group
+            canMove: (_: string, __: string[], to: string[]) => to.length < 2,
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        expect(press(a, 'ArrowRight')).toBe(false)
+        await nextFrame()
+        const moved = { A: [], B: ['b', 'c'], C: ['a'], D: ['d', 'e'] }
+        expect(lists(container)).toEqual(moved)
+        expect(document.activeElement).toBe(byId('a'))
+
+        // No group takes it further that way
+        expect(press(byId('a'), 'ArrowRight')).toBe(true)
+        expect(lists(container)).toEqual(moved)
+    })
+
+    it('returns the item on Escape whatever canMove says', async () => {
+        const { container } = await setup({
+            initial: { A: ['a', 'b'], B: ['c'] },
+            // Nothing moves into A
+            canMove: (_: string, __: string[], to: string[]) => !to.includes('a'),
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const b = byId('b')
+        focus(b)
+        press(b, ' ')
+        press(b, 'ArrowRight')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a'], B: ['c', 'b'] })
+
+        press(byId('b'), 'Escape')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c'] })
+    })
+
+    it('only moves past either end into a group that way, not one beside it', async () => {
+        const { container } = await keyboardSetup({ A: ['a'], B: ['b'] })
+
+        // A and B are side by side: neither's last item has anywhere to go
+        // down, to the right or the left
+        for (const id of ['a', 'b']) {
+            const item = byId(id)
+            focus(item)
+            press(item, ' ')
+            press(item, 'ArrowDown')
+            await nextFrame()
+            expect(lists(container)).toEqual({ A: ['a'], B: ['b'] })
+            expect(document.activeElement).toBe(byId(id))
+            press(byId(id), ' ')
+        }
+    })
+
+    it('moves past either end into the group that way', async () => {
+        const { container } = await setup({
+            initial: { A: ['a', 'b'], B: ['c'] },
+            stacked: true,
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const b = byId('b')
+        focus(b)
+        press(b, ' ')
+        expect(press(b, 'ArrowDown')).toBe(false)
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a'], B: ['b', 'c'] })
+
+        press(byId('b'), 'ArrowUp')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c'] })
+    })
+
+    it("keeps Home and End within the item's group", async () => {
+        const { container } = await setup({
+            initial: { A: ['a', 'b'], B: ['c', 'd'] },
+            stacked: true,
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const b = byId('b')
+        focus(b)
+        press(b, ' ')
+        expect(press(b, 'End')).toBe(false)
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c', 'd'] })
+
+        press(byId('b'), 'Home')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b', 'a'], B: ['c', 'd'] })
+
+        press(byId('b'), 'Home')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b', 'a'], B: ['c', 'd'] })
+        expect(document.activeElement).toBe(byId('b'))
+    })
+
+    it('waits for a move to another group to render before moving the item again', async () => {
+        const { container } = await keyboardSetup()
+
+        const a = byId('a')
+        focus(a)
+        // As a test runner can send them, or as a user can type before
+        // Svelte renders the move: all before it renders
+        send(a, ' ')
+        send(a, 'ArrowRight')
+        send(a, 'ArrowDown')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['a', 'c', 'd'] })
+
+        // Once it has, arrows move it again
+        press(byId('a'), 'ArrowDown')
+        expect(lists(container)).toEqual({ A: ['b'], B: ['c', 'a', 'd'] })
+    })
+
+    it('waits for a move to another group to render before returning the item on Escape', async () => {
+        const { container } = await keyboardSetup()
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        press(a, 'ArrowDown')
+        expect(lists(container)).toEqual({ A: ['b', 'a'], B: ['c', 'd'] })
+
+        // Escape before Svelte renders the move
+        send(byId('a'), 'ArrowRight')
+        send(byId('a'), 'Escape')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['c', 'a', 'd'] })
+        expect(document.activeElement).toBe(byId('a'))
+
+        // Once it has, Escape returns it
+        press(byId('a'), 'Escape')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['a', 'b'], B: ['c', 'd'] })
+    })
+
+    it('leaves focus where it is when a keyboard move lands later', async () => {
+        const { container, component } = await setup({
+            initial: { A: ['a', 'b'], B: ['c'] },
+            // Only the group it joins ignores the move: the item disappears
+            reject: (id: string) => id === 'B',
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        press(a, 'ArrowRight')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['c'] })
+
+        // The user carries on elsewhere
+        focus(byId('c'))
+
+        // Later (e.g. an undo), the app puts it there itself
+        component.setLists((latest: Lists) => ({ ...latest, B: ['c', 'a'] }))
+        flushSync()
+        await nextFrame()
+
+        expect(document.activeElement).toBe(byId('c'))
+        expect(isGrabbed(byId('a'))).toBe(false)
+    })
+
+    it('moves an item again after a keyboard move that never landed', async () => {
+        const { container, component } = await setup({
+            initial: { A: ['a', 'b'], B: ['c'] },
+            // Only the group it joins ignores the move: the item disappears
+            reject: (id: string) => id === 'B',
+            whileDrag: { opacity: 0.5 }
+        })
+
+        const a = byId('a')
+        focus(a)
+        press(a, ' ')
+        press(a, 'ArrowRight')
+        await nextFrame()
+        expect(lists(container)).toEqual({ A: ['b'], B: ['c'] })
+
+        // The app puts it back (e.g. an undo), and it's grabbed again
+        component.setLists((latest: Lists) => ({ ...latest, A: ['a', 'b'] }))
+        flushSync()
+        await nextFrame()
+        const restored = byId('a')
+        focus(restored)
+        press(restored, ' ')
+        expect(press(restored, 'ArrowDown')).toBe(false)
+        expect(lists(container)).toEqual({ A: ['b', 'a'], B: ['c'] })
     })
 })

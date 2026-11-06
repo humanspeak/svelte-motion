@@ -147,8 +147,7 @@ export interface ReorderContextProps<V> {
 
 /**
  * Lets the `Reorder.Group`s in a `Reorder.Board` move items between them.
- * Mirrors the pointer half of Motion 14.10.1 `Reorder/types.ts`
- * `ReorderBoardContextProps`. A group is identified by its context object.
+ * Mirrors Motion 14.10.1 `Reorder/types.ts` `ReorderBoardContextProps`. A group is identified by its context object.
  */
 export interface ReorderBoardContextProps {
     /**
@@ -174,15 +173,58 @@ export interface ReorderBoardContextProps {
         event: MouseEvent | TouchEvent | PointerEvent
     ) => boolean
     /**
-     * The drag of `value` ended, so drop any move of it that its new group
-     * hasn't picked up, e.g. because the groups refused it.
+     * Move a grabbed item to the nearest group in the direction of the
+     * arrow key at `keyIndex` (up, left, down, right).
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param keyIndex - The arrow key: 0 up, 1 left, 2 down, 3 right.
+     * @param element - The item's element.
+     * @param from - The values when it was grabbed.
+     * @returns Whether it moved.
+     */
+    key: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        keyIndex: number,
+        element: Element,
+        from: unknown[]
+    ) => boolean
+    /**
+     * Move a grabbed item back to the group it was grabbed in, if it's
+     * since been moved to another.
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param from - The values when it was grabbed.
+     * @returns Whether it moved.
+     */
+    restore: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        from: unknown[]
+    ) => boolean
+    /**
+     * The drag or keyboard grab of `value` ended, so drop any move of it
+     * that its new group hasn't picked up, e.g. because the groups refused
+     * it.
      *
      * @param value - The item's value.
      */
     end: (value: unknown) => void
     /**
-     * Called by a mounting item, to continue the drag that moved it here
-     * from another group.
+     * Whether the item at `element` has moved to another group that hasn't
+     * picked it up yet.
+     *
+     * @param element - The item's element.
+     * @returns Whether the item's element is moving.
+     */
+    isMoving: (element: Element) => boolean
+    /**
+     * Called by a mounting item, to continue the drag or keyboard grab
+     * that moved it here from another group.
      *
      * @param group - The item's (new) group.
      * @param value - The item's value.

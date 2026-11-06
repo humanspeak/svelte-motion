@@ -206,7 +206,10 @@
 
     /**
      * If a `Reorder.Board` just moved this item here from another group,
-     * carry on its drag (Motion 14.10.1 `Item.tsx`, a mount layout effect).
+     * carry on its drag or keyboard grab (Motion 14.10.1 `Item.tsx`, a
+     * mount layout effect). For a keyboard move, `receive` focuses this
+     * element and grabs it through `grab`, synchronously: the element is
+     * connected and has its `tabindex` by the time this effect runs.
      * This item's own effects run after its `MotionContainer`'s, so by the
      * first one with an element, its VisualElement is mounted and its drag
      * listeners (and so its `elementDragControls` entry) are in place.
@@ -248,6 +251,16 @@
     })
 
     const handleBlur: FocusEventHandler<HTMLElement> = (event) => {
+        /**
+         * Svelte: the cross-group equivalent of the keyed-each move-blur
+         * below. A `Reorder.Board` keyboard move destroys this row and
+         * mounts a new one in the other group; some browsers blur the
+         * focused node as it's removed. React suppresses that blur; Svelte
+         * doesn't, and dropping the grab here would end the board's handoff
+         * (`grab` calls `board.end`), so the new row would never take focus
+         * and the grab. While the move is in flight, ignore it.
+         */
+        if (board?.isMoving(event.currentTarget)) return
         // A move-blur: the node moved and focus fell to <body>.
         if (pendingRefocus && event.relatedTarget === null) return
         userBlur?.(event)

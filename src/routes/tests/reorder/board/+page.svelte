@@ -45,6 +45,11 @@
             expected: 'It lands at the top of the column.'
         },
         {
+            text: 'Tab to a card, Space, ArrowRight: it moves to the next column and stays grabbed; Escape returns it.',
+            expected:
+                'ArrowRight moves the grabbed card into the next column, keeping focus and its whileDrag size. Escape returns it to the column and slot it was grabbed from, focused and dropped. Drags stays the same.'
+        },
+        {
             text: '(?overflow) Drag "a" to the right edge of the board and hold it there.',
             expected:
                 'The board scrolls across to "done", not the column the card came from, and the card moves into "done" on the way.'
@@ -113,6 +118,11 @@
             calls
             <code>onReorder</code> without it, the group it joined with it, and the drag carries on
             in the new group without calling <code>onDragStart</code> again.
+        </p>
+        <p>
+            With a card grabbed by keyboard (Space), arrows across the column, or past either end of
+            it, move it to the nearest column that way, and Escape returns it to where it was
+            grabbed.
         </p>
         <p>
             Add <code>?overflow</code> for a board that scrolls across around columns that scroll down.

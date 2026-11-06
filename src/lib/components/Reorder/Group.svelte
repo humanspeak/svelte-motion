@@ -168,7 +168,10 @@
         elements,
         // Motion 14.10.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
         // that the grab snapshot is a copy (`values` may be mutated in place)
-        // and it reports whether it committed a new order.
+        // and it reports whether it committed a new order. In a Reorder.Board,
+        // arrows across `axis`, or along it from either end, move a grabbed
+        // item to the nearest group that way, and Escape returns it to the
+        // group it was grabbed in.
         onKeyDown: (event, item, from, grab) => {
             const { key, currentTarget } = event
             if (
@@ -187,17 +190,34 @@
             let committed = false
             if (key === ' ') {
                 if (!event.repeat) grab(currentTarget, from ? undefined : [...values])
-            } else if (key === 'Escape' && from) {
-                // Values added since the grab keep their slots.
-                const kept = from.flatMap((value) => order.filter((data) => data.value === value))
-                committed = commit(
-                    order,
-                    order.map((data) => (from.includes(data.value) ? kept.shift()! : data)),
-                    item
-                )
-                grab(currentTarget)
-            } else if (keyIndex < 0) {
+            } else if (keyIndex < 0 && !(key === 'Escape' && from)) {
                 return false
+            } else if (board?.isMoving(currentTarget)) {
+                // Until Svelte renders its move to another group, this item
+                // and its group's values are out of date: moving it again,
+                // or back, would leave it in both groups.
+            } else if (key === 'Escape' && from) {
+                // Drop it first: a move back to the group it was grabbed in
+                // hands it on to the item that mounts there.
+                grab(currentTarget)
+                if (
+                    !board?.restore(
+                        context as ReorderContextProps<unknown>,
+                        item,
+                        currentTarget,
+                        from
+                    )
+                ) {
+                    // Values added since the grab keep their slots.
+                    const kept = from.flatMap((value) =>
+                        order.filter((data) => data.value === value)
+                    )
+                    committed = commit(
+                        order,
+                        order.map((data) => (from.includes(data.value) ? kept.shift()! : data)),
+                        item
+                    )
+                }
             } else {
                 // Home and End work on every axis; arrows across it are the page's.
                 const isAlongAxis = keyIndex > 3 || axis === 'xy' || axis === (isX ? 'x' : 'y')
@@ -210,9 +230,25 @@
                 if (target > -1) {
                     if (from) committed = commit(order, moveItem(order, index, target), item)
                     else elements.get(list[target].value)?.()?.focus()
-                } else if (!isAlongAxis) {
+                } else if (
+                    !(
+                        from &&
+                        keyIndex < 4 &&
+                        board?.key(
+                            context as ReorderContextProps<unknown>,
+                            item,
+                            keyIndex,
+                            currentTarget,
+                            from
+                        )
+                    ) &&
+                    !isAlongAxis
+                ) {
                     return false
                 }
+                // A board move doesn't commit through this group, so
+                // `committed` stays false: the item that mounts in the other
+                // group takes focus (`board.receive`).
             }
             event.preventDefault()
             return committed

@@ -7,8 +7,12 @@
  * upstream does. Moves and releases go to the body: a dragged item moved to
  * another group is a new element, and the gesture listens on the window.
  *
- * Skipped: "moves a grabbed item between groups with the arrow keys" (the
- * keyboard path is plan 007's).
+ * Keyboard: "moves a grabbed item between groups with the arrow keys" is
+ * ported with dispatched keydowns, as upstream sends them. Two more cases
+ * press real keys, so the browser blurs (or not) the focused card as Svelte
+ * removes it from its column.
+ *
+ * Skipped: none.
  */
 import { expect, test, type Page } from '@playwright/test'
 
@@ -132,6 +136,76 @@ test.describe('Reorder.Board', () => {
             .toBeLessThanOrEqual(1)
         await expect.poll(() => scale(page, 'a')).toBe(1)
         await expect(drags(page)).toHaveText('1,1')
+    })
+
+    test('moves a grabbed item between groups with the arrow keys', async ({ page }) => {
+        const key = (id: string, key: string) =>
+            page.getByTestId(id).evaluate((element, key) => {
+                element.dispatchEvent(
+                    new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+                )
+            }, key)
+        const isFocused = (id: string) =>
+            page
+                .getByTestId(id)
+                .evaluate((element) => element.ownerDocument.activeElement === element)
+
+        await page.getByTestId('b').evaluate((element) => (element as HTMLElement).focus())
+        await key('b', ' ')
+        await key('b', 'ArrowRight')
+        await expect(state(page)).toHaveText('todo:a,c doing:d,b,e done:')
+
+        // Focus and the grab follow it
+        await expect.poll(() => isFocused('b')).toBe(true)
+        await key('b', 'ArrowDown')
+        await expect(state(page)).toHaveText('todo:a,c doing:d,e,b done:')
+
+        await key('b', 'ArrowRight')
+        await expect(state(page)).toHaveText('todo:a,c doing:d,e done:b')
+
+        // Escape returns it to where it was grabbed
+        await key('b', 'Escape')
+        await expect(state(page)).toHaveText('todo:a,b,c doing:d,e done:')
+        await expect.poll(() => isFocused('b')).toBe(true)
+        await expect(drags(page)).toHaveText('0,0')
+    })
+
+    test('moves a card to the next column with real keys, and keeps it grabbed', async ({
+        page
+    }) => {
+        await page.getByTestId('a').focus()
+        await page.keyboard.press(' ')
+        await page.keyboard.press('ArrowRight')
+        await expect(state(page)).toHaveText('todo:b,c doing:a,d,e done:')
+        await expect.poll(() => parentId(page, 'a')).toBe('doing')
+        await expect(page.getByTestId('a')).toBeFocused()
+
+        // Still grabbed: arrows move it within its new column
+        await page.keyboard.press('ArrowDown')
+        await expect(state(page)).toHaveText('todo:b,c doing:d,a,e done:')
+        await expect(page.getByTestId('a')).toBeFocused()
+
+        await page.keyboard.press(' ')
+        await expect(drags(page)).toHaveText('0,0')
+    })
+
+    test('returns a moved card to its column and slot on Escape', async ({ page }) => {
+        await page.getByTestId('b').focus()
+        await page.keyboard.press(' ')
+        await page.keyboard.press('ArrowRight')
+        await expect(state(page)).toHaveText('todo:a,c doing:d,b,e done:')
+        await expect(page.getByTestId('b')).toBeFocused()
+
+        await page.keyboard.press('Escape')
+        await expect(state(page)).toHaveText('todo:a,b,c doing:d,e done:')
+        await expect.poll(() => parentId(page, 'b')).toBe('todo')
+        await expect(page.getByTestId('b')).toBeFocused()
+
+        // Dropped: arrows move focus, not the card
+        await page.keyboard.press('ArrowDown')
+        await expect(state(page)).toHaveText('todo:a,b,c doing:d,e done:')
+        await expect(page.getByTestId('c')).toBeFocused()
+        await expect(drags(page)).toHaveText('0,0')
     })
 
     test('drags an item into an empty group', async ({ page }) => {

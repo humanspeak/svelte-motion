@@ -1,7 +1,7 @@
 /**
  * `Reorder.Board`'s logic: a near line-for-line port of Motion 14.10.1
  * `components/Reorder/Board.tsx` `createBoard` and its helpers, pointer
- * path only. Deviations are marked `// Svelte:`, so the next upstream diff
+ * and keyboard paths. Deviations are marked `// Svelte:`, so the next upstream diff
  * (`git -C ~/Github/motion diff <old> <new> -- packages/framer-motion/src/components/Reorder/Board.tsx`)
  * maps onto this file.
  */
@@ -63,6 +63,12 @@ interface Handoff {
      */
     controls?: VisualElementDragControls
     event?: DragEvent
+    /**
+     * When moved with the keyboard: the values to keep it grabbed with, if
+     * it's still grabbed.
+     */
+    keys?: boolean
+    from?: unknown[]
 }
 
 /**
@@ -126,8 +132,7 @@ export const isNested = (a: Group, b: Group) => {
 /**
  * Create a board: the context that lets the `Reorder.Group`s inside a
  * `Reorder.Board` move dragged items between them. Port of
- * `Board.tsx:116-439` `createBoard`, without the keyboard members (`key`,
- * `restore`, `isMoving`, and `receive`'s keyboard branch).
+ * `Board.tsx:116-439` `createBoard`.
  *
  * @param getProps - Returns the board's latest props. Svelte: a getter
  *   replaces upstream's `props.current` ref.
@@ -145,35 +150,46 @@ export function createBoard(getProps: () => BoardProps): ReorderBoardContextProp
         getProps().canMove?.(value as never, from.values as never[], to.values as never[]) !== false
 
     /**
-     * Move `value` from one group to another: to the slot under the item's
-     * centre (`Board.tsx:133-187`).
+     * Where the latest keyboard grab began, for Escape to return it there
+     * (`Board.tsx:129-132`). Svelte: the group is its context object.
+     */
+    let origin: { group: Group; from: unknown[] } | undefined
+
+    /**
+     * Move `value` from one group to another: to `index` in its values or,
+     * by default, the slot under the item's centre (`Board.tsx:134-191`).
      */
     const move = (
         from: Group,
         to: Group,
         value: unknown,
         element: Element,
-        props: Partial<Handoff>
+        props: Partial<Handoff>,
+        index?: number
     ) => {
         const point = centre(element)
         const { values } = to
 
-        /**
-         * Only the items it shows: a group keeps unmounted (e.g.
-         * virtualized) items' data while their values remain.
-         *
-         * Svelte: items' elements are getters in `to.elements`.
-         */
-        const itemElement = (item: unknown) => to.elements.get(item)?.()
-        const order = to.getOrder().filter((item) => itemElement(item.value)?.isConnected)
-        const isRTL = getComputedStyle(to.getGroupElement()!).direction === 'rtl'
-        const next = order.find((item) => isBefore(point, itemElement(item.value)!, to.axis, isRTL))
-        const last = order[order.length - 1]
-        const index = next
-            ? values.indexOf(next.value)
-            : last
-              ? values.indexOf(last.value) + 1
-              : values.length
+        if (index === undefined) {
+            /**
+             * Only the items it shows: a group keeps unmounted (e.g.
+             * virtualized) items' data while their values remain.
+             *
+             * Svelte: items' elements are getters in `to.elements`.
+             */
+            const itemElement = (item: unknown) => to.elements.get(item)?.()
+            const order = to.getOrder().filter((item) => itemElement(item.value)?.isConnected)
+            const isRTL = getComputedStyle(to.getGroupElement()!).direction === 'rtl'
+            const next = order.find((item) =>
+                isBefore(point, itemElement(item.value)!, to.axis, isRTL)
+            )
+            const last = order[order.length - 1]
+            index = next
+                ? values.indexOf(next.value)
+                : last
+                  ? values.indexOf(last.value) + 1
+                  : values.length
+        }
 
         handoff = {
             value,
@@ -251,11 +267,74 @@ export function createBoard(getProps: () => BoardProps): ReorderBoardContextProp
             return true
         },
 
+        key: (from, value, keyIndex, element, grabbed) => {
+            const point = centre(element)
+            const axis = keyIndex % 2 ? 'x' : 'y'
+            const direction = keyIndex > 1 ? 1 : -1
+            let to: Group | undefined
+            let nearest = Infinity
+
+            for (const group of groups) {
+                // Svelte: `getGroupElement()` replaces `groupRef.current`.
+                const target = group.getGroupElement()
+                if (!target) continue
+
+                const { left, right, top, bottom, width, height } = target.getBoundingClientRect()
+
+                // Hidden, e.g. display: none
+                if (!width && !height) continue
+
+                /**
+                 * Its near edge is past the item that way, so a group beside
+                 * this one isn't below its last item, whatever their heights.
+                 */
+                const edge = [bottom, right, top, left][keyIndex]
+                if ((edge - point[axis]) * direction <= 0) continue
+
+                const x = Math.max(left - point.x, 0, point.x - right)
+                const y = Math.max(top - point.y, 0, point.y - bottom)
+                if (x * x + y * y < nearest && canMove(from, group, value)) {
+                    nearest = x * x + y * y
+                    to = group
+                }
+            }
+
+            if (!to) return false
+
+            if (origin?.from !== grabbed) {
+                origin = { group: from, from: grabbed }
+            }
+            move(from, to, value, element, { keys: true, from: grabbed })
+
+            return true
+        },
+
+        restore: (from, value, element, grabbed) => {
+            const to =
+                origin?.from === grabbed && [...groups].find((group) => group === origin!.group)
+
+            if (!to || to === from) return false
+
+            /**
+             * Before the first value that followed it when it was grabbed,
+             * and is still there.
+             */
+            const after = grabbed.slice(grabbed.indexOf(value) + 1)
+            const index = to.values.findIndex((item) => after.includes(item))
+
+            origin = undefined
+            move(from, to, value, element, { keys: true }, index < 0 ? to.values.length : index)
+
+            return true
+        },
+
         end: (value) => {
             if (handoff?.value === value) handoff = undefined
         },
 
-        receive: (to, value, element) => {
+        isMoving: (element) => handoff?.element === element,
+
+        receive: (to, value, element, grab) => {
             const visualElement = visualElementStore.get(element)
             const nextControls = visualElement && elementDragControls.get(visualElement)
 
@@ -273,11 +352,25 @@ export function createBoard(getProps: () => BoardProps): ReorderBoardContextProp
                 return false
             }
 
-            const { controls } = latest
+            const { keys, from, controls } = latest
             /**
              * Whether the groups moved the item, rather than copied it.
              */
             const isMoved = !latest.element.isConnected
+
+            if (keys) {
+                handoff = undefined
+                /**
+                 * Unless focus has moved on since, e.g. the groups took it
+                 * much later.
+                 */
+                const { activeElement, body } = element.ownerDocument
+                if (isMoved && (!activeElement || activeElement === body)) {
+                    ;(element as HTMLElement).focus()
+                    grab(element as HTMLElement, from)
+                }
+                return false
+            }
 
             if (!nextControls || !controls?.isDragging) return false
 
