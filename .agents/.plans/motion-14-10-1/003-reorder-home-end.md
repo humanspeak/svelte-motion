@@ -4,6 +4,8 @@
 >
 > **Drift check (run first)**: `git diff --stat f93a1d92..HEAD -- src/lib/components/Reorder/checkReorder.ts src/lib/components/Reorder/checkReorder.spec.ts src/lib/components/Reorder/Group.svelte src/lib/components/Reorder/context.ts src/lib/components/Reorder/keyboard.component.spec.ts e2e/reorder/keyboard.spec.ts docs/src/routes/docs/reorder/+page.svx`
 > The only expected change is this batch folder. If any listed path changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
+>
+> Revision 2026-11-06: The "behaviour change hidden in that logic" premise was wrong. Our 14.9.1 port already called `preventDefault` for along-axis keys with nowhere to go; it only returned early for keys across the axis. The executor showed this, and the guard verified it at `2b1ef67e` (`Group.svelte:196-206`). So 4 tests go red first, not 5, and the changeset drops its second sentence. Operator agreed.
 
 ## Status
 
@@ -204,7 +206,7 @@ This exercises the Svelte-only refocus path after a large keyed-each move.
    - Add a table row: "`Home` / `End` | Move focus to the first or last item, or move the grabbed item there. Works on every axis".
    - Change the note to "Arrows across the axis are left to the page." Arrows along it with nowhere to go are now consumed.
    - Change "(Motion 14.9)" to "(Motion 14.9; Home/End in 14.10)".
-2. Create `.changeset/reorder-home-end.md` with frontmatter `'@humanspeak/svelte-motion': minor`. The body: "`Reorder`: Home and End move focus, or the grabbed item, to either end of the group (Motion 14.10). Arrow keys along the group's axis are now always handled, even with nowhere to go."
+2. Create `.changeset/reorder-home-end.md` with frontmatter `'@humanspeak/svelte-motion': minor`. The body: "`Reorder`: Home and End move focus, or the grabbed item, to either end of the group (Motion 14.10)."
 
 **Verify**: `pnpm --dir docs build` → exit 0. Revert any change to `docs/static/r/animated-tabs.json`.
 

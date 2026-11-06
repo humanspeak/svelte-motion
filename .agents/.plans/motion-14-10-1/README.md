@@ -18,7 +18,7 @@ We call this upstream code unchanged. Plan 001 pins the user-visible items:
 - **`press()`**: `count`, `countTimeout`, `hold` and `repeat` options, plus the `onActive`, `onHold` and `onRepeat` handlers. We re-export `press` at `src/lib/index.ts:36`. Plan 001 re-exports the types.
 - **`drag()` `x`/`y`**, **`DragControlOptions.immediate`** and **`DragConstraintsContext.getProps`**: our runtime wiring is motion-dom's. Plan 005 adds typing, docs and tests.
 - **`animate()`**: a timeline made only of nested sequences is now recognised (`e257e1b0e`). Timeline `call()` no longer fires extra times on repeat (`4cf2f4a01`). A timeline is re-registered with its `useAnimate` scope on each replay (`a90c0532f`). `reduceMotion` now applies to sequences on plain elements (`8795896fb`, `123a7679c`). Plan 001 pins the first three.
-- **Press released during a drag is now a cancel** (`press/index.ts:232-237`). This is a visible change for `drag` plus `whileTap` users. Plan 001 characterises it.
+- **Press released during a drag:** `press/index.ts:232-237` turns it into a cancel, but on a `drag` + `whileTap` element the drag's capture-phase pointerup releases the lock first, so a `count: 1` press still ends as `onTap`. That matches upstream React (drag registers before tap). Only `count` sequences are cancelled by a drag; plan 002 Step 5 tests that. (Corrected 2026-11-06 after plan 001's first run.)
 - **Performance** (lazy transform groups, fewer objects per value, memoised `getAnimatableNone`, and more): free.
 - **The one break**: `src/lib/html/motionDomSsr.spec.ts`'s fake value lacks `run()`, because upstream switched from `value.start(` to `value.run(`. Plan 001 Step 4 fixes it.
 
@@ -36,7 +36,7 @@ We call this upstream code unchanged. Plan 001 pins the user-visible items:
 | 14.10.0 `animate`: minor fixes | 001 (free) |
 | (unlisted) `Reorder.Board` | 006, 007, 008 |
 | (unlisted) Reorder auto-scroll: real overflow, per-axis state | 004 |
-| (unlisted) press released during a drag counts as a cancel | 001 (characterised) |
+| (unlisted) a drag cancels a press `count` sequence | 002 Step 5 (test) |
 
 ## Parallel waves
 
@@ -52,7 +52,7 @@ We call this upstream code unchanged. Plan 001 pins the user-visible items:
 
 | Plan | Title | Wave | Priority | Effort | Depends on | Touches | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| [001](001-bump-motion-14-10-1.md) | Pins → 14.10.1, version 2.10.0, SSR mock `run`, timeline and press-during-drag regression pins, press type re-exports | 1 | P1 | M | — | `package.json`, `pnpm-lock.yaml`, `src/lib/html/motionDomSsr.spec.ts`, new `src/lib/utils/timelineFixes.spec.ts`, `src/lib/index.ts` (press types block), new `tests/drag/tap-during-drag` page + e2e, `src/routes/+page.svelte`, changeset | TODO |
+| [001](001-bump-motion-14-10-1.md) | Pins → 14.10.1, version 2.10.0, SSR mock `run`, timeline and press-during-drag regression pins, press type re-exports | 1 | P1 | M | — | `package.json`, `pnpm-lock.yaml`, `src/lib/html/motionDomSsr.spec.ts`, new `src/lib/utils/timelineFixes.spec.ts`, `src/lib/index.ts` (press types block), changeset | TODO |
 | [002](002-tap-prop-press-options.md) | `tap` prop (count/hold/repeat), `globalTapTarget`, `propagate.tap` | 2 | P1 | M | 001 | `src/lib/utils/gestures.ts` + spec, `src/lib/types.ts` (`MotionProps` next to `onTapCancel`), `src/lib/html/_MotionContainer.svelte`, new tap probe + spec, new `tests/motion/tap-options` page + e2e, docs gestures section + `tap-options` example, `docsNav.ts`, `examplesIndex.ts`, `+page.svelte`, changeset | TODO |
 | [003](003-reorder-home-end.md) | Reorder Home/End; along-axis keys always handled | 1 | P1 | S | — | `Reorder/checkReorder.ts` + spec, `Reorder/Group.svelte` (`onKeyDown`), `Reorder/context.ts` (JSDoc), `keyboard.component.spec.ts`, `e2e/reorder/keyboard.spec.ts`, docs reorder Keyboard section, changeset | TODO |
 | [004](004-reorder-auto-scroll-per-axis.md) | Auto-scroll: real-overflow check and per-axis state | 1 | P2 | S | — | `Reorder/autoScroll.ts` + spec, changeset | DONE: `8cea2a85`, guard PASS |
@@ -75,7 +75,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) 
 
 ## Shared hotspots (non-overlapping hunks; expect trivial merges)
 
-- **`src/routes/+page.svelte`** (test index links): 001, 002, 005 and 006 each add one link in different sections. Keep all of them.
+- **`src/routes/+page.svelte`** (test index links): 002, 005 and 006 each add one link in different sections. Keep all of them.
 - **`src/lib/index.ts`**: 001 adds a press-types block after `:46-51`; 005 moves `drag` out of the `from 'motion'` block (`:25-40`) into the re-typed exports (`:55-58`); 006 adds `ReorderBoardProps` to the Reorder types (`:7-12`). The three hunks are in different regions.
 - **`src/lib/types.ts`**: 002 edits `MotionProps` next to `onTapCancel` (`:708-713`). 005 edits only the `DragControls.start` JSDoc (`:585-602`).
 - **`docs/src/lib/docsNav.ts`, `docs/src/lib/examplesIndex.ts`**: 002 (wave 2) and 008 (wave 3). They run one after the other.
@@ -111,7 +111,6 @@ Before handing a page over:
 - check that the panel text states every side effect.
 
 Twins needed:
-- 001: `drag/tap-during-drag`.
 - 002: `motion/tap-options` (upstream has no dev page; build a twin with `<motion.button tap={…}>`).
 - 003: `reorder/keyboard` (Home/End).
 - 005: `drag/point-constraint` and `drag/vanilla` headless mode.

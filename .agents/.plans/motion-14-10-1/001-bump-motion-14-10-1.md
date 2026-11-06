@@ -4,6 +4,8 @@
 >
 > **Drift check (run first)**: `git diff --stat f93a1d92..HEAD -- package.json pnpm-lock.yaml src/lib/html/motionDomSsr.spec.ts src/lib/index.ts src/lib/index.spec.ts src/lib/__tests__/motionExportAllowlist.ts src/lib/utils/gestures.spec.ts src/routes/tests/drag src/routes/+page.svelte e2e/drag`
 > The only expected change is this batch folder (`.agents/.plans/motion-14-10-1/`). If any listed path changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
+>
+> Revision 2026-11-06: (1) Dropped the `tap-during-drag` page, e2e, index link and changeset line. The first executor run showed, and the guard confirmed against upstream, that a plain `count: 1` press released at the end of a drag ends as `onTap` in upstream React 14.10.1 too. `definitions.ts` registers drag before tap, and both PanSession and `press()` listen for pointerup on `window` in the capture phase, so the drag lock is released before `press()` checks `isDragActive()`. The "cancel" rule only applies to `count` sequences, which plan 002 Step 5 covers. (2) `require('motion-dom/package.json')` throws `ERR_PACKAGE_PATH_NOT_EXPORTED`, so version checks now read `node_modules/<pkg>/package.json` directly. (3) In a fresh worktree, run `pnpm exec svelte-kit sync` once before vitest. Operator agreed to this amendment.
 
 ## Status
 
@@ -13,7 +15,7 @@
 - **Depends on**: none
 - **Wave**: 1
 - **Category**: migration
-- **Planned at**: commit `f93a1d92`, 2026-11-06
+- **Planned at**: commit `d66a17dd`, 2026-11-06 (originally `f93a1d92`; re-stamped by the 2026-11-06 revision)
 
 ## Why this matters
 
@@ -54,7 +56,7 @@ This plan does five things:
   - `e257e1b0e`: `animate()` recognises a sequence made only of nested `{ sequence, at }` objects. Before this, it treated it as a list of subjects. Upstream test: `packages/framer-motion/src/animation/animate/__tests__/animate.test.tsx` "animates a sequence made only of nested sequences".
   - `a90c0532f`: a timeline re-registers with its `useAnimate` scope each time it gets a new `finished`. So a timeline played again after finishing is stopped when the scope unmounts. Upstream test: `packages/framer-motion/src/animation/hooks/__tests__/use-animate.test.tsx` "Stops an animation played again after finishing on unmount".
   - `4cf2f4a01`: timeline `call()` callbacks no longer fire extra times when a frame lands on a repeat boundary. Upstream test: `packages/framer-motion/src/animation/timeline/__tests__/repeat-frames.test.ts` "a frame on a repeat boundary doesn't fire callbacks extra". It drives frames by hand with `MotionGlobalConfig.useManualTiming = true` and `processFrame(t)`, and stubs `window.requestAnimationFrame` so it never fires.
-- **Press behaviour change (characterise it, don't fix it).** At v14.9.1, `motion-dom/src/gestures/press/index.ts` returned early on pointerup when `!isValidPressEvent(endEvent)`, which includes `isDragActive()`. A press released while the drag lock was held therefore never called its end callback. At v14.10.1 (`press/index.ts:232-237`), the press always ends, and `if (isDragActive()) success = false` turns it into a cancel. Our `src/lib/utils/gestures.ts:139-145` end callback runs `setGestureActive(visualElement, 'whileTap', false)` and fires `onTapCancel` when `success` is false. For a `motion.div` with `drag` plus `whileTap`/`onTap*`, releasing a drag should now fire `onTapCancel` once and release `whileTap`. Upstream test: `packages/motion-dom/src/gestures/drag/__tests__/press-interop.test.ts` (expects `["start","cancel"]`).
+- **Press during a drag (no test here).** At v14.10.1, a press that ends while the drag lock is held becomes a cancel (`press/index.ts:232-237`). But for a `motion.*` element with `drag` and `whileTap`, the drag's window pointerup listener (capture phase, registered first) releases the lock before `press()` checks it, so a `count: 1` press ends as `onTap`. That matches upstream React, where `definitions.ts` lists drag before tap. Only `count` sequences are cancelled by a drag (upstream `press-interop.test.ts`); plan 002 tests that.
 - **Existing unit test that may need updating.** `src/lib/utils/gestures.spec.ts`, test "ignores press while a drag holds the global lock" (around line 190), asserts that pointerdown under `setDragLock(true)` doesn't activate `whileTap`. At v14.10.1, `startPress` still returns early on `!isValidPressEvent(startEvent)`, so this should still pass. Leave it alone unless it fails.
 - **New public types in 14.10.1.** `motion-dom` exports `PressOptions`, `PressHandlers`, `OnPressStartEvent` and `PointerEventOptions` (via `export * from "./gestures/press/types"`). We re-export the runtime `press` at `src/lib/index.ts:36` but no press types. The existing type re-export block for drag is `src/lib/index.ts:46-51`:
   ```ts
@@ -96,9 +98,6 @@ Never use port 4198, never set `PW_REUSE_SERVER`, and never use `git stash`.
 - `src/lib/utils/timelineFixes.spec.ts` (create)
 - `src/lib/index.ts`: one new `export type { … } from 'motion-dom'` block for press types
 - `src/lib/__tests__/motionExportAllowlist.ts`: only if Step 4 proves it necessary
-- `src/routes/tests/drag/tap-during-drag/+page.svelte` (create)
-- `e2e/drag/tap-during-drag.spec.ts` (create)
-- `src/routes/+page.svelte` (one link)
 - `.changeset/motion-14-10-1.md` (create)
 
 **Out of scope:**
@@ -119,7 +118,7 @@ Never use port 4198, never set `PW_REUSE_SERVER`, and never use `git stash`.
 
 Run `pnpm install --frozen-lockfile`.
 
-**Verify**: `node -p "require('motion-dom/package.json').version"` → `14.9.1`. If it prints anything else, STOP.
+**Verify**: `node -p "require('./node_modules/motion-dom/package.json').version"` → `14.9.1`. Then run `pnpm exec svelte-kit sync`. If it prints anything else, STOP.
 
 ### Step 1: Write the regression tests (red on 14.9.1)
 
@@ -140,22 +139,11 @@ Run `pnpm install --frozen-lockfile`.
      - Build the timeline with our `animate([[v, 100, { duration: 0.1 }]], { repeat: 2, defaultTransition: { ease: 'linear' } })` instead of `new Timeline(...)`.
      - Stub `window.requestAnimationFrame = vi.fn(() => 0)` in `beforeEach` and restore it in `afterEach`. Also reset `useManualTiming` in `afterEach`.
      - Expect `callback.mock.calls` to equal `[[1], [1], [1]]`.
-2. Create `src/routes/tests/drag/tap-during-drag/+page.svelte`:
-   - A `motion.div` with `data-testid="card"`, `drag="x"`, `whileTap={{ scale: 0.9 }}` and `transition={{ duration: 0.1 }}`, 160×100 px.
-   - Counters for `onTapStart`, `onTap` and `onTapCancel`, rendered as `<span data-testid="tap-start">`, `tap`, `tap-cancel`.
-   - A `TesterPanel` with two steps:
-     - "Drag the card 150 px right and release". Expected: "tap-cancel goes to 1, tap stays 0, the card returns to full size".
-     - "Click the card without moving". Expected: "tap goes to 1".
-3. Create `e2e/drag/tap-during-drag.spec.ts`. The header comment cites upstream `press-interop.test.ts` at v14.10.1 and `press/index.ts:232-237`. Two tests:
-   - Use `page.mouse` to press on the card centre, move 150 px in 10 steps, and release. Then expect `tap-cancel` to read `1`, `tap` to read `0`, and, within 1 s, the card's computed transform scale back to 1. Read the scale with the `readScale` helper pattern from `e2e/motion/rapid-tap.test.ts`.
-   - A plain click: expect `tap` to read `1` and `tap-cancel` to read `0`.
-4. Add the page link to `src/routes/+page.svelte` next to the other `/tests/drag/*` links.
 
 **Verify**:
 - `pnpm exec vitest run src/lib/utils/timelineFixes.spec.ts` → the nested-sequence test and the repeat-boundary test FAIL on 14.9.1. Record the result of the replay/detach test. If it passes on 14.9.1, keep it as a guard and say so in the commit message.
-- `PW_PORT=4241 pnpm exec playwright test --project=chromium e2e/drag/tap-during-drag.spec.ts` → record the result. The expected red is the drag test failing on `tap-cancel` (reads `0`). If it passes on 14.9.1, keep it as a guard and say so in the commit message. Listener order may already have released the lock before press ended.
 
-Commit the red tests: `test: pin the 14.10.1 timeline and press-during-drag fixes (red on 14.9.1)`.
+Commit the red tests: `test: pin the 14.10.1 timeline fixes (red on 14.9.1)`.
 
 ### Step 2: Set the version
 
@@ -169,7 +157,7 @@ In `package.json`, set `"motion": "14.10.1"` and `"motion-dom": "14.10.1"`, then
 
 **Verify**:
 - `grep -n '"motion\(-dom\)\?": ' package.json` → both show `14.10.1`, no caret.
-- `node -p "require('motion/package.json').version + ' ' + require('motion-dom/package.json').version"` → `14.10.1 14.10.1`
+- `node -p "require('./node_modules/motion/package.json').version + ' ' + require('./node_modules/motion-dom/package.json').version"` → `14.10.1 14.10.1`
 - `pnpm exec vitest run src/lib/__tests__/motionDependencies.spec.ts` → PASS
 
 ### Step 4: Fix the SSR mock and check the export tripwire
@@ -198,7 +186,6 @@ export type {
 
 **Verify**:
 - `pnpm exec vitest run src/lib/utils/timelineFixes.spec.ts` → all PASS
-- `PW_PORT=4241 pnpm exec playwright test --project=chromium e2e/drag/tap-during-drag.spec.ts` → all PASS
 
 ### Step 7: Changeset
 
@@ -207,7 +194,6 @@ Create `.changeset/motion-14-10-1.md` with frontmatter `'@humanspeak/svelte-moti
 - `drag()` accepts `x`/`y` motion values, and `dragControls.start(event, { immediate: true })` starts a drag without waiting for movement.
 - `animate()` recognises a timeline made only of nested sequences.
 - Timeline callbacks no longer fire extra times on repeat, and a timeline played again after finishing is stopped when its `useAnimate` scope unmounts.
-- Releasing a press while dragging now counts as a tap cancel (`onTapCancel`), and `whileTap` ends.
 - Various animation performance improvements.
 
 Do not mention plans.
@@ -229,7 +215,7 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
 - **Red-first anchors**:
   - In `timelineFixes.spec.ts`, the nested-sequence and repeat-boundary tests fail on 14.9.1 and pass on 14.10.1.
-  - The replay/detach test and `tap-during-drag.spec.ts` are expected red. If either is green on 14.9.1, record it and keep it as a guard.
+  - The replay/detach test is expected red. If it is green on 14.9.1, record it and keep it as a guard.
 - `motionDomSsr.spec.ts` is the "bump breaks it" check. It fails after Step 3 and passes after Step 4.
 - `index.spec.ts` stays the tripwire for new upstream runtime exports.
 
@@ -238,7 +224,6 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 - [ ] `grep -c '"14.10.1"' package.json` → `2`, and `node -p "require('./package.json').version"` → `2.10.0`
 - [ ] `pnpm check` → 0 errors
 - [ ] `pnpm test:only` → all pass, including the 3 new tests in `src/lib/utils/timelineFixes.spec.ts`
-- [ ] `PW_PORT=4241 pnpm exec playwright test --project=chromium e2e/drag/tap-during-drag.spec.ts` → 2 passed
 - [ ] Full chromium e2e → no new failures
 - [ ] `git diff --name-only <wave-0 SHA>..HEAD` lists only in-scope files
 - [ ] `.changeset/motion-14-10-1.md` exists
@@ -255,5 +240,4 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
 - Every future bump will trip `src/lib/index.spec.ts` when upstream adds runtime exports. Allowlist internals and re-export public API.
 - The `"version"` edit is a one-off the maintainer asked for. No other plan in this batch touches `"version"`.
-- `tap-during-drag` documents a behaviour change. If an upstream release reverts it, this spec is what will tell you.
 - Reviewer: check that `motionDomSsr.spec.ts` keeps `start` in the mock (older motion-dom paths may still call it) and only adds `run`.

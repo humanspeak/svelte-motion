@@ -3,7 +3,7 @@
 > **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving to the next step. If anything in "STOP conditions" occurs, stop and report; do not improvise. Do not edit the batch `README.md`, because the dispatcher maintains it.
 >
 > **Drift check (run first)**: `git diff --stat f93a1d92..HEAD -- src/lib/index.ts src/lib/types.ts src/lib/utils/dragControls.ts src/lib/utils/dragControls.spec.ts src/routes/tests/drag e2e/drag docs/src/routes/docs/drag docs/src/lib/examples/vanilla-drag docs/src/routes/examples/vanilla-drag src/routes/+page.svelte`
-> Expected changes are plan 001's (the press type block in `src/lib/index.ts`, `src/routes/tests/drag/tap-during-drag`, `e2e/drag/tap-during-drag.spec.ts`, one `+page.svelte` link) and possibly plan 002's (`MotionProps` tap props in `src/lib/types.ts`). If anything else changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
+> Expected changes are plan 001's (the press type block in `src/lib/index.ts`) and possibly plan 002's (`MotionProps` tap props in `src/lib/types.ts`). If anything else changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
 
 ## Status
 
