@@ -4,6 +4,7 @@ import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type {
     DragConstraintsFunction,
     DragControlOptions,
+    PressOptions,
     ResolvedValues,
     VisualElementDragControls
 } from 'motion-dom'
@@ -713,6 +714,61 @@ export type MotionProps = {
     onTap?: MotionOnTap
     /** Called when a tap gesture is cancelled (pointercancel) */
     onTapCancel?: MotionOnTapCancel
+    /**
+     * Options for the tap gesture, applied to `onTapStart`, `onTap`,
+     * `onTapCancel` and `whileTap`. `onTapStart` and `whileTap` start on the
+     * first press. `onTap` fires only when the gesture completes (and on each
+     * repeat); otherwise `onTapCancel` fires.
+     *
+     * Setting `tap` alone does not enable the tap gesture: pair it with
+     * `onTap`, `onTapStart`, `onTapCancel` or `whileTap`.
+     *
+     * - `count`: Quick, consecutive presses needed for `onTap`. Default `1`.
+     * - `countTimeout`: Max seconds between presses. Default `0.3`.
+     * - `hold`: Seconds a press must be held for `onTap`. Default `0`.
+     * - `repeat`: While held, `onTap` fires every `repeat` seconds, and
+     *   `whileTap` stays active.
+     *
+     * Ported from upstream `motion-dom/src/node/types.ts` at v14.10.1.
+     *
+     * @example
+     * ```svelte
+     * <!-- Double tap -->
+     * <motion.div tap={{ count: 2 }} onTap={onDoubleTap} />
+     *
+     * <!-- Long press -->
+     * <motion.div tap={{ hold: 0.5 }} whileTap={{ scale: 0.9 }} onTap={onLongPress} />
+     *
+     * <!-- Stepper: onTap fires every 0.1 seconds while held -->
+     * <motion.button tap={{ repeat: 0.1 }} onTap={increment} />
+     * ```
+     */
+    tap?: PressOptions
+    /**
+     * If `true`, the tap gesture attaches its start listener to `window`
+     * instead of the element, so a press anywhere starts it.
+     *
+     * Note: upstream marks this as not supported publicly.
+     *
+     * @example
+     * ```svelte
+     * <motion.div globalTapTarget whileTap={{ scale: 0.9 }} />
+     * ```
+     */
+    globalTapTarget?: boolean
+    /**
+     * Controls whether gesture events propagate to parent motion components.
+     * By default all gestures propagate. Set `tap: false` to stop a child's
+     * tap from also starting its motion ancestors' tap gestures.
+     *
+     * @example
+     * ```svelte
+     * <motion.div onTap={onParentTap}>
+     *     <motion.div onTap={onChildTap} propagate={{ tap: false }} />
+     * </motion.div>
+     * ```
+     */
+    propagate?: { tap?: boolean }
     /** Called when a drag gesture starts */
     onDragStart?: MotionOnDragStart
     /** Called during a drag gesture */

@@ -19,7 +19,14 @@
  */
 
 import type { MotionViewport } from '$lib/types.js'
-import { addDomEvent, frame, hover, press, type VisualElement } from 'motion-dom'
+import {
+    addDomEvent,
+    frame,
+    hover,
+    press,
+    type PointerEventOptions,
+    type VisualElement
+} from 'motion-dom'
 
 /*
  * Drag suppression is NOT handled here any more.
@@ -103,7 +110,12 @@ export const attachHoverGesture = (
     })
 }
 
-/** Zero-argument tap lifecycle callbacks, matching this library's public types. */
+/**
+ * Zero-argument tap lifecycle callbacks, matching this library's public types.
+ *
+ * `attachPressGesture` reads these at event time, so a getter-backed object
+ * can supply the latest callbacks without re-attaching `press()`.
+ */
 export interface PressGestureCallbacks {
     onTapStart?: () => void
     onTap?: () => void
@@ -113,37 +125,60 @@ export interface PressGestureCallbacks {
 /**
  * Attach press → `setActive('whileTap', …)`.
  *
- * Port of `framer-motion/src/gestures/press.ts:31-56`. motion-dom's `press()`
- * owns pointer AND keyboard activation (it uses `isElementKeyboardAccessible`
- * internally), which is what keeps the #414 keyboard-tap behaviour without any
- * custom code here — `e2e/armed-buttons` is the parity check.
+ * Port of `framer-motion/src/gestures/press.ts` (`PressGesture.mount`) and the
+ * `isRepeat` branch of `framer-motion/src/gestures/hover.ts`
+ * (`handleGestureEvent`), both at v14.10.1. motion-dom's `press()` owns pointer
+ * AND keyboard activation (it uses `isElementKeyboardAccessible` internally),
+ * which is what keeps the #414 keyboard-tap behaviour without any custom code
+ * here — `e2e/armed-buttons` is the parity check.
+ *
+ * `press()` reads `options` on each press, and keeps an in-progress `count`
+ * sequence per `press()` call. Callers that want option changes to apply
+ * without losing a half-finished double tap should pass ONE object for the
+ * element's lifetime and mutate it in place (upstream `press.ts` `update()`).
  *
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
- * @param callbacks Optional lifecycle callbacks.
+ * @param callbacks Optional lifecycle callbacks, read at event time.
+ * @param options Optional press options passed straight to motion-dom's
+ *   `press()`: `count`, `countTimeout`, `hold`, `repeat`, `useGlobalTarget`
+ *   and `stopPropagation`.
  * @returns Cleanup that detaches the listeners.
  */
 export const attachPressGesture = (
     element: Element,
     visualElement: VisualElement,
-    callbacks?: PressGestureCallbacks
+    callbacks?: PressGestureCallbacks,
+    options?: PointerEventOptions
 ): (() => void) => {
-    /** Upstream skips disabled buttons entirely (`press.ts:12-14`). */
+    /** Upstream skips disabled buttons entirely (`press.ts` `handlePressEvent`). */
     const isDisabledButton = () => element instanceof HTMLButtonElement && element.disabled
 
-    return press(element, () => {
-        if (isDisabledButton()) return
-        setGestureActive(visualElement, 'whileTap', true)
-        postRender(callbacks?.onTapStart)
-
-        return (_endEvent, { success }) => {
+    return press(
+        element,
+        () => {
             if (isDisabledButton()) return
-            setGestureActive(visualElement, 'whileTap', false)
-            // `success` distinguishes a real tap from a cancel (released
-            // outside, or interrupted) — upstream `press.ts:20-24`.
-            postRender(success ? callbacks?.onTap : callbacks?.onTapCancel)
-        }
-    })
+            setGestureActive(visualElement, 'whileTap', true)
+            postRender(callbacks?.onTapStart)
+
+            return {
+                onComplete: (_endEvent, { success }) => {
+                    if (isDisabledButton()) return
+                    setGestureActive(visualElement, 'whileTap', false)
+                    // `success` distinguishes a completed tap from a cancel
+                    // (released outside, released before `hold`, an unfinished
+                    // `count` sequence, or interrupted).
+                    postRender(success ? callbacks?.onTap : callbacks?.onTapCancel)
+                },
+                // Upstream hover.ts `isRepeat`: fire onTap, keep whileTap active.
+                onRepeat: () => {
+                    if (isDisabledButton()) return
+                    postRender(callbacks?.onTap)
+                }
+            }
+        },
+        options
+    )
 }
 
 /** Zero-argument focus lifecycle callbacks, matching this library's public types. */

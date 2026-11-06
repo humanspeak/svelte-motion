@@ -205,6 +205,148 @@ describe('attachPressGesture', () => {
 
         stop()
     })
+
+    // Tap options (Motion 14.10): ports of upstream
+    // `framer-motion/src/gestures/__tests__/press-options.test.tsx` at v14.10.1,
+    // driven through motion-dom's `press()` with real timers.
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    it('count: 2 fires onTap only on the second press', async () => {
+        const { node, setActive } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTapStart = vi.fn()
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
+        const stop = attachPressGesture(
+            element,
+            node,
+            { onTapStart, onTap, onTapCancel },
+            { count: 2 }
+        )
+
+        element.dispatchEvent(pointer('pointerdown'))
+        expect(setActive).toHaveBeenCalledWith('whileTap', true)
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTapStart).toHaveBeenCalledTimes(1)
+        expect(onTap).not.toHaveBeenCalled()
+
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTapStart).toHaveBeenCalledTimes(1)
+        expect(onTap).toHaveBeenCalledTimes(1)
+        expect(onTapCancel).not.toHaveBeenCalled()
+
+        stop()
+    })
+
+    it('count: 2 cancels when the second press is too late', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
+        const stop = attachPressGesture(
+            element,
+            node,
+            { onTap, onTapCancel },
+            { count: 2, countTimeout: 0.05 }
+        )
+
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        await wait(120)
+        await flushPostRender()
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
+        expect(onTap).not.toHaveBeenCalled()
+
+        stop()
+    })
+
+    it('hold: 0.05 cancels on early release, succeeds when held', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
+        const stop = attachPressGesture(element, node, { onTap, onTapCancel }, { hold: 0.05 })
+
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
+        expect(onTap).not.toHaveBeenCalled()
+
+        element.dispatchEvent(pointer('pointerdown'))
+        await wait(120)
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTap).toHaveBeenCalledTimes(1)
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
+
+        stop()
+    })
+
+    it('repeat: 0.03 fires onTap while held without deactivating whileTap', async () => {
+        const { node, setActive } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const stop = attachPressGesture(element, node, { onTap }, { repeat: 0.03 })
+
+        element.dispatchEvent(pointer('pointerdown'))
+        expect(setActive).toHaveBeenCalledWith('whileTap', true)
+        await wait(120)
+        await flushPostRender()
+        expect(onTap.mock.calls.length).toBeGreaterThanOrEqual(2)
+        // Upstream `hover.ts` `isRepeat`: a repeat fires onTap but leaves
+        // whileTap active.
+        expect(setActive).not.toHaveBeenCalledWith('whileTap', false)
+
+        element.dispatchEvent(pointer('pointerup'))
+        expect(setActive).toHaveBeenCalledWith('whileTap', false)
+
+        stop()
+    })
+
+    it('options are read per press', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const options: { count?: number } = {}
+        const stop = attachPressGesture(element, node, { onTap }, options)
+
+        options.count = 2
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTap).not.toHaveBeenCalled()
+
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTap).toHaveBeenCalledTimes(1)
+
+        stop()
+    })
+    it('a drag starting during a count sequence cancels it', async () => {
+        // Mirrors upstream `motion-dom/src/gestures/drag/__tests__/press-interop.test.ts`
+        // and `gestures/press/index.ts:301-325` (v14.10.1): motion-dom cancels the
+        // press when the global drag lock is taken mid-sequence. No Svelte-side
+        // drag hook is involved.
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const onTapCancel = vi.fn()
+        const stop = attachPressGesture(element, node, { onTap, onTapCancel }, { count: 2 })
+
+        element.dispatchEvent(pointer('pointerdown'))
+        element.dispatchEvent(pointer('pointerup'))
+        element.dispatchEvent(pointer('pointerdown'))
+
+        const releaseLock = setDragLock(true)
+        try {
+            window.dispatchEvent(pointer('pointermove'))
+            await flushPostRender()
+            expect(onTapCancel).toHaveBeenCalledTimes(1)
+            expect(onTap).not.toHaveBeenCalled()
+        } finally {
+            releaseLock?.()
+            stop()
+        }
+    })
 })
 
 describe('attachFocusGesture', () => {

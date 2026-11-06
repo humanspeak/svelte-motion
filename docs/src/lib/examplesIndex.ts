@@ -241,6 +241,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Tab Select',
         description: 'Interactive tab select animation example using Svelte Motion.'
     },
+    'tap-options': {
+        title: 'Tap options',
+        description:
+            'Double tap, long press and auto-repeat from one tap gesture, with the tap prop’s count, hold and repeat.'
+    },
     'three-effect': {
         title: 'Three.js Effect',
         description: 'Spring a mesh and ripple a shader uniform with animate() and threeEffect.'

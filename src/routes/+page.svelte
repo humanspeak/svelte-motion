@@ -326,6 +326,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/tap-options') + searchParams}
+                    >
+                        Tap options: double tap, long press, repeat
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/while-focus') + searchParams}
                     >
                         While Focus
