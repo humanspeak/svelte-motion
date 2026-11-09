@@ -224,6 +224,40 @@ describe('Reorder keyboard', () => {
         expect(onReorder).toHaveBeenLastCalledWith(['b', 'a', 'c'], 'b')
     })
 
+    // Guards for upstream `fe72ef29e` (a React-only race: a key sent before
+    // React rendered the grab missed it). Our grab is `$state`, which updates
+    // synchronously, so these pass as is; they catch a regression to a grab
+    // that only lands after a flush. No `flushSync()` between the two events.
+    const keydown = (element: Element, key: string) =>
+        element.dispatchEvent(
+            new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        )
+
+    it('moves on an arrow sent before Svelte flushes the grab', async () => {
+        await mount()
+        const a = item('a')
+
+        keydown(a, ' ')
+        keydown(a, 'ArrowDown')
+        flushSync()
+        expect(order()).toEqual(['b', 'a', 'c'])
+        expect(isGrabbed(a)).toBe(true)
+    })
+
+    it('drops when focus leaves before Svelte flushes the grab', async () => {
+        await mount()
+        const a = item('a')
+        a.focus()
+        flushSync()
+
+        keydown(a, ' ')
+        item('c').focus()
+        flushSync()
+        expect(isGrabbed(a)).toBe(false)
+        press(a, 'ArrowDown')
+        expect(order()).toEqual(['a', 'b', 'c'])
+    })
+
     it('leaves Enter alone so it keeps its tap meaning', async () => {
         const onReorder = vi.fn()
         await mount({ onReorder })
@@ -460,6 +494,55 @@ describe('Reorder keyboard', () => {
         expect(focused()).toBe('e')
         press(e, 'ArrowDown')
         expect(focused()).toBe('g')
+    })
+
+    // Motion 14.10.0: Home and End (upstream `keyboard.test.tsx` v14.10.1).
+    it('moves focus, or the grabbed item, to either end with Home and End', async () => {
+        const onReorder = vi.fn()
+        await mount({ values: ['a', 'b', 'c', 'd'], onReorder })
+        const b = item('b')
+        b.focus()
+        flushSync()
+
+        expect(press(b, 'End')).toBe(false)
+        expect(focused()).toBe('d')
+        press(item('d'), 'Home')
+        expect(focused()).toBe('a')
+        expect(onReorder).not.toHaveBeenCalled()
+
+        b.focus()
+        flushSync()
+        press(b, ' ')
+        expect(press(b, 'End')).toBe(false)
+        expect(order().join('')).toBe('acdb')
+        press(b, 'Home')
+        expect(order().join('')).toBe('bacd')
+        // Already there
+        press(b, 'Home')
+        expect(onReorder).toHaveBeenCalledTimes(2)
+        expect(focused()).toBe('b')
+    })
+
+    it('uses Home and End on every axis', async () => {
+        await mount({ axis: 'x' })
+        const a = item('a')
+        a.focus()
+        flushSync()
+        press(a, ' ')
+        // Svelte port addition: still prevented across a single axis
+        expect(press(a, 'End')).toBe(false)
+        expect(order().join('')).toBe('bca')
+    })
+
+    // Svelte port addition: upstream `Group.tsx` v14.10.1 `isAlongAxis`.
+    it('an arrow along the axis with nowhere to go is prevented; one across the axis is not', async () => {
+        await mount()
+        const c = item('c')
+        c.focus()
+        flushSync()
+        expect(press(c, 'ArrowDown')).toBe(false)
+        expect(focused()).toBe('c')
+        expect(press(c, 'ArrowRight')).toBe(true)
     })
 
     it('ignores keys from inside the item', async () => {

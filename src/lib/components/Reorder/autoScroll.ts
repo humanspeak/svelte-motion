@@ -37,38 +37,33 @@ const overflowStyles = new Set(['auto', 'scroll'])
 export const selectAutoScrollAxis = (axis: ReorderAxis, velocity: DragPoint): 'x' | 'y' =>
     axis === 'xy' ? (Math.abs(velocity.x) > Math.abs(velocity.y) ? 'x' : 'y') : axis
 
-/**
- * Scroll limits captured when an edge first activates, so a gesture
- * can't grow the scroll range it started with (e.g. when scrolling
- * itself triggers layout that extends the scrollable area).
- */
-const initialScrollLimits = new WeakMap<HTMLElement, number>()
-
 /** Which edge is currently auto-scrolling: "start" (top/left) or "end" (bottom/right). */
 type ActiveEdge = 'start' | 'end' | null
-const activeScrollEdge = new WeakMap<HTMLElement, ActiveEdge>()
 
-/** Group element of the in-flight drag, so `resetAutoScrollState` can clear per-ancestor state. */
-let currentGroupElement: Element | null = null
+interface ScrollState {
+    edge: ActiveEdge
+    limit: number
+}
 
 /**
- * Clear all auto-scroll bookkeeping for the group involved in the
- * gesture that just ended. Called from `Reorder.Item`'s `onDragEnd`.
+ * Per axis and scrollable element, for the current drag: the edge it's
+ * auto-scrolling towards, "start" (top/left) or "end" (bottom/right), and
+ * its scroll limit when that began (Bug 1 fix). A drag in a Reorder.Board
+ * scrolls on both axes, often of one element (like the page), and can
+ * scroll several, so they're kept per axis and all cleared when it ends.
+ */
+const scrollStates = {
+    x: new Map<HTMLElement, ScrollState>(),
+    y: new Map<HTMLElement, ScrollState>()
+}
+
+/**
+ * Forget every container scrolled during the drag that just ended.
+ * Called from `Reorder.Item`'s `onDragEnd`.
  */
 export const resetAutoScrollState = (): void => {
-    if (currentGroupElement) {
-        const scrollableAncestor = findScrollableAncestor(currentGroupElement, 'y')
-        if (scrollableAncestor) {
-            activeScrollEdge.delete(scrollableAncestor)
-            initialScrollLimits.delete(scrollableAncestor)
-        }
-        const scrollableAncestorX = findScrollableAncestor(currentGroupElement, 'x')
-        if (scrollableAncestorX && scrollableAncestorX !== scrollableAncestor) {
-            activeScrollEdge.delete(scrollableAncestorX)
-            initialScrollLimits.delete(scrollableAncestorX)
-        }
-        currentGroupElement = null
-    }
+    scrollStates.x.clear()
+    scrollStates.y.clear()
 }
 
 const isScrollableElement = (element: Element, axis: 'x' | 'y'): boolean => {
@@ -77,7 +72,18 @@ const isScrollableElement = (element: Element, axis: 'x' | 'y'): boolean => {
 
     const isDocumentScroll = element === document.body || element === document.documentElement
 
-    return overflowStyles.has(overflow) || isDocumentScroll
+    /**
+     * An element that scrolls on one axis computes overflow auto on both
+     * (e.g. a column of a board that scrolls the other way), so it must also
+     * have content to scroll on this one.
+     */
+    return (
+        isDocumentScroll ||
+        (overflowStyles.has(overflow) &&
+            (axis === 'x'
+                ? element.scrollWidth > element.clientWidth
+                : element.scrollHeight > element.clientHeight))
+    )
 }
 
 const findScrollableAncestor = (element: Element | null, axis: 'x' | 'y'): HTMLElement | null => {
@@ -144,6 +150,8 @@ const getScrollAmount = (
  * is inside the edge threshold and travelling toward that edge.
  * Called from `Reorder.Item`'s `onDrag` on every gesture frame.
  *
+ * Port of framer-motion `Reorder/utils/auto-scroll.ts` @ v14.10.1.
+ *
  * @param groupElement - The `Reorder.Group` element the item belongs to.
  * @param pointerPosition - Pointer position on `axis`, in client coordinates.
  * @param axis - The group's reorder axis.
@@ -157,8 +165,6 @@ export const autoScrollIfNeeded = (
 ): void => {
     if (!groupElement) return
 
-    currentGroupElement = groupElement
-
     const scrollableAncestor = findScrollableAncestor(groupElement, axis)
     if (!scrollableAncestor) return
 
@@ -168,40 +174,42 @@ export const autoScrollIfNeeded = (
         axis
     )
 
-    // Outside both threshold zones: clear state so re-entering an edge
-    // re-runs the velocity gate below.
+    const states = scrollStates[axis]
+
+    // Outside both threshold zones: clear this axis' state so re-entering
+    // an edge re-runs the velocity gate below.
     if (edge === null) {
-        activeScrollEdge.delete(scrollableAncestor)
-        initialScrollLimits.delete(scrollableAncestor)
+        states.delete(scrollableAncestor)
         return
     }
 
-    const currentActiveEdge = activeScrollEdge.get(scrollableAncestor)
+    let state = states.get(scrollableAncestor)
 
     const isDocumentScroll =
         scrollableAncestor === document.body || scrollableAncestor === document.documentElement
 
-    if (currentActiveEdge !== edge) {
+    if (state?.edge !== edge) {
         // Only start scrolling when the gesture is moving toward the
         // edge — hovering near it after dragging away shouldn't scroll.
         const shouldStart = (edge === 'start' && velocity < 0) || (edge === 'end' && velocity > 0)
         if (!shouldStart) return
 
-        activeScrollEdge.set(scrollableAncestor, edge)
-
-        const maxScroll =
-            axis === 'x'
-                ? scrollableAncestor.scrollWidth -
-                  (isDocumentScroll ? window.innerWidth : scrollableAncestor.clientWidth)
-                : scrollableAncestor.scrollHeight -
-                  (isDocumentScroll ? window.innerHeight : scrollableAncestor.clientHeight)
-
-        initialScrollLimits.set(scrollableAncestor, maxScroll)
+        // Activate this edge, and record the initial scroll limit
+        // (prevents infinite scroll)
+        state = {
+            edge,
+            limit:
+                axis === 'x'
+                    ? scrollableAncestor.scrollWidth -
+                      (isDocumentScroll ? window.innerWidth : scrollableAncestor.clientWidth)
+                    : scrollableAncestor.scrollHeight -
+                      (isDocumentScroll ? window.innerHeight : scrollableAncestor.clientHeight)
+        }
+        states.set(scrollableAncestor, state)
     }
 
     // Cap forward scrolling at the limit captured on activation.
     if (scrollAmount > 0) {
-        const initialLimit = initialScrollLimits.get(scrollableAncestor)!
         const currentScroll =
             axis === 'x'
                 ? isDocumentScroll
@@ -210,7 +218,7 @@ export const autoScrollIfNeeded = (
                 : isDocumentScroll
                   ? window.scrollY
                   : scrollableAncestor.scrollTop
-        if (currentScroll >= initialLimit) return
+        if (currentScroll >= state.limit) return
     }
 
     if (axis === 'x') {

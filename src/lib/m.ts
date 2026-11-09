@@ -1,3 +1,4 @@
+import Board from '$lib/components/Reorder/Board.svelte'
 import Group from '$lib/components/Reorder/Group.svelte'
 import Item from '$lib/components/Reorder/Item.svelte'
 import type { MotionComponents } from '$lib/html/index'
@@ -55,11 +56,16 @@ export const m: MotionComponents = Object.fromEntries(
  *     </Reorder.Group>
  * </LazyMotion>
  * ```
+ *
+ * `Reorder.Board` lets items be dragged between the groups inside it
+ * (Motion 14.10). It renders no element, so it's the same component here.
  */
 export const Reorder: {
+    readonly Board: typeof Board
     readonly Group: typeof Group
     readonly Item: typeof Item
 } = {
+    Board,
     Group: /* @__PURE__ */ withMotionKind(Group, { [MOTION_KIND_PROP]: 'm' }),
     Item
 } as const

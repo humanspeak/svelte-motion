@@ -1,0 +1,159 @@
+---
+title: Reorder.Board
+description: Drag items between Reorder groups — kanban columns, buckets and lists — with canMove limits, keyboard moves and two-axis auto-scroll
+---
+
+<script>
+  import Example from '#lib/components/general/Example.svelte'
+  import Kanban from '#lib/examples/reorder-board/demos/Kanban.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Reorder.Board | Docs | Svelte Motion'
+      seo.description = 'Drag items between Reorder groups — kanban columns, buckets and lists — with canMove limits, keyboard moves, and two-axis auto-scroll using Svelte Motion.'
+      seo.ogTitle = 'Reorder.Board'
+      seo.ogTagline = 'Drag items between reorderable lists'
+      seo.ogFeatures = ['Kanban Columns', 'canMove', 'Keyboard', 'Two-Axis Scroll']
+      seo.ogSlug = 'docs-reorder-board'
+  }
+</script>
+
+# Reorder.Board
+
+`Reorder.Board` lets items be dragged between the [`Reorder.Group`](/docs/reorder)s inside it: kanban columns, buckets, "selected" and "available" lists. Wrap the groups in a Board and a card can leave one group and join another in the same drag, while both groups' other items animate to make room. It renders no element of its own.
+
+<Example>
+  <Kanban />
+</Example>
+
+## Usage
+
+Wrap two or more groups in `Reorder.Board`. Each group keeps its own `values` and `onReorder`, exactly as it would on its own:
+
+```svelte
+<script lang="ts">
+    import { Reorder } from '@humanspeak/svelte-motion'
+
+    let todo = $state(['Sketch', 'Write', 'Review'])
+    let done = $state(['Plan'])
+</script>
+
+<Reorder.Board>
+    <Reorder.Group axis="y" values={todo} onReorder={(next) => (todo = next)}>
+        {#each todo as item (item)}
+            <Reorder.Item value={item}>{item}</Reorder.Item>
+        {/each}
+    </Reorder.Group>
+    <Reorder.Group axis="y" values={done} onReorder={(next) => (done = next)}>
+        {#each done as item (item)}
+            <Reorder.Item value={item}>{item}</Reorder.Item>
+        {/each}
+    </Reorder.Group>
+</Reorder.Board>
+```
+
+The Board can sit anywhere above the groups, so put whatever layout you need (a flex row of columns, headers, scroll containers) between it and them.
+
+## Moving between groups
+
+When a dragged item's centre crosses into another group, it moves there:
+
+1. The group it left calls `onReorder(without, moved)`, its values without the item.
+2. The group it joins calls `onReorder(with, moved)`, its values with the item in the slot under the item's centre.
+
+Both calls pass the moved item's value as the second argument. The drag carries on in the new group, so the item can keep reordering there or move on to a third group.
+
+The two calls come one after the other, so if the app keeps every group in one state, update it from the latest state rather than from a copy taken before the drag. With a `$state` record, writing each group's own key does exactly that:
+
+```svelte
+<script lang="ts">
+    let columns = $state({ todo: ['a', 'b'], doing: ['c'], done: [] as string[] })
+</script>
+
+<Reorder.Board>
+    {#each Object.keys(columns) as id (id)}
+        <Reorder.Group axis="y" values={columns[id]} onReorder={(next) => (columns[id] = next)}>
+            <!-- items -->
+        </Reorder.Group>
+    {/each}
+</Reorder.Board>
+```
+
+## canMove
+
+`canMove(value, from, to)` decides whether `value` may move from the group whose values are `from` to the group whose values are `to`. It runs before either group's `onReorder`. Return `false` to refuse: a dragged item stays in its group until it's dragged over one that accepts it, and a keyboard move skips on to the next group in that direction.
+
+```svelte
+<script lang="ts">
+    const canMove = (card: string, from: string[], to: string[]) =>
+        to !== columns.doing || to.length < 3
+</script>
+
+<Reorder.Board {canMove}>
+    <!-- groups -->
+</Reorder.Board>
+```
+
+- While a dragged item is over a group it refuses, `canMove` is called every frame. Keep it fast and free of side effects.
+- `from` and `to` are the groups' `values` arrays, so compare them with your own state to tell the groups apart.
+- Escape ignores `canMove`: it always returns a grabbed item to the group and slot it was grabbed from.
+
+## Keyboard
+
+Board extends [Reorder's keyboard support](/docs/reorder#keyboard) across groups. Tab to an item, then:
+
+| Key | Action |
+|-----|--------|
+| `Space` | Grab the focused item, or drop it if it's grabbed |
+| Arrow keys along the axis (grabbed) | Move the item one place within its group |
+| Arrow keys across the axis (grabbed) | Move the item to the nearest group in that direction, e.g. Left/Right between `axis="y"` columns |
+| Arrow keys along the axis past either end (grabbed) | Move the item to the nearest group in that direction, e.g. Down from the last item of a column into the group below |
+| `Home` / `End` | Move focus, or the grabbed item, to the first or last place in its own group. They never leave the group |
+| `Escape` | Return the item to the group and slot it was grabbed from, then drop it |
+
+A move to another group calls both groups' `onReorder`, as a drag does, and the item keeps focus and its grab in the new group. A group that `canMove` refuses is skipped.
+
+## Scrolling
+
+Inside a Board, items drag on both axes, so a card can leave its column sideways, and auto-scroll works on both axes too. Hold a dragged item near the edge of a scroll container and it scrolls:
+
+- **Along the group's axis** (down an `axis="y"` column), the scroll container around the group scrolls, as it does for a single group.
+- **Across the axis** (sideways between columns), the scroll container around the columns scrolls, such as a board that scrolls horizontally. The column itself isn't scrolled sideways, even though a card dragged out of it overflows it.
+
+Put the scroll container around a group rather than on the group itself, and give the group a minimum height that fills its column, so an empty column still has an area to drop into:
+
+```svelte
+<div style="height: 300px; overflow-y: auto">
+    <Reorder.Group axis="y" values={todo} onReorder={(next) => (todo = next)} style="min-height: 100%">
+        <!-- items -->
+    </Reorder.Group>
+</div>
+```
+
+## Notes
+
+- Values must be unique across all the Board's groups, not just within each group.
+- Groups nested inside each other's items never exchange items, so a Board can hold nested lists without items jumping between levels.
+- A virtualized group places an incoming item using its rendered items only; values that aren't rendered keep their place in `values`.
+- Every `Reorder.Group` inside the Board joins it automatically: the groups need no extra props.
+
+## Props
+
+### Reorder.Board
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `canMove` | `(value: V, from: V[], to: V[]) => boolean` | — | Whether `value` may move from the group with values `from` to the group with values `to`. Called before either `onReorder`; return `false` to refuse |
+
+`Reorder.Group` and `Reorder.Item` take their [usual props](/docs/reorder#props).
+
+## Related
+
+- [Reorder](/docs/reorder) — Reorder within a single group
+- [Drag](/docs/drag) — The gesture system Reorder builds on
+- [Reorder.Board examples](/examples/reorder-board) — Kanban and a WIP-limited column
+
+---
+
+Based on Motion's `Reorder.Board`, added in Motion 14.10.

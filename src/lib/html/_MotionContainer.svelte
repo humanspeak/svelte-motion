@@ -47,6 +47,7 @@
         rootProjectionNode,
         type AnyResolvedKeyframe,
         type MotionNodeOptions,
+        type PointerEventOptions,
         type PresenceContextProps,
         type TargetAndTransition,
         type Transition
@@ -218,6 +219,9 @@
         onTapStart: onTapStartProp,
         onTap: onTapProp,
         onTapCancel: onTapCancelProp,
+        tap: tapProp,
+        globalTapTarget: globalTapTargetProp,
+        propagate: propagateProp,
         onDragStart: onDragStartProp,
         onDrag: onDragProp,
         onDragEnd: onDragEndProp,
@@ -3552,15 +3556,6 @@
                 })
             )
         }
-        if (whileTapProp || onTapStartProp || onTapProp || onTapCancelProp) {
-            cleanups.push(
-                attachPressGesture(target, node, {
-                    onTapStart: onTapStartProp,
-                    onTap: onTapProp,
-                    onTapCancel: onTapCancelProp
-                })
-            )
-        }
         if (whileFocusProp || onFocusStartProp || onFocusEndProp) {
             cleanups.push(
                 attachFocusGesture(target, node, {
@@ -3580,6 +3575,55 @@
         return () => {
             for (const cleanup of cleanups) cleanup()
         }
+    })
+
+    // ── Press (Motion 14.10 `tap` options) ───────────────────────────────────
+    //
+    // Upstream `framer-motion/src/gestures/press.ts:23-27` (v14.10.1): "press()
+    // reads its options on each press, so this object is kept and updated in
+    // place when props change." motion-dom keeps a half-finished `count`
+    // sequence per `press()` call, so re-attaching would silently drop it.
+    // Hence ONE options object for the component's lifetime, synced in place
+    // (upstream `update()`), and a press effect that depends on neither the
+    // `tap` object nor callback identity.
+    const pressOptions: PointerEventOptions = {}
+    $effect.pre(() => {
+        for (const key of Object.keys(pressOptions)) {
+            delete pressOptions[key as keyof PointerEventOptions]
+        }
+        Object.assign(pressOptions, tapProp, {
+            useGlobalTarget: globalTapTargetProp,
+            stopPropagation: propagateProp?.tap === false
+        })
+    })
+
+    // Feature gate as upstream `motion/features/definitions.ts:15`:
+    // `tap` alone does not enable the gesture.
+    const hasTapGesture = $derived(
+        !!(whileTapProp || onTapStartProp || onTapProp || onTapCancelProp)
+    )
+
+    $effect(() => {
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        if (!hasTapGesture) return
+        // Callbacks are getters, read at event time, so a new callback
+        // identity does not re-attach `press()`.
+        return attachPressGesture(
+            element,
+            visualElement,
+            {
+                get onTapStart() {
+                    return onTapStartProp
+                },
+                get onTap() {
+                    return onTapProp
+                },
+                get onTapCancel() {
+                    return onTapCancelProp
+                }
+            },
+            pressOptions
+        )
     })
 
     // Legacy animation controls (`animate={controls}`) mirror upstream's

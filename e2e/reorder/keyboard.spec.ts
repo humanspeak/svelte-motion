@@ -9,7 +9,8 @@ import { expect, test, type Page } from '@playwright/test'
  *
  * Port of upstream `tests/react/issue-2658.spec.ts` at Motion 14.9.1, where
  * the group became one tab stop and arrows move focus until an item is
- * grabbed; the last two tests are Svelte-specific additions.
+ * grabbed; the last two tests are Svelte-specific additions, as is the
+ * Home/End (Motion 14.10) test.
  */
 const order = (page: Page) => page.locator('#order').textContent()
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.id)
@@ -141,6 +142,23 @@ test.describe('reorder/keyboard (#2658)', () => {
         await expect.poll(() => grabbed(page)).toBe('c')
         await press(page, 'ArrowUp')
         expect(await order(page)).toBe('c,a,b,d')
+    })
+
+    test('End and Home move the grabbed item to either end and keep focus', async ({ page }) => {
+        // Motion 14.10.0: a move across the whole keyed each, the Svelte-only
+        // refocus path's biggest jump
+        await open(page)
+        await page.focus('#a')
+        await press(page, 'Space')
+        await press(page, 'End')
+        expect(await order(page)).toBe('b,c,d,a')
+        expect(await focused(page)).toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('a')
+
+        await press(page, 'Home')
+        expect(await order(page)).toBe('a,b,c,d')
+        expect(await focused(page)).toBe('a')
+        await expect.poll(() => grabbed(page)).toBe('a')
     })
 
     test('a reorder in a transition keeps focus and the grab', async ({ page }) => {

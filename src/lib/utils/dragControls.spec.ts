@@ -73,6 +73,17 @@ describe('createDragControls', () => {
         expect(a.start).toHaveBeenCalledExactlyOnceWith(event, { distanceThreshold: 12 })
     })
 
+    it('passes immediate through to each controller', () => {
+        const controls = createDragControls()
+        const a = fakeControls()
+        controls.subscribe(a.controls)
+
+        const event = pointerDown()
+        controls.start(event, { immediate: true })
+
+        expect(a.start).toHaveBeenCalledExactlyOnceWith(event, { immediate: true })
+    })
+
     it('is a no-op with no subscribers', () => {
         const controls = createDragControls()
         expect(() => {

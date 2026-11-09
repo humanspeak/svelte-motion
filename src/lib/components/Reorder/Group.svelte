@@ -17,8 +17,9 @@
     import MotionContainer from '$lib/html/_MotionContainer.svelte'
     import type { Box } from '$lib/utils/projection'
     import { isMotionValueChild } from '$lib/utils/motionValueChild'
+    import { getReorderBoardContext } from './board'
     import { checkReorder, keyTarget, moveItem } from './checkReorder'
-    import { setReorderContext, type ItemData } from './context'
+    import { setReorderContext, type ItemData, type ReorderContextProps } from './context'
     import { detectAxis } from './detectAxis'
     import { applyOrderSwap } from './order'
     import type { MouseEventHandler, PointerEventHandler } from 'svelte/elements'
@@ -128,7 +129,7 @@
      */
     let hasReordered = false
 
-    setReorderContext<V>({
+    const context: ReorderContextProps<V> = {
         get axis() {
             return axis
         },
@@ -165,9 +166,12 @@
         setActive: activate,
         checkTabStop,
         elements,
-        // Motion 14.9.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
+        // Motion 14.10.1 `Reorder/Group.tsx` `onKeyDown`, line for line, except
         // that the grab snapshot is a copy (`values` may be mutated in place)
-        // and it reports whether it committed a new order.
+        // and it reports whether it committed a new order. In a Reorder.Board,
+        // arrows across `axis`, or along it from either end, move a grabbed
+        // item to the nearest group that way, and Escape returns it to the
+        // group it was grabbed in.
         onKeyDown: (event, item, from, grab) => {
             const { key, currentTarget } = event
             if (
@@ -180,38 +184,95 @@
                 return false
             }
             const order = getMeasuredOrder()
-            const keyIndex = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].indexOf(key)
+            const keys = ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Home', 'End']
+            const keyIndex = keys.indexOf(key)
             const isX = keyIndex % 2
             let committed = false
             if (key === ' ') {
                 if (!event.repeat) grab(currentTarget, from ? undefined : [...values])
-            } else if (key === 'Escape' && from) {
-                // Values added since the grab keep their slots.
-                const kept = from.flatMap((value) => order.filter((data) => data.value === value))
-                committed = commit(
-                    order,
-                    order.map((data) => (from.includes(data.value) ? kept.shift()! : data)),
-                    item
-                )
-                grab(currentTarget)
-            } else if (keyIndex < 0 || (axis !== 'xy' && axis !== (isX ? 'x' : 'y'))) {
+            } else if (keyIndex < 0 && !(key === 'Escape' && from)) {
                 return false
+            } else if (board?.isMoving(currentTarget)) {
+                // Until Svelte renders its move to another group, this item
+                // and its group's values are out of date: moving it again,
+                // or back, would leave it in both groups.
+            } else if (key === 'Escape' && from) {
+                // Drop it first: a move back to the group it was grabbed in
+                // hands it on to the item that mounts there.
+                grab(currentTarget)
+                if (
+                    !board?.restore(
+                        context as ReorderContextProps<unknown>,
+                        item,
+                        currentTarget,
+                        from
+                    )
+                ) {
+                    // Values added since the grab keep their slots.
+                    const kept = from.flatMap((value) =>
+                        order.filter((data) => data.value === value)
+                    )
+                    committed = commit(
+                        order,
+                        order.map((data) => (from.includes(data.value) ? kept.shift()! : data)),
+                        item
+                    )
+                }
             } else {
+                // Home and End work on every axis; arrows across it are the page's.
+                const isAlongAxis = keyIndex > 3 || axis === 'xy' || axis === (isX ? 'x' : 'y')
                 // Focus only moves between rendered items.
                 const list = from ? order : order.filter(({ value }) => isRendered(value))
                 const index = list.findIndex(({ value }) => value === item)
-                const target = keyTarget(list, index, keyIndex, axis, !!isX && isRTL())
+                const target = isAlongAxis
+                    ? keyTarget(list, index, keyIndex, axis, !!isX && isRTL())
+                    : -1
                 if (target > -1) {
                     if (from) committed = commit(order, moveItem(order, index, target), item)
                     else elements.get(list[target].value)?.()?.focus()
+                } else if (
+                    !(
+                        from &&
+                        keyIndex < 4 &&
+                        board?.key(
+                            context as ReorderContextProps<unknown>,
+                            item,
+                            keyIndex,
+                            currentTarget,
+                            from
+                        )
+                    ) &&
+                    !isAlongAxis
+                ) {
+                    return false
                 }
+                // A board move doesn't commit through this group, so
+                // `committed` stays false: the item that mounts in the other
+                // group takes focus (`board.receive`).
             }
             event.preventDefault()
             return committed
         },
         // Track identity and contents so in-place $state mutations count too.
-        trackOrder: () => values.forEach(() => {})
-    })
+        trackOrder: () => values.forEach(() => {}),
+        // For a `Reorder.Board` (Motion 14.10.1 `Reorder/Group.tsx`).
+        get values() {
+            return values
+        },
+        onReorder: (newOrder, moved) => onReorder(newOrder, moved),
+        getOrder: getMeasuredOrder,
+        markReordered: () => {
+            hasReordered = true
+        }
+    }
+    setReorderContext<V>(context)
+
+    /**
+     * Inside a `Reorder.Board`, register with it so its items can move
+     * between groups (Motion 14.10.1 `Reorder/Group.tsx` `board?.add`).
+     */
+    const board = getReorderBoardContext()
+    $effect(() => board?.add(context as ReorderContextProps<unknown>))
 
     $effect(() => {
         for (const map of [itemLayouts, elements]) {

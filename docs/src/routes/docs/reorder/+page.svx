@@ -186,7 +186,7 @@ Items are motion components underneath — every [drag prop](/docs/drag) (`while
 
 ## Keyboard
 
-Every `Reorder.Item` can be reordered from the keyboard, with no opt-in (Motion 14.9). The group is a single tab stop (a roving tabindex), like a listbox or grid:
+Every `Reorder.Item` can be reordered from the keyboard, with no opt-in (Motion 14.9; Home/End in 14.10). The group is a single tab stop (a roving tabindex), like a listbox or grid:
 
 | Key | Action |
 |-----|--------|
@@ -194,12 +194,13 @@ Every `Reorder.Item` can be reordered from the keyboard, with no opt-in (Motion 
 | Arrow keys (nothing grabbed) | Move focus to the next or previous item along the group's axis |
 | `Space` | Grab the focused item, or drop it if it's grabbed |
 | Arrow keys (grabbed) | Move the grabbed item one place along the group's axis: Up/Down for `y`, Left/Right for `x`, all four for `xy`. Left and Right swap in RTL |
+| `Home` / `End` | Move focus to the first or last item, or move the grabbed item there. Works on every axis |
 | `Escape` | Restore the order from when the item was grabbed, then drop it |
 
 - In a grid (`axis="xy"`), Up and Down go to the row drawn above or below, to the item nearest across, both for moving focus and for moving a grabbed item. Left and Right go along the order.
 - Only rendered items take focus: values that aren't rendered (e.g. virtualized) are skipped, and if the tab stop's item is unrendered the first rendered item takes over.
 - Enter isn't handled, so it keeps its tap meaning (`onTap`, `whileTap`).
-- Arrows with Alt, Ctrl or Meta held, and keys pressed inside an item's children (an `<input>`, say), are ignored. Arrows across the axis, and arrows with nowhere to go, are left to the page.
+- Arrows with Alt, Ctrl or Meta held, and keys pressed inside an item's children (an `<input>`, say), are ignored. Arrows across the axis are left to the page.
 - Moving focus away (Tab, or clicking elsewhere) drops the item and keeps the current order.
 - Grabbing activates the item's `whileDrag` state, so style the grabbed look with `whileDrag`. `onDragStart` and `onDragEnd` don't fire for keyboard grabs.
 - Each move calls `onReorder` with the new order and the moved item, like a drag step. Escape calls it only if the order actually changed.
@@ -213,6 +214,10 @@ To turn keyboard reordering off for an item, call `preventDefault()` in its `onk
 ```
 
 A `tabindex` on an item overrides the group's roving tab stop. `tabindex={-1}` only removes the item's Tab stop: a click, an arrow key or `focus()` still focuses it, and Space then grabs it.
+
+## Moving items between groups
+
+To drag items from one group into another, such as kanban columns, wrap the groups in `Reorder.Board` (Motion 14.10). See [Reorder.Board](/docs/reorder-board) for `canMove`, keyboard moves between groups and scrolling.
 
 ## Notes
 
@@ -265,8 +270,15 @@ All other motion props are forwarded to the underlying motion element.
 
 All other motion props — including every drag prop and callback — are forwarded to the underlying motion element.
 
+### Reorder.Board
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `canMove` | `(value: V, from: V[], to: V[]) => boolean` | — | Whether `value` may move from the group with values `from` to the group with values `to`. See [Reorder.Board](/docs/reorder-board) |
+
 ## Related
 
+- [Reorder.Board](/docs/reorder-board) — Drag items between groups
 - [Drag](/docs/drag) — The gesture system Reorder builds on
 - [Layout Animations](/docs/layout-animations) — How siblings FLIP between slots
 - [Motion values](/docs/motion-values) — Observe the live drag offset

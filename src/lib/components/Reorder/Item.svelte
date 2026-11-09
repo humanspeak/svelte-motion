@@ -10,7 +10,8 @@
      * siblings via a transform-driven `zIndex`. Keyboard reorderable
      * (Motion 14.6.0): Space grabs and drops, arrows move, Escape restores.
      * The group is one tab stop and arrows move focus between items
-     * (Motion 14.9).
+     * (Motion 14.9). Inside a `Reorder.Board` it drags on both axes and
+     * can be dragged into another group (Motion 14.10).
      *
      * @prop as - Element to render. Defaults to `'li'`.
      * @prop value - The entry in the group's `values` this item represents.
@@ -26,7 +27,8 @@
     import { parseStyleString } from '$lib/utils/style'
     import { useTransform } from '$lib/utils/transform.svelte'
     import { autoScrollIfNeeded, resetAutoScrollState, selectAutoScrollAxis } from './autoScroll'
-    import { getReorderContext } from './context'
+    import { getReorderBoardContext } from './board'
+    import { getReorderContext, type ReorderContextProps } from './context'
     import type { ReorderItemProps } from './types'
 
     let {
@@ -34,6 +36,7 @@
         style,
         value,
         as = 'li',
+        onDragStart,
         onDrag,
         onDragEnd,
         onkeydown,
@@ -54,7 +57,18 @@
     // measurement; without this bridge the motion child can retain the safe
     // initial `y` constraint instead of re-wiring drag to the detected axis.
     const reorderAxis = $derived(context.axis)
-    const itemDrag = $derived(reorderAxis === 'xy' ? true : reorderAxis)
+
+    /**
+     * The enclosing `Reorder.Board`, if any. Its groups are identified by
+     * their context objects (Motion 14.10.1 `Item.tsx` `board`).
+     */
+    const board = getReorderBoardContext()
+    const group = context as ReorderContextProps<unknown>
+
+    /**
+     * In a Reorder.Board, items can be dragged out of their group.
+     */
+    const itemDrag = $derived(reorderAxis === 'xy' || board ? true : reorderAxis)
 
     const motionValueChild = $derived(isMotionValueChild(children) ? children : undefined)
     const childSnippet = $derived(typeof children === 'function' ? children : undefined)
@@ -73,21 +87,54 @@
 
     const zIndex = useTransform([x, y], ([latestX, latestY]) => (latestX || latestY ? 1 : 'unset'))
 
+    /**
+     * Set when this item continues a drag that a `Reorder.Board` moved here
+     * from another group: the gesture's `onDragStart` already fired there,
+     * so the restart here skips it once (Motion 14.10.1 `Item.tsx`
+     * `isContinued`).
+     */
+    let isContinued = false
+
+    const handleDragStart = (event: PointerEvent, info: DragInfo) => {
+        if (isContinued) isContinued = false
+        else onDragStart?.(event, info)
+    }
+
+    /**
+     * After a `Reorder.Board` moves this item, its destroyed row keeps
+     * receiving this gesture's moves until the new row takes it over. Then
+     * `element` is detached (or gone): `board.drag` returns false for it and
+     * `updateOrder` leaves an order without `value` as it is, so this
+     * mustn't throw either way.
+     */
     const handleDrag = (event: PointerEvent, info: DragInfo) => {
         // The bound style MotionValue is dual-written by the drag
         // gesture, so it reads as the live offset from the item's slot.
         const offset = { x: point.x.get() as number, y: point.y.get() as number }
-        context.updateOrder(value, offset, info.velocity)
+        const moved = !!element && !!board?.drag(group, value, element, event)
+        if (!moved) context.updateOrder(value, offset, info.velocity)
 
-        const scrollAxis = selectAutoScrollAxis(reorderAxis, info.velocity)
-        // Auto-scroll compares viewport geometry, so use the matching client coordinate.
-        const pointerPosition = scrollAxis === 'x' ? event.clientX : event.clientY
-        autoScrollIfNeeded(
-            context.getGroupElement(),
-            pointerPosition,
-            scrollAxis,
-            info.velocity[scrollAxis]
-        )
+        /**
+         * In a Reorder.Board, scroll on both axes, e.g. across columns as
+         * well as down them. Across them, scroll what's around the columns:
+         * an item dragged out of its column overflows it, so the column
+         * could scroll across too (Motion 14.10.1 `Item.tsx` `onDrag`).
+         */
+        const scrollAxes: Array<'x' | 'y'> = board
+            ? ['x', 'y']
+            : [selectAutoScrollAxis(reorderAxis, info.velocity)]
+        for (const scrollAxis of scrollAxes) {
+            // Auto-scroll compares viewport geometry, so use the matching client coordinate.
+            const pointerPosition = scrollAxis === 'x' ? event.clientX : event.clientY
+            autoScrollIfNeeded(
+                board && !reorderAxis.includes(scrollAxis)
+                    ? board.column(group)
+                    : context.getGroupElement(),
+                pointerPosition,
+                scrollAxis,
+                info.velocity[scrollAxis]
+            )
+        }
         onDrag?.(event, info)
     }
 
@@ -95,6 +142,7 @@
         // Runs a frame after release, so after the release's click
         context.clearReordered()
         resetAutoScrollState()
+        board?.end(value)
         onDragEnd?.(event, info)
     }
 
@@ -151,9 +199,30 @@
 
     const grab = (element: HTMLElement, from?: V[]) => {
         grabbedFrom = from
+        if (!from) board?.end(value)
         // Fire-and-forget like upstream: the animation settles on its own.
         void visualElementStore.get(element)?.animationState?.setActive('whileDrag', !!from)
     }
+
+    /**
+     * If a `Reorder.Board` just moved this item here from another group,
+     * carry on its drag or keyboard grab (Motion 14.10.1 `Item.tsx`, a
+     * mount layout effect). For a keyboard move, `receive` focuses this
+     * element and grabs it through `grab`, synchronously: the element is
+     * connected and has its `tabindex` by the time this effect runs.
+     * This item's own effects run after its `MotionContainer`'s, so by the
+     * first one with an element, its VisualElement is mounted and its drag
+     * listeners (and so its `elementDragControls` entry) are in place.
+     */
+    let isReceived = false
+    $effect(() => {
+        if (!board || !element || isReceived) return
+        isReceived = true
+        const node = element
+        untrack(() => {
+            if (board.receive(group, value, node, grab as never)) isContinued = true
+        })
+    })
 
     const handleKeyDown: KeyboardEventHandler<HTMLElement> = (event) => {
         // A consumer that rejected the previous proposal mustn't leave it stuck.
@@ -182,6 +251,16 @@
     })
 
     const handleBlur: FocusEventHandler<HTMLElement> = (event) => {
+        /**
+         * Svelte: the cross-group equivalent of the keyed-each move-blur
+         * below. A `Reorder.Board` keyboard move destroys this row and
+         * mounts a new one in the other group; some browsers blur the
+         * focused node as it's removed. React suppresses that blur; Svelte
+         * doesn't, and dropping the grab here would end the board's handoff
+         * (`grab` calls `board.end`), so the new row would never take focus
+         * and the grab. While the move is in flight, ignore it.
+         */
+        if (board?.isMoving(event.currentTarget)) return
         // A move-blur: the node moved and focus fell to <body>.
         if (pendingRefocus && event.relatedTarget === null) return
         userBlur?.(event)
@@ -222,6 +301,7 @@
     dragSnapToOrigin
     style={itemStyle}
     {layout}
+    onDragStart={handleDragStart}
     onDrag={handleDrag}
     onDragEnd={handleDragEnd}
     onLayoutMeasure={(box: LayoutMeasurePayload) => context.registerItem(value, box)}

@@ -326,6 +326,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/tap-options') + searchParams}
+                    >
+                        Tap options: double tap, long press, repeat
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/while-focus') + searchParams}
                     >
                         While Focus
@@ -775,6 +783,14 @@
                         Reorder: ref dragConstraints in a scrolled layoutScroll group (#2024)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/board') + searchParams}
+                    >
+                        Reorder: Board, drag items between groups (Motion 14.10)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -962,6 +978,14 @@
                         href={resolve('/tests/drag/release-animate-variants') + searchParams}
                     >
                         Drag: release doesn't fire onAnimationComplete per animate label (#1831)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/drag/point-constraint') + searchParams}
+                    >
+                        Drag: function dragConstraints with getProps() (Motion 14.10)
                     </a>
                 </li>
                 <li>

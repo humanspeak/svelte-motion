@@ -37,6 +37,9 @@ export interface ItemData<V> {
  * - `trackOrder` exists because Svelte doesn't restore focus after a
  *   keyed-each move the way React does: the item refocuses itself once
  *   `values` changes.
+ * - `markReordered` replaces a `Reorder.Board` setting upstream's
+ *   `hasReordered` ref, and items' elements are in `elements` rather than
+ *   in `getOrder()`'s data.
  */
 export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
@@ -90,9 +93,10 @@ export interface ReorderContextProps<V> {
      * Handle a key on an item: Space grabs and drops, arrows along `axis`
      * move the grabbed item one place, or a row in a grid (see
      * `keyTarget`), or move focus that way if it isn't grabbed (Left and
-     * Right swap in RTL), and Escape restores the order in `from`, the
-     * values when it was grabbed. Mirrors Motion 14.9.1
-     * `Reorder/Group.tsx` `onKeyDown`.
+     * Right swap in RTL), Home and End do the same to either end on every
+     * axis, and Escape restores the order in `from`, the values when it was
+     * grabbed. Arrows across `axis` are left to the browser. Mirrors Motion
+     * 14.10.1 `Reorder/Group.tsx` `onKeyDown`.
      *
      * @param event - The item's keydown event.
      * @param item - The item's value.
@@ -111,6 +115,138 @@ export interface ReorderContextProps<V> {
      * item can refocus itself after the list it belongs to is re-rendered.
      */
     trackOrder: () => void
+    /**
+     * The group's latest `values`, for a `Reorder.Board` to move items
+     * between groups (Motion 14.10.1 `Reorder/types.ts`
+     * `ReorderContextProps.values`).
+     */
+    readonly values: V[]
+    /**
+     * Call the group's `onReorder`, for a `Reorder.Board` moving an item
+     * into or out of it (Motion 14.10.1 `ReorderContextProps.onReorder`).
+     *
+     * @param newOrder - The group's new values.
+     * @param moved - The value that moved.
+     */
+    onReorder: (newOrder: V[], moved: V) => void
+    /**
+     * The measured items, in `values` order (Motion 14.10.1
+     * `ReorderContextProps.getOrder`). Unmounted items aren't measured, so
+     * they're not here; a board finds the items' elements in `elements`.
+     *
+     * @returns The measured order.
+     */
+    getOrder: () => ItemData<V>[]
+    /**
+     * Mark the group as reordered by a drag, so it swallows the release's
+     * click. A `Reorder.Board` calls it on the group an item moved into,
+     * where the release lands (upstream `to.hasReordered.current = true`).
+     */
+    markReordered: () => void
+}
+
+/**
+ * Lets the `Reorder.Group`s in a `Reorder.Board` move items between them.
+ * Mirrors Motion 14.10.1 `Reorder/types.ts` `ReorderBoardContextProps`. A group is identified by its context object.
+ */
+export interface ReorderBoardContextProps {
+    /**
+     * Register a group's context.
+     *
+     * @param group - The group's context.
+     * @returns A function that removes it.
+     */
+    add: (group: ReorderContextProps<unknown>) => () => void
+    /**
+     * Move an item being dragged into the group under its centre.
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param event - The latest drag event.
+     * @returns Whether it moved, or is moving, so `group` shouldn't reorder it too.
+     */
+    drag: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        event: MouseEvent | TouchEvent | PointerEvent
+    ) => boolean
+    /**
+     * Move a grabbed item to the nearest group in the direction of the
+     * arrow key at `keyIndex` (up, left, down, right).
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param keyIndex - The arrow key: 0 up, 1 left, 2 down, 3 right.
+     * @param element - The item's element.
+     * @param from - The values when it was grabbed.
+     * @returns Whether it moved.
+     */
+    key: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        keyIndex: number,
+        element: Element,
+        from: unknown[]
+    ) => boolean
+    /**
+     * Move a grabbed item back to the group it was grabbed in, if it's
+     * since been moved to another.
+     *
+     * @param group - The item's group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param from - The values when it was grabbed.
+     * @returns Whether it moved.
+     */
+    restore: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        from: unknown[]
+    ) => boolean
+    /**
+     * The drag or keyboard grab of `value` ended, so drop any move of it
+     * that its new group hasn't picked up, e.g. because the groups refused
+     * it.
+     *
+     * @param value - The item's value.
+     */
+    end: (value: unknown) => void
+    /**
+     * Whether the item at `element` has moved to another group that hasn't
+     * picked it up yet.
+     *
+     * @param element - The item's element.
+     * @returns Whether the item's element is moving.
+     */
+    isMoving: (element: Element) => boolean
+    /**
+     * Called by a mounting item, to continue the drag or keyboard grab
+     * that moved it here from another group.
+     *
+     * @param group - The item's (new) group.
+     * @param value - The item's value.
+     * @param element - The item's element.
+     * @param grab - Sets or clears the item's keyboard grab.
+     * @returns Whether it continues a drag, whose `onDragStart` has already been called.
+     */
+    receive: (
+        group: ReorderContextProps<unknown>,
+        value: unknown,
+        element: Element,
+        grab: (element: HTMLElement, from?: unknown[]) => void
+    ) => boolean
+    /**
+     * The outermost element around `group` that holds none of the other
+     * groups, like its column. Dragging across groups scrolls the
+     * containers around it, rather than the column.
+     *
+     * @param group - The item's group.
+     * @returns That element, or `null` without one.
+     */
+    column: (group: ReorderContextProps<unknown>) => Element | null
 }
 
 const REORDER_CONTEXT_KEY = Symbol('reorder-group')

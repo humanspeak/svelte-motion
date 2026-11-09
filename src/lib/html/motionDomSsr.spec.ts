@@ -7,6 +7,8 @@ function createValue() {
         set: () => undefined,
         isAnimating: () => false,
         start: () => undefined,
+        // motion-dom 14.10.1 visual-element-target.ts:153 calls value.run().
+        run: () => undefined,
         stop: () => undefined,
         animation: undefined
     }

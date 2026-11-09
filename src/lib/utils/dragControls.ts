@@ -12,6 +12,11 @@ import type { VisualElementDragControls } from 'motion-dom'
  * Pass the controls to one or more motion elements via the `dragControls` prop, then call
  * `controls.start(event)` to initiate the drag as if the user had pressed down on them.
  *
+ * `start` options: `snapToCursor` centres the element on the pointer; `distanceThreshold`
+ * sets how far the pointer must travel before the drag starts; `immediate` starts the drag
+ * at once, without waiting for the pointer to move (Motion 14.10), for example to carry a
+ * drag on from another element.
+ *
  * @returns {DragControls} An object with `start`, `cancel`, `stop`, and the internal `subscribe` method.
  * @see https://motion.dev/docs/react-motion-component#dragging
  *

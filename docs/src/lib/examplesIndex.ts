@@ -188,6 +188,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'Drag-to-reorder lists with Reorder.Group and Reorder.Item — FLIP siblings and edge auto-scroll.'
     },
+    'reorder-board': {
+        title: 'Reorder.Board',
+        description:
+            'Drag cards between kanban columns with Reorder.Board, with a canMove WIP limit and auto-scrolling columns.'
+    },
     'vanilla-values': {
         title: 'Vanilla Values',
         description:
@@ -240,6 +245,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
     'tab-select': {
         title: 'Tab Select',
         description: 'Interactive tab select animation example using Svelte Motion.'
+    },
+    'tap-options': {
+        title: 'Tap options',
+        description:
+            'Double tap, long press and auto-repeat from one tap gesture, with the tap prop’s count, hold and repeat.'
     },
     'three-effect': {
         title: 'Three.js Effect',

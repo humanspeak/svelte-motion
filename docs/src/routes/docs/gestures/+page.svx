@@ -92,6 +92,48 @@ If a transform must **never pass its resting value** — e.g. a `scale` press on
 </motion.button>
 ```
 
+### Double tap, long press and repeat
+
+The `tap` prop changes when a tap counts. It applies to `onTapStart`, `onTap`, `onTapCancel` and `whileTap`, matching Motion 14.10.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `count` | `1` | Quick, consecutive presses needed for `onTap`. |
+| `countTimeout` | `0.3` | Max seconds between presses. A later press cancels the sequence. |
+| `hold` | `0` | Seconds the press must be held for `onTap`. Releasing earlier cancels. |
+| `repeat` | — | While held, `onTap` fires every `repeat` seconds. |
+
+```svelte
+<!-- Double tap -->
+<motion.div tap={{ count: 2 }} onTap={onDoubleTap} />
+```
+
+```svelte
+<!-- Long press -->
+<motion.div tap={{ hold: 0.5 }} whileTap={{ scale: 0.9 }} onTap={onLongPress} />
+```
+
+```svelte
+<!-- Stepper: onTap fires every 0.1 seconds while held -->
+<motion.button tap={{ repeat: 0.1 }} onTap={increment} />
+```
+
+- `onTapStart` and `whileTap` start on the **first** press, so the element reacts straight away.
+- `onTap` fires when the gesture completes, and on each `repeat`. `whileTap` stays on between repeats.
+- Otherwise `onTapCancel` fires: a press that is too late, released too early, or released off the element.
+- `tap` alone does not turn the gesture on. Pair it with `onTap`, `onTapStart`, `onTapCancel` or `whileTap`.
+- Keyboard presses (**Enter**) follow the same rules.
+
+**`globalTapTarget` and `propagate`.** `globalTapTarget` attaches the tap's start listener to `window`, so a press anywhere starts the gesture (Motion marks it as not publicly supported). By default a tap on a child also starts the taps of its motion ancestors. Set `propagate={{ tap: false }}` on the child to stop that:
+
+```svelte
+<motion.div onTap={onCardTap}>
+    <motion.button onTap={onLike} propagate={{ tap: false }}>Like</motion.button>
+</motion.div>
+```
+
+Try all three on the [tap options example](/examples/tap-options).
+
 ### Interrupts carry momentum
 
 Gesture channels ride persistent motion values, so interrupting a spring re-targets the **same value** — position *and velocity* carry into the next animation, exactly as in Framer Motion. Press an element while its hover spring is still climbing and the press animation launches from that live upward velocity: the element keeps growing for a beat before curving into the shrink, instead of reversing from a dead stop. Rapid flicks across a hover boundary read as one continuous elastic motion.
