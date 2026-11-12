@@ -122,7 +122,7 @@ Pinch needs real input to sign off: a trackpad pinch covers scale; rotation and 
 ## Open before the PR
 
 - **`e2e/animate-presence/pop-layout-container-move.spec.ts:282`** ("exiting item holds after two adds (fixed, transform-centred container)") failed once in each of the last two full e2e runs (drift about 38.8 px, expected < 1) and passes alone. It did not fail in plan 001's full run. Plan 006's executor measured 1 of 10 failures on the code before 006 and 3 of 10 after; the page binds no style motion value, so 006's loop does nothing there. Unexplained. Investigate before the PR.
-- **Spring e2e**: add our own `after > atReverse` assertion beside upstream's `after > before` in `e2e/motion/spring-velocity.spec.ts` (see 002's guard log).
+- ~~Spring e2e stricter assertion~~: done at `59dd0f13` (our `after > atReverse` beside upstream's; smallest measured margin 72 px on x, 0.05 on opacity; guard re-ran 60 of 60).
 
 ## Open question for the maintainer (not planned)
 
