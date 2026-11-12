@@ -4,8 +4,10 @@
 >
 > **Never use `git stash`.** Never use or kill port 4198. Never set `PW_REUSE_SERVER`. The docs Playwright config uses its own fixed port (5201); run it while no other lane is running it.
 >
-> **Drift check (run first)**: `git diff --stat 82bf6e74..HEAD -- docs/src/routes/docs/pinch docs/src/routes/examples/pinch docs/src/lib/examples/pinch docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts docs/src/routes/docs/lazy-motion docs/src/routes/docs/gestures docs/src/routes/docs/drag`
+> **Drift check (run first)**: `git diff --stat c0843d78..HEAD -- docs/src/routes/docs/pinch docs/src/routes/examples/pinch docs/src/lib/examples/pinch docs/src/lib/docsNav.ts docs/src/lib/examplesIndex.ts docs/src/routes/docs/lazy-motion docs/src/routes/docs/gestures docs/src/routes/docs/drag`
 > The only expected change is plan 002's two sentences in `docs/src/routes/docs/gestures/+page.svx` (section "Interrupts carry momentum"). If anything else changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
+>
+> **Revision 2026-11-12 (guard)**: drift baseline moved from `82bf6e74` to `c0843d78`, the branch tip after plans 001, 002, 003, 004 and 006 merged. Plan 002 added one sentence to `docs/src/routes/docs/gestures/+page.svx` (in "Interrupts carry momentum"); find this plan's gestures anchors by their text. With the new baseline the drift check should print nothing. Work on the branch your worktree is already on; ignore the `lane/14120-pinch-docs` branch name. Plan 006 also landed a fix that matters to the docs demos: a value bound through a `style` motion value now animates back when a `while*` state ends.
 
 ## Status
 
@@ -15,7 +17,7 @@
 - **Depends on**: 004-pinch-prop.md (the demos import `pinchFeatures` and use the `pinch` prop). It also documents the vanilla `pinch()` that plan 001 exports.
 - **Wave**: 3
 - **Category**: docs
-- **Planned at**: commit `82bf6e74`, 2026-11-12
+- **Planned at**: commit `82bf6e74`, 2026-11-12; re-stamped at `c0843d78` after plans 001-004 and 006
 
 ## Why this matters
 
