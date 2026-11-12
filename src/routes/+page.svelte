@@ -794,6 +794,19 @@
             </ul>
         </div>
         <div>
+            <h2 class="mb-3 text-xl font-medium">Pinch (Motion 14.11)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/pinch/vanilla') + searchParams}
+                    >
+                        Vanilla pinch()
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
             <h2 class="mb-3 text-xl font-medium">Drag</h2>
             <ul class="list-disc space-y-2 pl-5">
                 <li>
