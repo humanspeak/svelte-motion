@@ -80,7 +80,8 @@ const ANIMATION_FEATURE_PROPS = [
     'exit',
     'whileInView',
     'whileFocus',
-    'whileDrag'
+    'whileDrag',
+    'whilePinch'
 ] as const
 
 /**

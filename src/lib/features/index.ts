@@ -1,16 +1,20 @@
+import type { PinchFeatureDefinition } from '$lib/utils/pinchFeature'
+
 /**
  * Runtime capabilities made available to motion components inside a
  * `<LazyMotion>` subtree.
  */
 export type FeatureBundle = {
     /** Enables initial/animate/exit animation behavior. */
-    animations: true
+    animations?: true
     /** Enables hover, tap, focus, pan, and in-view gesture behavior. */
     gestures?: true
     /** Enables drag gesture behavior. */
     drag?: true
     /** Enables layout and shared-layout animation behavior. */
     layout?: true
+    /** Enables the `pinch` prop. Only `pinchFeatures` provides it. */
+    pinch?: PinchFeatureDefinition
 }
 
 /**
