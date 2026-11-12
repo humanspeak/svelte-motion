@@ -138,6 +138,8 @@ Try all three on the [tap options example](/examples/tap-options).
 
 Gesture channels ride persistent motion values, so interrupting a spring re-targets the **same value** — position *and velocity* carry into the next animation, exactly as in Framer Motion. Press an element while its hover spring is still climbing and the press animation launches from that live upward velocity: the element keeps growing for a beat before curving into the shrink, instead of reversing from a dead stop. Rapid flicks across a hover boundary read as one continuous elastic motion.
 
+This holds for `stiffness`/`damping` springs and, from Motion 14.12, for `visualDuration`/`bounce` springs; a `duration` spring starts from rest.
+
 There is nothing to configure — it applies to every `whileHover`/`whileTap` interrupt. See it (and feel it) on the [velocity interrupts example](/examples/velocity-interrupts).
 
 ## `whileFocus`
