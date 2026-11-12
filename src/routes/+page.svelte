@@ -334,6 +334,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/spring-velocity') + searchParams}
+                    >
+                        Spring velocity through an interrupt (Motion 14.12)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/while-focus') + searchParams}
                     >
                         While Focus
