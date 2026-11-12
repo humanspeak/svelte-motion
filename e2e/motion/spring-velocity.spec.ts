@@ -46,6 +46,15 @@ test.describe('interrupted springs carry velocity', () => {
             expect(results.opacity.after).toBeGreaterThan(results.opacity.before)
             expect(results.x.after).toBeGreaterThan(results.x.before)
 
+            // Ours, not upstream's: since 14.12 the interrupted animation
+            // catches up to now on stop, so the reversal can start right of
+            // `before` and a spring from rest can still pass the check above.
+            // Measured from the interrupt instead: a spring that inherits
+            // velocity keeps moving past `atReverse`, one from rest cannot.
+            // Measured margin over 80 runs: x >= 71, opacity >= 0.05.
+            expect(results.opacity.after).toBeGreaterThan(results.opacity.atReverse)
+            expect(results.x.after).toBeGreaterThan(results.x.atReverse)
+
             expect(results.opacity.final).toBe(0)
             expect(results.x.final).toBe(0)
         })
