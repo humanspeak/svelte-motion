@@ -1483,6 +1483,30 @@
                 }
             }
         }
+        // Upstream's constructor copies the seeded state into the base target
+        // (`render/VisualElement.ts`: `this.baseTarget = { ...latestValues }`),
+        // and that state holds every style MotionValue's mount-time value, so
+        // a `while*` state that ends animates each removed key back to it
+        // (`animateChanges`, `render/utils/animation-state.ts`). Our node is
+        // created without `style` (see above), so those keys are missing and
+        // the gesture's end would leave the value where it was. Seed them here,
+        // once, without touching `latestValues`. The node's own scraper gives
+        // the key motion-dom animates; an `initial` value already in the base
+        // target wins, as it does upstream. SVG attribute MotionValues need no
+        // seed: `buildMotionNodeProps(false)` carries them at creation.
+        // `baseTarget` is `@internal` upstream, so it is absent from the types.
+        const { baseTarget } = node as unknown as { baseTarget: Record<string, unknown> }
+        const style = untrack(() => styleProp)
+        const styleMotionValues = node.scrapeMotionValuesFromProps(
+            { style } as MotionNodeOptions,
+            {},
+            node
+        )
+        for (const [key, value] of Object.entries(styleMotionValues)) {
+            if (isMotionValue(value) && baseTarget[key] === undefined) {
+                node.setBaseTarget(key, value.get() as AnyResolvedKeyframe)
+            }
+        }
         visualElement = node
         motionDomProjection = new MotionDomProjectionAdapter({
             parent: readMotionDomProjectionParent(),
