@@ -10,7 +10,12 @@ import { expect, test } from '@playwright/test'
  * ports `dev/html/public/playwright/animate/animate-time-spring-velocity.html`.
  */
 
-type ValueResult = { before: number; after: number; final: number }
+/**
+ * `before` is the last painted frame before the reversal; `atReverse` is read
+ * synchronously right after the reversing `animate()`, which is the value at
+ * the interrupt (the interrupted animation's `stop()` catches up to now).
+ */
+type ValueResult = { before: number; atReverse: number; after: number; final: number }
 type RunResult = { opacity: ValueResult; x: ValueResult }
 type RunWindow = { run: (transition: Record<string, unknown>) => Promise<RunResult> }
 
@@ -52,6 +57,12 @@ test.describe('interrupted springs carry velocity', () => {
             duration: 0.8
         })
 
-        expect(results.x.after).toBeLessThan(results.x.before)
+        // Measured from the interrupt, not the last painted frame: the
+        // catch-up tick on interrupt can leave the value right of `before`, and
+        // a spring from rest eases in, so 32ms later it can still be right of
+        // `before` even though it never moved further right. A spring that
+        // inherited velocity would be well past `atReverse` here instead.
+        expect(results.x.after).toBeLessThan(results.x.atReverse)
+        expect(results.opacity.after).toBeLessThan(results.opacity.atReverse)
     })
 })

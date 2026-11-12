@@ -11,7 +11,11 @@
     // and `tests/animate/time-spring-velocity.spec.ts` at v14.12.0.
 
     type SpringTransition = Record<string, string | number>
-    type ValueResult = { before: number; after: number; final: number }
+    // `atReverse` is read synchronously right after the reversing `animate()`:
+    // the interrupted animation's `stop()` catches its value up to the moment
+    // of the interrupt (Motion 14.12), so this is where the reversing spring
+    // starts. `before` is the last painted frame, which can be behind it.
+    type ValueResult = { before: number; atReverse: number; after: number; final: number }
     type RunResult = { opacity: ValueResult; x: ValueResult }
     type RunWindow = { run?: (transition: SpringTransition) => Promise<RunResult> }
 
@@ -62,12 +66,21 @@
     const reverse = async (row: Row) => {
         const box = boxes[row.id]
         if (!box) return
-        const before = readX(box)
+        // Measure from where the reversing spring starts, not the last painted
+        // frame: interrupting catches the value up to now, so a spring from
+        // rest can still sit right of the last frame after it turns back.
         animate(box, { x: 0 }, row.transition)
-        await nextFrame()
-        await nextFrame()
-        const after = readX(box)
-        verdicts[row.id] = after > before ? 'kept moving right' : 'turned back at once'
+        const atReverse = readX(box)
+        // Take the furthest point over the first two frames: a physics spring
+        // reversed late in its run carries little velocity, so it can peak
+        // past `atReverse` in the first frame and be back by the second. A
+        // spring from rest never gets past `atReverse` at all.
+        let furthest = -Infinity
+        for (let i = 0; i < 2; i++) {
+            await nextFrame()
+            furthest = Math.max(furthest, readX(box))
+        }
+        verdicts[row.id] = furthest > atReverse ? 'kept moving right' : 'turned back at once'
     }
 
     onMount(() => {
@@ -100,11 +113,12 @@
 
                 const before = read[name](element)
                 const animation = animate(element, { [name]: back }, transition)
+                const atReverse = read[name](element)
                 await wait(32)
                 const after = read[name](element)
                 await animation
 
-                results[name] = { before, after, final: read[name](element) }
+                results[name] = { before, atReverse, after, final: read[name](element) }
                 element.remove()
             }
 
