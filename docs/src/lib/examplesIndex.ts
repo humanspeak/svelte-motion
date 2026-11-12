@@ -183,6 +183,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         title: 'Path Morphing',
         description: 'Interactive path morphing animation example using Svelte Motion.'
     },
+    pinch: {
+        title: 'Pinch',
+        description:
+            'Pinch to zoom, rotate and move an element, with elastic limits and rotation snapping.'
+    },
     reorder: {
         title: 'Reorder',
         description:

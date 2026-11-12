@@ -44,8 +44,11 @@ In svelte-motion, `LazyMotion` selects behaviour but does not yet reduce bundle 
 | `domMin` | mount/update animations |
 | `domAnimation` | animations plus hover, tap, focus, pan, and in-view gestures |
 | `domMax` | everything in `domAnimation` plus drag and layout animations |
+| `pinchFeatures` | the `pinch` prop and `whilePinch`; spread it with another bundle |
 
 Use `domAnimation` for most interface motion. Use `domMin` for pages that only need entrance/update animation. Use `domMax` when the subtree uses `drag`, `layout`, or `layoutId`.
+
+Pinch is not part of `domMax`, and it needs `pinchFeatures` on `motion.*` components as well, so load it with `features={{ ...domMax, ...pinchFeatures }}` (or on its own) wherever a component uses `pinch`. See [Pinch](/docs/pinch).
 
 ## Async loading
 
