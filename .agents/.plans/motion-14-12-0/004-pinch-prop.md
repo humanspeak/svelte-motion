@@ -6,8 +6,10 @@
 >
 > **Port rule**: this lane's Playwright port is **4264**. Prefix every Playwright command with `PW_PORT=4264`. Never use or kill port 4198. Never set `PW_REUSE_SERVER`.
 >
-> **Drift check (run first)**: `git diff --stat 82bf6e74..HEAD -- src/lib/features src/lib/components/LazyMotion.svelte src/lib/utils/visualElementCore.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts src/lib/index.ts src/routes/tests/pinch e2e/pinch tests/consumer-vite6/verify-tree-shaking.mjs`
+> **Drift check (run first)**: `git diff --stat ec3565ab..HEAD -- src/lib/features src/lib/components/LazyMotion.svelte src/lib/utils/visualElementCore.ts src/lib/html/_MotionContainer.svelte src/lib/types.ts src/lib/index.ts src/routes/tests/pinch e2e/pinch tests/consumer-vite6/verify-tree-shaking.mjs`
 > The only expected change is plan 001's edit to `src/lib/index.ts` (a `pinch` export and a pinch types block). If anything else changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
+>
+> **Revision 2026-11-12 (guard)**: drift baseline moved from `82bf6e74` to `ec3565ab`, the branch tip after plan 001 merged. Plan 001 edited `src/lib/index.ts` as this plan expects: `pinch` is in the `from 'motion'` block and a pinch types block follows the press types block, so every `src/lib/index.ts` line number quoted below is about 16 lines lower than the live file. Find the anchors by their text, not by line number. With the new baseline the drift check should print nothing. Work on the branch your worktree is already on; ignore the `lane/14120-pinch-prop` branch name.
 
 ## Status
 
@@ -17,7 +19,7 @@
 - **Depends on**: 001-bump-motion-14-12-0.md (`addPinchListeners`, `PinchProps` and the `whilePinch` animation type only exist in motion-dom 14.12.0)
 - **Wave**: 2
 - **Category**: direction (net-new upstream feature)
-- **Planned at**: commit `82bf6e74`, 2026-11-12
+- **Planned at**: commit `82bf6e74`, 2026-11-12; re-stamped at `ec3565ab` after plan 001
 
 ## Why this matters
 
