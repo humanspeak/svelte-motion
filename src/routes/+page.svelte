@@ -812,6 +812,14 @@
                         Vanilla pinch()
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/pinch/prop') + searchParams}
+                    >
+                        pinch prop, whilePinch and pinchFeatures
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

@@ -197,4 +197,19 @@ assert.deepEqual(
     `the ./m entry should export exactly Reorder and m, got: ${mEntry.exports.join(', ')}`
 )
 
+// 8. Pinch is opt-in (Motion 14.11 `render/dom/features-pinch.ts`: "Not part
+// of `motion` components or the `domMax` bundle"). `pinchFeatures` carries the
+// feature class, so motion-dom's pinch module (`addPinchListeners`, the only
+// module with a `gesturestart` listener) is only bundled when it is imported.
+const PINCH_MARKER = 'gesturestart'
+const pinchBundle = await bundle(`export { LazyMotion, pinchFeatures } from '${PKG}'`)
+assert.ok(
+    pinchBundle.code.includes(PINCH_MARKER),
+    'positive control: a pinchFeatures + LazyMotion bundle should contain the pinch module'
+)
+assert.ok(
+    !motionObject.code.includes(PINCH_MARKER),
+    'pinch is opt-in: a bundle that imports only `motion` must not contain the pinch module'
+)
+
 console.log('Tree-shaking consumer checks passed.')
