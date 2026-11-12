@@ -1,0 +1,304 @@
+---
+title: Pinch
+description: Pinch to zoom, rotate and move an element with two touches or a trackpad, with elastic limits, rotation snapping and a vanilla pinch() function
+---
+
+<script>
+  import Example from '#lib/components/general/Example.svelte'
+  import Photo from '#lib/examples/pinch/demos/Photo.svelte'
+  import Limits from '#lib/examples/pinch/demos/Limits.svelte'
+  import Vanilla from '#lib/examples/pinch/demos/Vanilla.svelte'
+  import { getSeoContext } from '#lib/components/contexts/Seo/Seo.context.js'
+
+  const seo = getSeoContext()
+  if (seo) {
+      seo.title = 'Pinch | Docs | Svelte Motion'
+      seo.description = 'Pinch to zoom, rotate and move an element with two touches, a trackpad or Safari gesture events, with elastic limits, rotation snapping and whilePinch, using Svelte Motion.'
+      seo.ogTitle = 'Pinch'
+      seo.ogTagline = 'Pinch to zoom, twist and move'
+      seo.ogFeatures = ['Zoom and Rotate', 'Elastic Limits', 'Rotation Snapping', 'Works with Drag']
+      seo.ogSlug = 'docs-pinch'
+  }
+</script>
+
+# Pinch
+
+The `pinch` prop scales, rotates and moves an element with a pinch: two touches, a trackpad pinch, or Safari's gesture events. Scale and rotation pivot around the point between the fingers (or under the cursor), so whatever is under them stays put, and the element follows them as they move. Give it limits and it resists past them, then springs back on release. Pinch arrived in Motion 14.11.
+
+<Example exampleUrl="/examples/pinch">
+  <Photo />
+</Example>
+
+Pinch the card to zoom between 1x and 4x and to twist it, and drag it to move it. On release, its rotation snaps to the nearest 90°. With a mouse, hold ctrl and scroll over the card.
+
+## Setup
+
+**`pinch` does nothing until `pinchFeatures` is loaded through [`LazyMotion`](/docs/lazy-motion).** This applies to `motion.*` components too: pinch is not part of `motion` components or the `domMax` bundle, so apps that never use it never ship its code.
+
+Load it next to another bundle:
+
+```svelte
+<script lang="ts">
+    import { LazyMotion, domMax, motion, pinchFeatures } from '@humanspeak/svelte-motion'
+</script>
+
+<LazyMotion features={{ ...domMax, ...pinchFeatures }}>
+    <motion.div drag pinch />
+</LazyMotion>
+```
+
+Or on its own:
+
+```svelte
+<script lang="ts">
+    import { LazyMotion, m, pinchFeatures } from '@humanspeak/svelte-motion'
+</script>
+
+<LazyMotion features={pinchFeatures}>
+    <m.div pinch />
+</LazyMotion>
+```
+
+## Usage
+
+`pinch` as a boolean turns the gesture on with the defaults: the element scales, rotates and moves with no limits.
+
+```svelte
+<motion.div pinch />
+```
+
+Pass options to set limits, snapping and callbacks:
+
+```svelte
+<motion.div
+    pinch={{
+        scale: { min: 1, max: 4 },
+        rotate: { snap: 90 }
+    }}
+/>
+```
+
+The gesture writes the element's `scale`, `rotate`, `x` and `y`. They are the same values `animate` and `style` motion values use, so you can animate the element after a pinch, or read them as it moves.
+
+## Limits and elasticity
+
+`scale` and `rotate` each take `{ min, max }` (rotation in degrees). Past a limit, the gesture resists by `elastic`, and the value springs back to the limit on release. Pass `false` to turn scaling or rotation off.
+
+`elastic` works like `dragElastic`: `0` stops at the limit, `1` doesn't resist. The default is `0.35`. Pass `{ min, max }` to set each side.
+
+<Example exampleUrl="/examples/pinch">
+  <Limits />
+</Example>
+
+```svelte
+<!-- Stops dead at 2x -->
+<motion.div pinch={{ scale: { min: 0.5, max: 2 }, elastic: 0 }} />
+
+<!-- Goes a little past 2x, then springs back -->
+<motion.div pinch={{ scale: { min: 0.5, max: 2 } }} />
+
+<!-- Free to shrink, stiff past the maximum -->
+<motion.div pinch={{ scale: { min: 0.5, max: 2 }, elastic: { min: 1, max: 0.1 } }} />
+```
+
+## Rotation and snapping
+
+`rotate.snap` rotates the element to the nearest multiple of that many degrees on release:
+
+```svelte
+<motion.div pinch={{ rotate: { snap: 90 } }} />
+```
+
+`snapToOrigin` animates scale back to `1`, and rotation and `x`/`y` back to `0`, whenever the pinch ends. It suits a "peek" interaction: zoom in to look, let go to put it back.
+
+```svelte
+<motion.div pinch={{ snapToOrigin: true }} />
+```
+
+`transition` is the spring values use to animate back inside their limits, to a `snap` angle or to their origin. It takes spring options:
+
+```svelte
+<motion.div
+    pinch={{
+        rotate: { snap: 90 },
+        transition: { stiffness: 300, damping: 30 }
+    }}
+/>
+```
+
+## Panning and origin
+
+`pan` (default `true`) moves the element with the focal point, and keeps the point under the fingers (or cursor) in place while it scales and rotates. Set `pan: false` to keep the element where it is.
+
+`origin` is the point that scale and rotation pivot around. `'pointer'`, the default, is the focal point between the touches, or the cursor. `{ x, y }` is a point on the element, as a fraction of its width and height: `{ x: 0.5, y: 0.5 }` is its centre. With `pan: false`, the default is the centre.
+
+```svelte
+<!-- Zoom around the centre, without moving -->
+<motion.div pinch={{ pan: false }} />
+
+<!-- Zoom around the top-left corner -->
+<motion.div pinch={{ origin: { x: 0, y: 0 } }} />
+```
+
+Pinch assumes the default `transform-origin`, the element's centre.
+
+## Callbacks
+
+`onStart`, `onMove` and `onEnd` go inside the `pinch` options. Each receives the latest event and a `PinchInfo` object:
+
+```svelte
+<motion.div
+    pinch={{
+        onStart: (event, info) => console.log('start', info.point),
+        onMove: (event, info) => console.log('move', info.scale, info.rotate),
+        onEnd: (event, info) => console.log('end', info.offset)
+    }}
+/>
+```
+
+`onStart` fires when the pinch starts, `onMove` each frame it changes, and `onEnd` once when it ends: a touch lifts or is cancelled, a trackpad pinch stops, or the gesture is turned off.
+
+### PinchInfo
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `point` | `{ x, y }` | The gesture's focal point in client coordinates: the midpoint between two touches, or the cursor for a trackpad pinch |
+| `offset` | `{ x, y }` | How far the focal point has moved since the gesture started |
+| `scale` | `number` | The gesture's scale relative to its start |
+| `rotate` | `number` | The gesture's rotation since its start, in degrees |
+
+`scale` and `rotate` are relative to the gesture, not the element: a second pinch on an element already at 2x starts again from `scale: 1`.
+
+## whilePinch
+
+`whilePinch` animates the element while a pinch is active, like [`whileDrag`](/docs/drag#while-dragging). It also needs `pinchFeatures`.
+
+```svelte
+<motion.div pinch whilePinch={{ boxShadow: '0 12px 40px #0006' }} />
+```
+
+A variant label reaches children, like the other `while*` props:
+
+```svelte
+<script lang="ts">
+    const variants = { pinching: { opacity: 0.5 } }
+</script>
+
+<m.div pinch whilePinch="pinching">
+    <m.div {variants} />
+</m.div>
+```
+
+## With drag
+
+Pinch composes with `drag`. A drag that one of the touches started carries on from wherever the pinch leaves the element: lift one finger and keep dragging with the other. Drag constraints aren't applied while pinching.
+
+```svelte
+<LazyMotion features={{ ...domMax, ...pinchFeatures }}>
+    <motion.div
+        drag
+        dragMomentum={false}
+        pinch={{ scale: { min: 1, max: 4 }, rotate: { snap: 90 } }}
+    />
+</LazyMotion>
+```
+
+## touch-action
+
+While pinch is on, the element gets `touch-action: none`, so the browser doesn't scroll or zoom the page under the fingers. If the element's `style` sets a `touch-action`, that wins. For example, keep `pan-y` on a pinchable item in a list so one finger still scrolls the page:
+
+```svelte
+<motion.div pinch style="touch-action: pan-y" />
+```
+
+## Vanilla pinch()
+
+`pinch()` makes plain elements pinchable without a motion component or `LazyMotion`. It takes an element, a list of elements or a CSS selector, and returns a function that removes the gesture. The start callback is optional:
+
+```ts
+import { pinch } from '@humanspeak/svelte-motion'
+
+pinch('img')
+pinch('img', { scale: { min: 1, max: 4 } })
+```
+
+`onPinchStart(element, startEvent)` is called once as each pinch starts. It can return nothing, a function to call when the pinch ends, or an object of handlers:
+
+```ts
+// An end handler
+const stop = pinch('#photo', (element, startEvent) => {
+    return (endEvent, info) => {}
+}, { scale: { min: 1, max: 4 } })
+
+// Handlers for this gesture
+pinch('#photo', () => ({
+    onPinch: (event, { scale }) => {},
+    onComplete: (event, info) => {}
+}))
+```
+
+`onPinch` is called each frame the gesture changes, after the element's values are updated. `onComplete` is called once when the gesture ends; returning it directly from the start callback is the same.
+
+The element's `scale`, `rotate`, `x` and `y` are motion values shared with `animate()`, so an `onComplete` handler can animate the element after a pinch. While attached, `pinch()` sets `touch-action: none` on the element, and the stop function restores it. In a Svelte component, return the stop function from `onMount` or `$effect`:
+
+```svelte
+<script lang="ts">
+    import { pinch } from '@humanspeak/svelte-motion'
+    import { onMount } from 'svelte'
+
+    let card: HTMLDivElement
+
+    onMount(() =>
+        pinch(
+            card,
+            () => ({
+                onPinch: (_, info) => console.log(info.scale),
+                onComplete: () => console.log('done')
+            }),
+            { rotate: { snap: 45 } }
+        )
+    )
+</script>
+
+<div bind:this={card}></div>
+```
+
+<Example exampleUrl="/examples/pinch">
+  <Vanilla />
+</Example>
+
+Inside a [`scopeMotion()`](/docs/scope-motion) scope, `pinch()` runs its start callback and the handlers it returns in that scope, so work they start is collected, and stopping the scope removes the gesture.
+
+## Input support
+
+- **Touch and pen**: a pinch starts when a second touch lands. Two fingers scale, rotate and move the element.
+- **Trackpad**: Chrome, Edge and Firefox report a trackpad pinch as `wheel` events with `ctrlKey`, so pinch handles those. The same means a mouse wheel with ctrl held zooms the element a step at a time. A trackpad pinch has no end event, so it ends once no events have arrived for 150ms.
+- **Safari**: Safari reports trackpad pinches as `gesturestart`, `gesturechange` and `gestureend` events, which carry rotation too.
+
+A Mac trackpad in Chrome reports no rotation, so there it only scales and moves.
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `scale` | `true` | `boolean \| { min?, max? }`. Scale the element. Pass `{ min, max }` to limit the scale |
+| `rotate` | `true` | `boolean \| { min?, max?, snap? }`. Rotate the element. `{ min, max }` limits it, in degrees; `snap` rotates to the nearest multiple on release |
+| `pan` | `true` | `boolean`. Move the element with the focal point, keeping the point under the fingers in place |
+| `origin` | `'pointer'` | `'pointer' \| { x, y }`. The point scale and rotation pivot around; `{ x, y }` is a fraction of the element's size. With `pan: false`, the default is the centre |
+| `elastic` | `0.35` | `boolean \| number \| { min?, max? }`. How far scale and rotation can go past their limits: `0` stops at the limit, `1` doesn't resist |
+| `snapToOrigin` | `false` | `boolean`. On release, animate scale back to `1`, and rotation and `x`/`y` back to `0` |
+| `transition` | — | `SpringOptions`. The spring used to return inside limits, to a `snap` angle or to the origin |
+| `onStart` | — | `(event, info) => void`. Called when the pinch starts (`pinch` prop only) |
+| `onMove` | — | `(event, info) => void`. Called each frame the pinch changes (`pinch` prop only) |
+| `onEnd` | — | `(event, info) => void`. Called when the pinch ends (`pinch` prop only) |
+
+## Related
+
+- [Gestures](/docs/gestures) — `whileHover`, `whileTap`, `whileFocus` and `whileInView`
+- [Drag](/docs/drag) — Physics-based dragging, which pinch composes with
+- [LazyMotion](/docs/lazy-motion) — Load `pinchFeatures` and the other feature bundles
+- [Pinch example](/examples/pinch) — The photo, limits and vanilla demos
+
+---
+
+Based on Motion's `pinch` gesture and `pinchFeatures` bundle, added in Motion 14.11.

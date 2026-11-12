@@ -184,6 +184,10 @@ Animate when the element enters the viewport. Backed by `IntersectionObserver`.
 
 **`once: true` for reveal animations** prevents the "scroll up, see it again" effect that's usually unwanted for content-reveal patterns.
 
+## `whilePinch`
+
+Animate while the element is being pinched with two touches or a trackpad, alongside the `pinch` prop that scales, rotates and moves it. Both need `pinchFeatures` loaded through `LazyMotion`, even on `motion.*` components; see [Pinch](/docs/pinch).
+
 ## Composing with `transition`
 
 Every gesture prop accepts an optional `transition` inside the target object so a gesture can have its own timing distinct from the component's default `transition`:
