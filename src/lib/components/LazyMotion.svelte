@@ -6,6 +6,7 @@
         type FeatureBundle,
         type LazyFeatureBundle
     } from '$lib/features'
+    import { loadPinchFeature } from '$lib/utils/pinchFeature'
     import { untrack, type Snippet } from 'svelte'
 
     /**
@@ -32,6 +33,22 @@
     let loadedFeatures = $state<FeatureBundle | undefined>(
         untrack(() => (isLazyFeatureBundle(features) ? undefined : features))
     )
+
+    /**
+     * Register a published bundle's opt-in features in motion-dom's global
+     * registry (upstream `LazyMotion`'s `loadFeatures`): `pinchFeatures`
+     * carries its feature class, which no other bundle registers.
+     *
+     * @param bundle The bundle being published to descendants.
+     * @returns Nothing.
+     */
+    const loadBundleFeatures = (bundle: FeatureBundle): void => {
+        if (bundle.pinch) loadPinchFeature(bundle.pinch)
+    }
+
+    // An eager bundle is registered during init, before any child component
+    // (and so any VisualElement) is created.
+    if (loadedFeatures) loadBundleFeatures(loadedFeatures)
     let isLoaded = $state(untrack(() => !isLazyFeatureBundle(features)))
 
     setLazyMotionContext({
@@ -48,6 +65,7 @@
         const currentLoadId = ++loadId
 
         if (!isLazyFeatureBundle(features)) {
+            loadBundleFeatures(features)
             loadedFeatures = features
             isLoaded = true
             return
@@ -58,7 +76,9 @@
         features()
             .then((bundle) => {
                 if (currentLoadId !== loadId) return
-                loadedFeatures = normalizeLazyFeatureBundle(bundle)
+                const loaded = normalizeLazyFeatureBundle(bundle)
+                loadBundleFeatures(loaded)
+                loadedFeatures = loaded
                 isLoaded = true
             })
             .catch(() => {

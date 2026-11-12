@@ -4,6 +4,7 @@ import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type {
     DragConstraintsFunction,
     DragControlOptions,
+    PinchProps,
     PressOptions,
     ResolvedValues,
     VisualElementDragControls
@@ -381,6 +382,21 @@ export type MotionWhileDrag =
     | undefined
 
 /**
+ * Animation properties for pinch interactions.
+ * When a pinch gesture is recognised, the element animates to this state; when
+ * it ends, it animates back to its baseline (from animate/initial), restoring
+ * only the changed keys. Requires `pinchFeatures` loaded through `<LazyMotion>`.
+ *
+ * Accepts inline keyframes, a variant key, or an array of variant keys.
+ */
+export type MotionWhilePinch =
+    | (Record<string, unknown> & { transition?: AnimationOptions })
+    | DOMKeyframesDefinition
+    | string
+    | string[]
+    | undefined
+
+/**
  * Animation properties for in-view interactions.
  * When the element enters the viewport, it animates to this state; when it leaves,
  * it animates back to its baseline (from animate/initial), restoring only the changed keys.
@@ -669,6 +685,14 @@ export type MotionProps = {
     whileFocus?: MotionWhileFocus
     /** Drag interaction animation */
     whileDrag?: MotionWhileDrag
+    /**
+     * Scale, rotate and move the element with a pinch: two touches, a trackpad
+     * pinch or Safari's gesture events. Pass options to set limits, snapping
+     * and callbacks. Requires `pinchFeatures` loaded through `<LazyMotion>`.
+     */
+    pinch?: boolean | PinchProps
+    /** Pinch interaction animation, applied while a pinch is recognised. Requires `pinchFeatures`. */
+    whilePinch?: MotionWhilePinch
     /** In-view interaction animation - animates when element enters viewport */
     whileInView?: MotionWhileInView
     /** IntersectionObserver options for `whileInView` (once / root / margin / amount) */

@@ -15,6 +15,7 @@ export type { FeatureBundle, LazyFeatureBundle } from '$lib/features'
 export { domAnimation } from '$lib/features/domAnimation'
 export { domMax } from '$lib/features/domMax'
 export { domMin } from '$lib/features/domMin'
+export { pinchFeatures } from '$lib/features/pinchFeatures'
 export { m } from '$lib/m'
 export { motion } from '$lib/motion'
 export { Reorder } from '$lib/reorder'
@@ -206,6 +207,7 @@ export type {
     MotionWhileFocus,
     MotionWhileHover,
     MotionWhileInView,
+    MotionWhilePinch,
     MotionWhileTap,
     ProjectionUpdatePayload,
     ReducedMotionConfig,
