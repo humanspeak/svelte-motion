@@ -22,8 +22,9 @@ export { Reorder } from '$lib/reorder'
 // Re-export core animation functions plus the vanilla (component-free)
 // layer — element effects, gestures (`drag()` is re-typed below), the
 // frameloop scheduler, `processFrame` (Motion 14.6) for driving the frameloop
-// from a loop other than `requestAnimationFrame`, generators, global config —
-// straight from motion.
+// from a loop other than `requestAnimationFrame`, `pinch()` (Motion 14.11's
+// multitouch pinch and rotate gesture), generators, global config — straight
+// from motion.
 export {
     MotionGlobalConfig,
     cancelFrame,
@@ -33,6 +34,7 @@ export {
     hover,
     inView,
     isMotionValue,
+    pinch,
     press,
     processFrame,
     resize,
@@ -56,6 +58,18 @@ export type {
     PointerEventOptions,
     PressHandlers,
     PressOptions
+} from 'motion-dom'
+
+// Motion 14.11: pinch() options, handlers and gesture info.
+export type {
+    OnPinchEvent,
+    OnPinchStartEvent,
+    PinchHandlers,
+    PinchInfo,
+    PinchLimits,
+    PinchOptions,
+    PinchProps,
+    PinchRotateOptions
 } from 'motion-dom'
 
 // `animate` and the element effects re-typed to accept both raw and
