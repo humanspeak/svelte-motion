@@ -44,7 +44,7 @@ The graph is a narrow diamond because every other plan needs motion-dom 14.12.0,
 | [001](001-bump-motion-14-12-0.md) | Pins → 14.12.0, version 2.11.0, re-export `pinch()` + types, spring-velocity regression tests | 1 | P1 | M | — | `package.json`, `pnpm-lock.yaml`, `src/lib/index.ts`, `src/lib/index.spec.ts`, `src/lib/__tests__/motionExportAllowlist.ts`, new `src/lib/utils/springVelocity.spec.ts`, changeset | DONE (guard PASS 2026-11-12, merged at `ec3565ab`) |
 | [002](002-spring-velocity-signoff.md) | Spring velocity through an interrupt: sign-off page, e2e, docs | 2 | P2 | S | 001 | new `tests/motion/spring-velocity` + `e2e/motion/spring-velocity.spec.ts`, `+page.svelte` (Motion section), docs `use-spring`, docs `gestures` ("Interrupts carry momentum") | DONE (guard PASS 2026-11-12 after one fix round; merged at `5e1c1634`, fix at `fbe7baa1`) |
 | [003](003-vanilla-pinch-page.md) | Vanilla `pinch()`: tester page and upstream's 11 browser tests | 2 | P2 | M | 001 | new `tests/pinch/vanilla`, new `e2e/pinch/{vanilla.spec.ts,_helpers.ts}`, `scopeMotion.svelte.spec.ts`, `+page.svelte` (new Pinch section) | DONE (guard PASS 2026-11-12, merged at `f074ad79`) |
-| [004](004-pinch-prop.md) | `pinch` prop, `whilePinch`, `pinchFeatures` bundle | 2 | P1 | L | 001 | new `utils/pinchFeature.ts` + spec, new `features/pinchFeatures.ts`, `features/index.ts` + spec, `LazyMotion.svelte`, `visualElementCore.ts` (one list), `types.ts`, `index.ts`, `_MotionContainer.svelte`, new probe + `components/pinch.spec.ts`, new `tests/pinch/prop` + `e2e/pinch/prop.spec.ts`, `+page.svelte` (Pinch section), `tests/consumer-vite6/verify-tree-shaking.mjs`, changeset | IN PROGRESS (steps 1-5 merged at `e4449617`; executor stopped at step 5 with 3 red ported tests, blocked on 006; steps 6-8 resume after 006) |
+| [004](004-pinch-prop.md) | `pinch` prop, `whilePinch`, `pinchFeatures` bundle | 2 | P1 | L | 001 | new `utils/pinchFeature.ts` + spec, new `features/pinchFeatures.ts`, `features/index.ts` + spec, `LazyMotion.svelte`, `visualElementCore.ts` (one list), `types.ts`, `index.ts`, `_MotionContainer.svelte`, new probe + `components/pinch.spec.ts`, new `tests/pinch/prop` + `e2e/pinch/prop.spec.ts`, `+page.svelte` (Pinch section), `tests/consumer-vite6/verify-tree-shaking.mjs`, changeset | DONE (guard PASS 2026-11-12; steps 1-5 at `e4449617`, steps 6-8 at `c0843d78`; needed plan 006) |
 | [005](005-pinch-docs.md) | Pinch docs page and pinch-to-zoom photo example | 3 | P2 | M | 004 | new `docs/…/docs/pinch`, new `docs/…/examples/pinch`, new `docs/src/lib/examples/pinch/demos/*`, `docsNav.ts`, `examplesIndex.ts`, docs `lazy-motion`, `gestures` (new `## whilePinch`), `drag`, maybe `compare-data.ts` | TODO |
 | [006](006-style-motion-value-base-target.md) | A `while*` gesture restores a value bound through a style motion value (older bug exposed by 004's ported tests) | 2b | P1 | S | 004 steps 1-5 | `_MotionContainer.svelte` (`createNodes` only), maybe `visualElementCore.ts` + spec, new `components/styleMotionValueBaseTarget.spec.ts` + probe, changeset (patch) | DONE (guard PASS 2026-11-12, merged at `ff15b87c`) |
 
@@ -118,6 +118,11 @@ Pinch needs real input to sign off: a trackpad pinch covers scale; rotation and 
 13. `git diff --check origin/main...HEAD`
 
 `pnpm --dir docs build` rewrites `docs/static/r/animated-tabs.json` (a Tailwind class re-sort). Revert it; never commit it.
+
+## Open before the PR
+
+- **`e2e/animate-presence/pop-layout-container-move.spec.ts:282`** ("exiting item holds after two adds (fixed, transform-centred container)") failed once in each of the last two full e2e runs (drift about 38.8 px, expected < 1) and passes alone. It did not fail in plan 001's full run. Plan 006's executor measured 1 of 10 failures on the code before 006 and 3 of 10 after; the page binds no style motion value, so 006's loop does nothing there. Unexplained. Investigate before the PR.
+- **Spring e2e**: add our own `after > atReverse` assertion beside upstream's `after > before` in `e2e/motion/spring-velocity.spec.ts` (see 002's guard log).
 
 ## Open question for the maintainer (not planned)
 
