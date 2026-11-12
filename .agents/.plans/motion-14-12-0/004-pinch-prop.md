@@ -183,7 +183,7 @@ They fail now because the props, the bundle and the feature do not exist.
    - "variant labels propagate to children"
    - "pinch={false} mid-gesture ends whilePinch"
    - "scale resists past max and springs back on release"
-   
+
    Add three of ours:
    - "a motion component outside LazyMotion doesn't pinch" (scale stays 1, `style.touchAction` is not `none`)
    - "an m component under domMax without pinchFeatures doesn't pinch"
@@ -198,7 +198,7 @@ Create `src/lib/utils/pinchFeature.ts`. Imports come from `'motion-dom'`: `Featu
 - `class PinchGestureFeature extends Feature<Element>`: a port of upstream `gestures/pinch.ts` at v14.12.0 (cite it), with two documented Svelte deviations:
   1. Attachment is idempotent and retried: a private `attach()` returns early when listeners are already attached or `this.node.current` is missing; `mount()` and `update()` both call it. `unmount()` calls the stored remove function and clears it.
   2. No `touchAction` writes (design decision 4).
-  
+
   Keep upstream's behaviour otherwise: the `call(key)` indirection so `onStart`/`onMove`/`onEnd` are read from the latest options, `setActive('whilePinch', true)` before `onStart`, and `setActive('whilePinch', false)` before `onEnd`.
 - `isPinchFeatureEnabled = (props: MotionNodeOptions): boolean => !!props.pinch`
 - `type PinchFeatureDefinition = NonNullable<FeatureDefinitions['pinch']>`
