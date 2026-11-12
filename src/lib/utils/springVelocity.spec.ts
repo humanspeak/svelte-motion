@@ -10,7 +10,7 @@
  */
 import { motionValue } from 'motion'
 import { calcGeneratorDuration, maxGeneratorDuration } from 'motion-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { animate, frame, spring } from '../index.js'
 
 const visualDurationOptions = [
@@ -21,8 +21,43 @@ const visualDurationOptions = [
 
 const nextFrame = () => new Promise<void>((resolve) => frame.postRender(() => resolve()))
 
+/**
+ * The fake clock the frameloop reads. `performance.now` is stubbed to it in
+ * `beforeEach`, so every awaited frame lands exactly one 60 fps frame later.
+ *
+ * motion-dom's frameloop captured `vitest.setup.ts`'s rAF mock (a 0 ms
+ * `setTimeout`) at module load, so the `beforeEach` rAF swap below never
+ * reaches it. On the real clock, back-to-back frames land about 1 ms apart,
+ * and animation time is rounded to whole milliseconds, so frames often sample
+ * the same value (and a velocity of 0). The frameloop reads the global
+ * `performance.now()` on every batch, so stepping a stubbed clock gives
+ * upstream's exact 1000 / 60 ms frames.
+ */
+let clock = 0
+
+/**
+ * Advances the fake clock by one frame per step and waits for that frame.
+ *
+ * @param count - Number of frames to wait for.
+ */
 const frames = async (count: number) => {
-    for (let i = 0; i < count; i++) await nextFrame()
+    for (let i = 0; i < count; i++) {
+        clock += 1000 / 60
+        await nextFrame()
+    }
+}
+
+/**
+ * Steps frames until `animation` resolves, capped at 600 frames (10 s).
+ *
+ * @param animation - The playback controls to wait for.
+ * @returns Whether the animation finished within the cap.
+ */
+const finish = async (animation: { then: (onResolve: () => void) => unknown }) => {
+    let finished = false
+    animation.then(() => (finished = true))
+    for (let i = 0; i < 600 && !finished; i++) await frames(1)
+    return finished
 }
 
 describe('spring velocity (Motion 14.12.0)', () => {
@@ -34,6 +69,12 @@ describe('spring velocity (Motion 14.12.0)', () => {
         ;(globalThis as never as { cancelAnimationFrame: unknown }).cancelAnimationFrame = (
             id: number
         ) => clearTimeout(id)
+        clock = performance.now()
+        vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
     })
 
     describe('generator', () => {
@@ -117,7 +158,7 @@ describe('spring velocity (Motion 14.12.0)', () => {
                 expect(x.get()).toBeGreaterThan(before)
                 expect(x.getVelocity()).toBeGreaterThan(0)
 
-                await animation
+                expect(await finish(animation)).toBe(true)
                 expect(x.get()).toBe(0)
             }
         )
