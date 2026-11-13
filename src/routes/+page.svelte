@@ -334,6 +334,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/spring-velocity') + searchParams}
+                    >
+                        Spring velocity through an interrupt (Motion 14.12)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/while-focus') + searchParams}
                     >
                         While Focus
@@ -789,6 +797,27 @@
                         href={resolve('/tests/reorder/board') + searchParams}
                     >
                         Reorder: Board, drag items between groups (Motion 14.10)
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div>
+            <h2 class="mb-3 text-xl font-medium">Pinch (Motion 14.11)</h2>
+            <ul class="list-disc space-y-2 pl-5">
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/pinch/vanilla') + searchParams}
+                    >
+                        Vanilla pinch()
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/pinch/prop') + searchParams}
+                    >
+                        pinch prop, whilePinch and pinchFeatures
                     </a>
                 </li>
             </ul>

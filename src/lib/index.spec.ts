@@ -52,6 +52,7 @@ import {
     MotionValueState,
     type NestedSequence,
     type ObjectTarget,
+    pinch,
     pipe,
     PresenceChild,
     press,
@@ -171,6 +172,10 @@ describe('public API: index.ts', () => {
 
     it('re-exports Motion 14.6 processFrame', () => {
         expect(typeof processFrame).toBe('function')
+    })
+
+    it('re-exports Motion 14.11 pinch', () => {
+        expect(typeof pinch).toBe('function')
     })
 
     it('re-exports the Motion 13.2 effect registry primitives', () => {

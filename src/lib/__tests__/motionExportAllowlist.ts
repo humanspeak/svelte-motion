@@ -133,6 +133,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
 
     // [b] Gesture, pointer and drag internals
     'addDomEvent',
+    'addPinchListeners',
     'addPointerEvent',
     'addPointerInfo',
     'elementDragControls',
@@ -356,6 +357,7 @@ export const MOTION_PUBLIC_REEXPORTS: readonly string[] = [
     'createScopedAnimate',
     'inertia',
     'keyframes',
+    'pinch',
     'resolveElements'
 ]
 

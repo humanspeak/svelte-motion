@@ -67,6 +67,7 @@
     } from '$lib/utils/gestures'
     import { readTransformChannels } from '$lib/utils/hover'
     import { observeMove } from '$lib/utils/observeMove'
+    import { resolvePinchTouchAction } from '$lib/utils/pinchFeature'
     import {
         computeFlipTransforms,
         runLayoutSizeAnimation,
@@ -206,6 +207,8 @@
         whileInView: whileInViewProp,
         viewport: viewportProp,
         whileDrag: whileDragProp,
+        pinch: pinchProp,
+        whilePinch: whilePinchProp,
         onPanSessionStart: onPanSessionStartProp,
         onPanStart: onPanStartProp,
         onPan: onPanProp,
@@ -297,6 +300,12 @@
     const hasGestureFeatures = $derived(!!activeFeatures?.gestures)
     const hasDragFeatures = $derived(!!activeFeatures?.drag)
     const hasLayoutFeatures = $derived(!!activeFeatures?.layout)
+    // Pinch is opt-in for both kinds (Motion 14.12 `render/dom/features-pinch.ts`:
+    // "Not part of `motion` components or the `domMax` bundle"): it is on when
+    // the nearest LazyMotion's loaded bundle carries `pinchFeatures`.
+    const hasPinchFeatures = $derived(
+        !!(motionKindProp === 'm' ? activeFeatures : lazyMotion?.getFeatures())?.pinch
+    )
     // `<LazyMotion strict>`: a `motion` component inside defeats LazyMotion, so
     // in development it throws; the main `Reorder` (`ignoreStrict`) warns once
     // and names the `m` entry instead (Motion 14.7.1 `motion/index.tsx`
@@ -678,6 +687,7 @@
             whileFocus: filterReducedMotionDefinition(whileFocusProp),
             whileInView: filterReducedMotionDefinition(whileInViewProp),
             whileDrag: filterReducedMotionDefinition(whileDragProp),
+            whilePinch: filterReducedMotionDefinition(whilePinchProp),
             // Gesture callbacks are public VisualElement props upstream. Carry
             // them here even though the Svelte drag adapter invokes them: a
             // callback-reference replacement is still a real props commit and
@@ -720,6 +730,11 @@
                       onDragTransitionEnd: onDragTransitionEndProp
                   }
                 : {}),
+            // The prop motion-dom's `addPinchListeners` reads (via the `pinch`
+            // feature, `PinchGestureFeature`, a port of framer-motion
+            // `gestures/pinch.ts` @ v14.12.0). Gated on the nearest LazyMotion
+            // bundle carrying `pinchFeatures`.
+            ...(hasPinchFeatures ? { pinch: pinchProp } : {}),
             // `buildHTMLStyles(state, latestValues, transformTemplate)` reads the
             // template off the props, so the VE composes templated transforms
             // natively — the job `applyMotionStyleEffect` used to do.
@@ -1254,7 +1269,8 @@
                 whileTap: whileTapProp,
                 whileFocus: whileFocusProp,
                 whileInView: whileInViewProp,
-                whileDrag: whileDragProp
+                whileDrag: whileDragProp,
+                whilePinch: whilePinchProp
             } as MotionNodeOptions)
             if (!isControllingVariantLabels) return inheritedInitialVariant
             return isVariantLabel(initialProp) ? (initialProp as string | string[]) : undefined
@@ -1465,6 +1481,30 @@
                     const first = lateSeed[key]
                     if (first !== undefined && isMotionValue(value)) value.set(first)
                 }
+            }
+        }
+        // Upstream's constructor copies the seeded state into the base target
+        // (`render/VisualElement.ts`: `this.baseTarget = { ...latestValues }`),
+        // and that state holds every style MotionValue's mount-time value, so
+        // a `while*` state that ends animates each removed key back to it
+        // (`animateChanges`, `render/utils/animation-state.ts`). Our node is
+        // created without `style` (see above), so those keys are missing and
+        // the gesture's end would leave the value where it was. Seed them here,
+        // once, without touching `latestValues`. The node's own scraper gives
+        // the key motion-dom animates; an `initial` value already in the base
+        // target wins, as it does upstream. SVG attribute MotionValues need no
+        // seed: `buildMotionNodeProps(false)` carries them at creation.
+        // `baseTarget` is `@internal` upstream, so it is absent from the types.
+        const { baseTarget } = node as unknown as { baseTarget: Record<string, unknown> }
+        const style = untrack(() => styleProp)
+        const styleMotionValues = node.scrapeMotionValuesFromProps(
+            { style } as MotionNodeOptions,
+            {},
+            node
+        )
+        for (const [key, value] of Object.entries(styleMotionValues)) {
+            if (isMotionValue(value) && baseTarget[key] === undefined) {
+                node.setBaseTarget(key, value.get() as AnyResolvedKeyframe)
             }
         }
         visualElement = node
@@ -1746,8 +1786,15 @@
             ? `user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:${dragProp === true ? 'none' : `pan-${dragProp === 'x' ? 'y' : 'x'}`}`
             : ''
     )
+    // Upstream's PinchGesture sets `touch-action` imperatively on mount/update
+    // (`gestures/pinch.ts` @ v14.12.0). Svelte owns the style attribute, so it
+    // is declarative here, appended after drag's default so it wins, as
+    // upstream's update() does.
+    const pinchTouchActionStyle = $derived(
+        hasPinchFeatures && pinchProp ? `touch-action:${resolvePinchTouchAction(styleProp)}` : ''
+    )
     const inlineStyleBaseWithHolds = $derived(
-        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' && !startedFeatureless ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
+        `${initialKeyframes && 'pathLength' in initialKeyframes && isLoaded === 'mounting' && !startedFeatureless ? `${serializedStyleProp};visibility:hidden` : serializedStyleProp}${upstreamDragDefaultStyle ? `;${upstreamDragDefaultStyle}` : ''}${pinchTouchActionStyle ? `;${pinchTouchActionStyle}` : ''}${waitEnterBlockedBeforeMount || waitHiddenDisplay !== null ? ';display:none' : ''}`
     )
 
     /**

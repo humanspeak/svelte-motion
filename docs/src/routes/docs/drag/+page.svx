@@ -423,6 +423,7 @@ A motion component that already has a `drag` prop doesn't need `drag()`; use its
 - [Variants](/docs/variants) — Define reusable animation states
 - [AnimatePresence](/docs/animate-presence) — Exit animations on unmount
 - [Vanilla drag() example](/examples/vanilla-drag) — A slider knob built on `drag()`
+- [Pinch](/docs/pinch#with-drag) — Pinch composes with `drag`: lift one finger and the drag carries on from where the pinch left the element
 
 ---
 

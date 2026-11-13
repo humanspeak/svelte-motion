@@ -2,7 +2,7 @@ import { render } from '@testing-library/svelte'
 import type { MotionScope } from 'motion-dom'
 import { flushSync } from 'svelte'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { animate, delay, hover, scopeMotion, toMediaQuery } from '../index.js'
+import { animate, delay, hover, pinch, scopeMotion, toMediaQuery } from '../index.js'
 import ScopeMotionProbe from './__tests__/ScopeMotionProbe.svelte'
 import { useScopeMotion, type MotionScopeAttachment } from './scopeMotion.svelte.js'
 
@@ -207,5 +207,19 @@ describe('utils/scopeMotion - useScopeMotion', () => {
         expect(scope.state).toBe('active')
         scope.stop()
         expect(scope.state).toBe('stopped')
+    })
+
+    it('removes a pinch() started in a vanilla scope when the scope stops', () => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+
+        const scope = scopeMotion(() => {
+            pinch(element)
+            expect(element.style.touchAction).toBe('none')
+        })
+        expect(element.style.touchAction).toBe('none')
+
+        scope.stop()
+        expect(element.style.touchAction).toBe('')
     })
 })

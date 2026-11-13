@@ -55,6 +55,7 @@ export const competitors: Competitor[] = [
             { name: 'Variants with parent → child propagation', us: true, them: true },
             { name: 'whileHover / whileTap / whileFocus / whileInView', us: true, them: true },
             { name: 'Drag (constraints, momentum, elastic, snap)', us: true, them: true },
+            { name: 'Pinch to zoom and rotate (pinch, whilePinch)', us: true, them: true },
             { name: 'FLIP layout / layout="position"', us: true, them: true },
             { name: 'Shared layout via layoutId', us: true, them: true },
             { name: 'Spring physics', us: true, them: true },
@@ -138,6 +139,12 @@ export const competitors: Competitor[] = [
                 note: 'Motion has an imperative inView() helper; Svelte Motion exposes it as a whileInView prop.'
             },
             { name: 'Drag (constraints / momentum / elastic)', us: true, them: false },
+            {
+                name: 'Pinch to zoom and rotate',
+                us: 'pinch prop + pinch()',
+                them: 'pinch()',
+                note: 'Since Motion 14.11, pinch() makes elements pinchable. Svelte Motion re-exports it and adds the declarative pinch prop and whilePinch.'
+            },
             {
                 name: 'FLIP layout animation',
                 us: 'layout prop',
