@@ -38,7 +38,7 @@
             tag: 'GESTURE',
             title: { prefix: 'pinch to zoom and ', accent: 'twist', end: '.' },
             description:
-                'Pinch the card to zoom between 1x and 4x and twist it, and drag to move it. Past its limits it resists and springs back; on release its rotation snaps to the nearest 90°. Trackpad: pinch. Touch: pinch and twist with two fingers. Mouse: hold ctrl and scroll.',
+                'Pinch the card to zoom between 1x and 4x and twist it, and drag to move it. Past its limits it resists and springs back; on release its rotation snaps to the nearest 90°. Trackpad: pinch, and in Safari twist with two fingers too. Touch: pinch and twist with two fingers. Mouse: hold ctrl and scroll.',
             snippet: photoSection,
             codeSnippet: photoCode,
             notes: photoNotes,

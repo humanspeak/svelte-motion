@@ -29,7 +29,7 @@ The `pinch` prop scales, rotates and moves an element with a pinch: two touches,
   <Photo />
 </Example>
 
-Pinch the card to zoom between 1x and 4x and to twist it, and drag it to move it. On release, its rotation snaps to the nearest 90°. With a mouse, hold ctrl and scroll over the card.
+Pinch the card to zoom between 1x and 4x and to twist it, and drag it to move it. On release, its rotation snaps to the nearest 90°. With a mouse, hold ctrl and scroll over the card. A trackpad twists the card only in Safari; see Input support below.
 
 ## Setup
 

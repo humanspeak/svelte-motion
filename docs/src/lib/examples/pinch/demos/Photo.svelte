@@ -81,7 +81,9 @@
             </span>
             <button type="button" class="reset" onclick={reset}>Reset</button>
         </div>
-        <span class="micro hint">Mouse: hold ctrl and scroll over the card.</span>
+        <span class="micro hint">
+            Mouse: hold ctrl and scroll over the card. A trackpad twists only in Safari.
+        </span>
     </div>
 </div>
 
