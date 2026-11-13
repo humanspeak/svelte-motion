@@ -44,6 +44,7 @@
     ]
 
     const boxes: Partial<Record<RowId, HTMLDivElement>> = {}
+    const tracks: Partial<Record<RowId, HTMLDivElement>> = {}
     let verdicts = $state<Record<RowId, string>>({ physics: '—', visual: '—', duration: '—' })
 
     const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -60,7 +61,11 @@
         const box = boxes[row.id]
         if (!box) return
         verdicts[row.id] = '—'
-        animate(box, { x: 500 }, row.transition)
+        // To the end of the track, however wide the screen: 540px on a
+        // desktop, less on a phone, where the track shrinks to fit.
+        const track = tracks[row.id]
+        const distance = track ? track.clientWidth - box.offsetWidth : 500
+        animate(box, { x: distance }, row.transition)
     }
 
     const reverse = async (row: Row) => {
@@ -157,7 +162,7 @@
     {#each rows as row (row.id)}
         <section>
             <h2>{row.label}</h2>
-            <div class="track">
+            <div class="track" bind:this={tracks[row.id]}>
                 <div
                     bind:this={boxes[row.id]}
                     class="box"
@@ -192,10 +197,15 @@
 </TesterPanel>
 
 <style>
+    /* The layout centres this in a flex row, so it would otherwise shrink to
+       its content and squeeze the track: a 600px track on a desktop, the full
+       width less padding on a phone. */
     main {
         display: flex;
         flex-direction: column;
         gap: 2rem;
+        box-sizing: border-box;
+        width: min(100%, calc(600px + 4rem));
         padding: 2rem;
     }
     section {
@@ -209,7 +219,7 @@
     }
     .track {
         position: relative;
-        width: 600px;
+        width: min(600px, 100%);
         height: 60px;
         border-radius: 12px;
         background: rgba(148, 163, 184, 0.2);
@@ -221,6 +231,7 @@
     }
     .controls {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 0.75rem;
     }
@@ -229,5 +240,11 @@
         border: 1px solid currentColor;
         border-radius: 6px;
         cursor: pointer;
+    }
+    /* Phone width (an iOS Simulator): no sideways scroll. */
+    @media (max-width: 640px) {
+        main {
+            padding: 1rem;
+        }
     }
 </style>

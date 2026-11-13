@@ -210,6 +210,22 @@
         font-size: 13px;
     }
 
+    /* Phone width (an iOS Simulator): below the box, which keeps its place at
+       (100, 100), with room to pinch it to 2x and drag it. Ends above the
+       collapsed tester bar and scrolls if it is taller than that. */
+    @media (max-width: 640px) {
+        .readout {
+            top: 340px;
+            right: 16px;
+            bottom: 96px;
+            left: 16px;
+            align-content: start;
+            width: auto;
+            overflow: auto;
+            overscroll-behavior: contain;
+        }
+    }
+
     .kicker {
         font-size: 12px;
         letter-spacing: 0.08em;
