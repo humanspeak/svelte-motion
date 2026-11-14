@@ -58,7 +58,7 @@ The graph is a narrow diamond because the velocity code only exists in motion-do
 
 | Plan | Title | Wave | Priority | Effort | Depends on | Touches | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| [001](001-bump-motion-14-14-0.md) | Pins → 14.14.0, version 2.13.0, allowlist `getSpringOptions`, auto-mass and pinch-snap regression pins, LazyMotion guard | 1 | P1 | S–M | — | `package.json`, `pnpm-lock.yaml`, `src/lib/__tests__/motionExportAllowlist.ts`, new `src/lib/utils/springAutoMass.spec.ts`, `src/lib/components/LazyMotion.spec.ts`, `e2e/pinch/vanilla.spec.ts`, changeset | TODO |
+| [001](001-bump-motion-14-14-0.md) | Pins → 14.14.0, version 2.13.0, allowlist `getSpringOptions`, auto-mass and pinch-snap regression pins, LazyMotion guard | 1 | P1 | S–M | — | `package.json`, `pnpm-lock.yaml`, `src/lib/__tests__/motionExportAllowlist.ts`, new `src/lib/utils/springAutoMass.spec.ts`, `src/lib/components/LazyMotion.spec.ts`, `e2e/pinch/vanilla.spec.ts`, changeset | DONE (guard PASS 2026-11-14, see 001 guard log) |
 | [002](002-fx-prop.md) | `fx` prop renders an empty `fx` attribute | 2 | P3 | S | — | `src/lib/types.ts` (one `MotionProps` member), `_MotionContainer.svelte` (`derivedAttrs` only), new `components/fxProp.spec.ts`, `_MotionContainer.ssr.spec.ts`, new `tests/motion/fx-prop` + `e2e/motion/fx-prop.spec.ts`, `+page.svelte` (Motion section), docs `api-reference`, changeset | TODO |
 | [003](003-layout-velocity.md) | Spring layout animations keep their velocity: adapter port, fixtures, upstream's 15 tests | 2 | P1 | M–L | 001 | `utils/motionDomProjection.ts` (new helper + four calls) + spec, new `tests/layout/velocity`, new `tests/layout-id/throw`, new `e2e/layout/velocity.spec.ts`, new `e2e/layout-id/throw.spec.ts`, `+page.svelte` (Layout section), changeset | TODO |
 | [004](004-thrown-card-handoff.md) | A dragged card's `layoutId` twin starts where the card was released and keeps the throw | 3 | P2 | M | 003 | `utils/motionDomProjection.ts` (`takeOverLiveLeadOnMount`, `seedDepartingLeadSnapshot`), `e2e/layout-id/throw.spec.ts`, changeset (patch) | TODO |
@@ -105,6 +105,7 @@ Rules for every lane (they override any per-plan wording):
 - If the global `pnpm` cannot switch to the pinned 12.6.0, use `npx -y pnpm@12.6.0`.
 - Parallel builds compete for CPU and the layout-velocity specs sample single frames. Re-run a failing spec alone once before reporting it, and say that it was re-run.
 - Full-suite e2e runs (001 Step 8, 003 Step 6, 005 Step 5) happen while no other lane is running Playwright.
+  > **Revision 2026-11-14 (dispatcher):** wave 2 (002, 003, 007) runs in parallel, so those lanes **skip** their full-suite e2e step and run only their own specs. The dispatcher runs the full suite once on `feat/motion-14.14.0` after wave 2 is merged, and routes any failure back to the owning plan.
 - Trunk is the lint and format authority (`trunk fmt`, `trunk check`), not `pnpm lint`, `prettier` or `eslint`.
 - Lanes don't edit this README. The dispatcher updates the status table on `feat/motion-14.14.0`.
 - Merge back (merge, no squash) in this order: 001; then 002 and 003; then 004, 005, 006.
