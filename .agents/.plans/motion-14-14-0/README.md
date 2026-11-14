@@ -19,7 +19,7 @@ Nobody was available to answer questions during the run, so the whole delta is p
 > 2. **`fx` prop**: ship plan 002 as written.
 > 3. **Plan 005**: do it. If it disturbs behaviour that earlier plans (007, 012, 015) tuned, the work goes back to re-tuning those paths. Deferring with four `test.fail()` tests is **no longer** an acceptable end state; a failed investigation gate is reported to the maintainer instead.
 > 4. **Layout velocity changing existing apps**: adopt upstream, no opt-out.
-> 5. **352 ms default layout tween**: investigate. The dispatcher runs a read-only check against upstream; a real divergence becomes its own plan, adopting upstream.
+> 5. **352 ms default layout tween**: investigate. The dispatcher checked it: a real divergence. `mergedTransition` is `{}` when nothing is configured, and `{}` is truthy, so motion-dom never reaches its 0.45 s `defaultLayoutTransition` and falls to the generic 0.3 s tween. That became **plan 007** (wave 2, adopting upstream).
 
 ### Original defaults
 
@@ -49,7 +49,7 @@ Nobody was available to answer questions during the run, so the whole delta is p
 
 - **Wave 0** (serial, minutes): this folder is committed on `feat/motion-14.14.0` (`docs(plans): add Motion 14.14.0 plan batch`). That commit is the "wave-0 SHA".
 - **Wave 1**: 001.
-- **Wave 2** (parallel, each cut from `feat/motion-14.14.0` after 001 is merged): 002, 003. Their file sets are disjoint except `src/routes/+page.svelte` (see hotspots). 002 has no real dependency on 001; it sits in wave 2 so its lane starts from a branch that has the bump.
+- **Wave 2** (parallel, each cut from `feat/motion-14.14.0` after 001 is merged): 002, 003, 007. 007 shares `_MotionContainer.svelte` with 002 (different hunks) and `+page.svelte` with 002 and 003 (its link goes before `layout/scroll`, away from 003's). Their file sets are disjoint except `src/routes/+page.svelte` (see hotspots). 002 has no real dependency on 001; it sits in wave 2 so its lane starts from a branch that has the bump.
 - **Wave 3** (parallel, after 003 is merged): 004, 005, 006. 004 and 005 both edit `src/lib/utils/motionDomProjection.ts`, in different functions (see hotspots); merge 004 first.
 
 The graph is a narrow diamond because the velocity code only exists in motion-dom 14.13+, which only 001 installs, and because 004, 005 and 006 all build on 003's fixtures or behaviour.
@@ -64,6 +64,7 @@ The graph is a narrow diamond because the velocity code only exists in motion-do
 | [004](004-thrown-card-handoff.md) | A dragged card's `layoutId` twin starts where the card was released and keeps the throw | 3 | P2 | M | 003 | `utils/motionDomProjection.ts` (`takeOverLiveLeadOnMount`, `seedDepartingLeadSnapshot`), `e2e/layout-id/throw.spec.ts`, changeset (patch) | TODO |
 | [005](005-interrupt-from-painted-box.md) | An interrupted layout animation restarts from the painted box (investigation gate) | 3 | P3 | M | 003 | `_MotionContainer.svelte` (`scheduledReactiveCommit`, `runReactiveCommit`), `utils/motionDomProjection.ts` (`commitObservedLayoutChange`, `onScreenSnapshot`) + spec, `e2e/layout/velocity.spec.ts`, changeset (patch) | TODO |
 | [006](006-layout-velocity-docs.md) | Layout velocity and `mass: "auto"` docs, with an example page | 3 | P2 | M | 003 | docs `layout-animations`, docs `use-spring` (one row), new `docs/src/lib/examples/layout-velocity/demos/*`, new `docs/src/routes/examples/layout-velocity`, `examplesIndex.ts` | TODO |
+| [007](007-default-layout-transition.md) | A layout animation with no transition uses upstream's 0.45 s default | 2 | P2 | S | 001 | `_MotionContainer.svelte` (new `layoutTransition` + two layout `updateOptions` lines), new `tests/layout/default-transition`, new `e2e/layout/default-transition.spec.ts`, `+page.svelte` (before `layout/scroll`), changeset | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) | SUPERSEDED (by).
 
@@ -94,6 +95,7 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) 
 | layout-velocity | `lane/14140-layout-velocity` in `../svelte-motion-14140-layout-velocity` | 003 | 4273 |
 | throw | `lane/14140-throw` in `../svelte-motion-14140-throw` | 004 | 4274 |
 | painted-box | `lane/14140-painted-box` in `../svelte-motion-14140-painted-box` | 005 | 4275 |
+| default-layout-transition | `lane/14140-default-layout-transition` in `../svelte-motion-14140-default-layout-transition` | 007 | 4276 |
 | docs | `lane/14140-docs` in `../svelte-motion-14140-docs` | 006 | — (docs config, its own fixed port) |
 
 Rules for every lane (they override any per-plan wording):
