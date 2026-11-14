@@ -12,7 +12,16 @@ The survey was grounded by running code, in a disposable worktree, with nothing 
 
 Nobody was available to answer questions during the run, so the whole delta is planned and the decisions below are defaults.
 
-## Maintainer decisions (defaults, to confirm)
+## Maintainer decisions (confirmed 2026-11-14)
+
+> **Revision 2026-11-14 (dispatcher):** the maintainer answered the five open questions below. Dispatch executor: **opus**.
+> 1. **Version**: approved. Plan 001 writes `2.13.0`; the maintainer adds the `minor` label so it publishes 2.14.0.
+> 2. **`fx` prop**: ship plan 002 as written.
+> 3. **Plan 005**: do it. If it disturbs behaviour that earlier plans (007, 012, 015) tuned, the work goes back to re-tuning those paths. Deferring with four `test.fail()` tests is **no longer** an acceptable end state; a failed investigation gate is reported to the maintainer instead.
+> 4. **Layout velocity changing existing apps**: adopt upstream, no opt-out.
+> 5. **352 ms default layout tween**: investigate. The dispatcher runs a read-only check against upstream; a real divergence becomes its own plan, adopting upstream.
+
+### Original defaults
 
 - **Plan the whole delta.** Default taken.
 - **Release as svelte-motion 2.14.0 using a `minor` label from 2.13.x.** Plan 001 sets `"version": "2.13.0"`; it is the only plan that touches `"version"`. The maintainer adds the label. No plan adds PR labels. **Flagged for confirmation**: if you would rather land 2.13.x, or skip the label, only plan 001 Step 3's version line changes.
