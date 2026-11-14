@@ -1,0 +1,179 @@
+# Plan 004: A dragged card that hands off to a `layoutId` twin starts where it was drawn and keeps its throw velocity
+
+> **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving to the next step. If anything in "STOP conditions" occurs, stop and report; do not improvise. Do not edit the batch `README.md`, because the dispatcher maintains it.
+>
+> **Never use `git stash`.**
+>
+> **Port rule**: this lane's Playwright port is **4274**. Prefix every Playwright command with `PW_PORT=4274`. Never use or kill port 4198. Never set `PW_REUSE_SERVER`.
+>
+> **Drift check (run first)**: `git diff --stat 4665b907..HEAD -- src/lib/utils/motionDomProjection.ts e2e/layout-id/throw.spec.ts src/routes/tests/layout-id/throw`
+> Expected changes: plan 003 added `readSnapshotVelocity` / `recordSnapshotVelocity` to `motionDomProjection.ts` (shifting later line numbers by roughly 60) and created the spec and the page. Find the functions named below by name, not by line. If `takeOverLiveLeadOnMount` or `seedDepartingLeadSnapshot` themselves changed, compare against the excerpts; on a mismatch, STOP.
+
+## Status
+
+- **Priority**: P2
+- **Effort**: M
+- **Risk**: MED. The fix is in the shared-layout handoff, which the `layoutId` e2e suite covers heavily; the root cause below is a reading of the code backed by one measurement, not a proven fix.
+- **Depends on**: 003-layout-velocity.md (it creates the page, the spec, and `recordSnapshotVelocity`, and both plans edit `motionDomProjection.ts`)
+- **Wave**: 3
+- **Category**: bug (upstream divergence) + migration
+- **Planned at**: commit `4665b907`, 2026-11-14
+
+## Why this matters
+
+Upstream's layout-velocity tests include a card that is dragged, thrown, and replaced on release by a detail view with the same `layoutId`. In Motion the detail view starts exactly where the card was let go and, with a spring, keeps moving in the direction of the throw before travelling to its own place. In svelte-motion the detail view starts at the card's **undragged** position, a visible jump backwards of however far the card was dragged, and it carries no throw velocity. The jump is older than this release (it happens on Motion 14.12.0 too); the velocity half is new in 14.13. Both come from the same snapshot, so they are fixed together.
+
+## Current state
+
+- **Fixture and tests** (created by plan 003): `src/routes/tests/layout-id/throw/+page.svelte` and `e2e/layout-id/throw.spec.ts`. The red card (`#box`, `layoutId="card"`, `drag`, at `left: 300px; top: 100px`) is replaced on drag end by a blue `#box` with the same `layoutId` at `left: 50px; top: 400px`. Plan 003 marked "A thrown card hands its velocity to a layoutId element" with `test.fail()` and a comment naming this plan.
+- **Measured at planning time** (scratch copy of the fixture, vite dev server, Chromium; `R`/`B` is the red or blue box, then its left edge and width per frame). The card is dragged from 300 to 390 and released:
+  ```
+  R310 R330 R350 R370 R390  UP  B300 B300 B297 B292 B285 B278 …
+  ```
+  The blue box's first frame is at 300, not 390. The same jump was measured on unmodified `main` with motion-dom 14.12.0 (`?resize` fixture: `R390 UP B300/100 B298/102 …`). Upstream's test expects the first three frames to reach past `atSwap + 4`, where `atSwap` is the card's last left edge (about 390).
+- **Upstream** (`git -C ~/Github/motion show v14.14.0:packages/motion-dom/src/projection/node/create-projection-node.ts`):
+  - The departing lead is measured while still attached: `unmount()` → `willUpdate()` → `updateSnapshot()` (`:1046`). `measuredBox` is the page box with the element's own transforms in it (so the drag's `x`), and `layoutBox` has them removed.
+  - `updateSnapshot()` also records `snapshot.velocity` (`:1059-1091`); entries 4 and 5 are the velocities of the element's `x` and `y` motion values (the throw).
+  - `setAnimationOrigin` (`:1880-1915`) adds those to the edge velocities only for a shared handoff:
+    ```ts
+    const v = velocity.slice(0, 4).map(
+        (edge, i) => edge + (isSharedLayoutAnimation ? velocity[4 + (i >> 1)] : 0)
+    )
+    ```
+- **svelte-motion**, `src/lib/utils/motionDomProjection.ts`:
+  - `takeOverLiveLeadOnMount(lead)` runs when a `layoutId` node mounts while the previous lead is still on screen (called from `didMount()`). Its core, at `:1400-1418` before plan 003:
+    ```ts
+    // `promote` measured the lead (`updateSnapshot`), as upstream's
+    // `willUpdate()` would, transforms included. Keep that unless this
+    // mount already moved the lead's layout, then fall back to its
+    // cached pre-mount box.
+    const leadAdapter = MotionDomProjectionAdapter.adapters.get(lead)
+    const cached = leadAdapter?.onScreenSnapshot()
+    const measured = lead.snapshot
+    if (
+        leadAdapter &&
+        cached &&
+        (!measured || !sameBox(measured.layoutBox, cached.layoutBox))
+    ) {
+        leadAdapter.prepareSnapshotPath(lead)
+        lead.snapshot = cached
+    }
+    lead.isLayoutDirty = true
+    if (lead.snapshot) {
+        projection.snapshot = lead.snapshot
+        projection.snapshot.latestValues = lead.animationValues || lead.latestValues
+    }
+    ```
+    `cached` comes from `onScreenSnapshot()` → `measurementsFromRect(…)` (`:204-210`), which sets `measuredBox` and `layoutBox` to the **same** cached layout rect. That rect has no drag offset in it, and the snapshot has no `velocity`.
+  - `seedDepartingLeadSnapshot(element)` (`:1297-1327`) builds the snapshot for a lead whose DOM was already detached. It does apply the element's transforms to get the page box (`projection.applyTransform(box, true)`), but sets no `velocity`.
+- **Working hypothesis** (confirm it in Step 2 before changing anything): in the throw fixture the handoff goes through `takeOverLiveLeadOnMount`, the `sameBox` check fails, and the measured snapshot (transforms included) is replaced by `cached`, whose `measuredBox` is the undragged layout box. A shared handoff animates from `snapshot.measuredBox`, so the detail view starts at 300.
+- **Conventions**: no `as any` in library source; reach untyped node fields through a narrow local type. Exported functions carry Google-style JSDoc. `recordSnapshotVelocity(projection)` (plan 003) assigns `velocity` / `relativeVelocity` onto `projection.snapshot` from that node's own state.
+
+## Commands you will need
+
+| Purpose | Command | Expected on success |
+| --- | --- | --- |
+| Install | `pnpm install --frozen-lockfile` | exit 0; `motion-dom` is 14.14.0 |
+| Types | `pnpm check` | `0 ERRORS` |
+| All unit tests | `pnpm test:only` | all pass |
+| The throw spec | `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id/throw.spec.ts` | as stated per step |
+| Shared-layout e2e | `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id e2e/layout e2e/animate-presence e2e/drag e2e/reorder` | all pass (known skips only) |
+| Format / lint | `trunk fmt <files>` then `trunk check <files>` | no new issues |
+
+## Scope
+
+**In scope:**
+- `src/lib/utils/motionDomProjection.ts`: `takeOverLiveLeadOnMount()` and `seedDepartingLeadSnapshot()` only
+- `e2e/layout-id/throw.spec.ts`: one new test, and removing one `test.fail()`
+- `src/lib/components/presenceSharedLayout.spec.ts` or `src/lib/utils/motionDomProjection.spec.ts`: unit coverage, if the fix adds or changes a function that can be tested without a browser
+- `.changeset/thrown-card-handoff.md` (create)
+
+**Out of scope:**
+- `onScreenSnapshot()`, `commitObservedLayoutChange()`, `measurementsFromRect()` and anything in `_MotionContainer.svelte` (plan 005 works there).
+- The four `recordSnapshotVelocity` call sites plan 003 added.
+- The fixture page, except to fix a mistake in its port of upstream.
+- Changing any upstream threshold.
+
+## Git workflow
+
+- Lane branch `lane/14140-throw`, cut from `feat/motion-14.14.0` after plan 003 is merged.
+- Conventional commits, for example `test(layout-id): a thrown card's twin starts where the card was (red)` and `fix(layout-id): shared handoff keeps the lead's drawn box and velocity`.
+- Do not push.
+
+## Steps
+
+### Step 1: Write the failing test for the jump
+
+In `e2e/layout-id/throw.spec.ts`, add a test of our own next to upstream's three: "the detail view starts where the card was released". Reuse the spec's `throwCard` helper (drag from 350 to 440 at y 150, one move per frame). Sample the blue box's left edge on its first painted frame and assert it is within 20 px of `atSwap` (the red card's last left edge). The 20 px allows one frame of throw travel; the bug is a jump of about 90 px. Run it with `?tween` as well, so the assertion does not depend on velocity.
+
+**Verify**: `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id/throw.spec.ts` → the new test FAILS for both variants with the blue box about 90 px left of `atSwap` (measured: 300 against 390). "A thrown card hands its velocity…" is still an expected failure. If the new test passes, STOP: the jump is not reproducible on a built package and the hypothesis is wrong.
+
+### Step 2: Confirm the path
+
+Add temporary `console.debug` lines (remove them before committing) at the top of `takeOverLiveLeadOnMount`, inside its `lead.snapshot = cached` branch, and at the top of `seedDepartingLeadSnapshot`, printing `measured?.measuredBox.x`, `measured?.layoutBox.x`, `cached?.layoutBox.x` and the lead's `latestValues.x`. Open the throw page in the Playwright run (`page.on('console', …)` in a throwaway test, or `--headed`) and note which function runs and whether the `cached` branch is taken.
+
+**Verify**: your report states which of these is true:
+- (a) `takeOverLiveLeadOnMount` runs and replaces the measured snapshot with `cached` (the hypothesis);
+- (b) it runs and keeps `measured`, but `measured.measuredBox` has no drag offset;
+- (c) the handoff goes through `seedDepartingLeadSnapshot` or another path.
+
+For (c), or for (b) when the offset is missing because the lead was measured after its transforms were reset, STOP and report what you found: the fix is outside what this plan specifies.
+
+### Step 3: Keep the lead's drawn box
+
+For case (a): the `cached` fallback exists for a lead whose **layout** moved during the mount. A drag does not move the layout; it moves the element with a transform. So the fallback must not throw away the transforms. Make the snapshot handed to the new node match what upstream's `updateSnapshot()` produces:
+- `layoutBox`: the lead's layout box (cached, transform-free), as now;
+- `measuredBox`: that box **with the lead's own transforms applied**, in page space. `seedDepartingLeadSnapshot` already does this from the same cache (`cachedVisualBase()`, then `projection.applyTransform(box, true)` unless the cached read `keepsTransforms`, then `addElementScroll`). Use the same steps; extract them into one private method both functions call instead of copying them.
+
+Decide between "keep `measured` when only its transform-free `layoutBox` matches `cached`" and "rebuild `measuredBox` on the `cached` snapshot" from what Step 2 printed, and say which in your report. Keep the existing comment's intent and update its wording.
+
+**Verify**: `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id/throw.spec.ts` → the Step 1 test PASSES for both variants.
+
+### Step 4: Hand on the throw velocity
+
+In `takeOverLiveLeadOnMount`, after the lead's snapshot is final and before `projection.snapshot = lead.snapshot`, call `recordSnapshotVelocity(lead)`: the velocity must be read from the **lead** (the dragged element's `x`/`y` motion values and any layout animation it was running), not from the mounting node. In `seedDepartingLeadSnapshot`, call `recordSnapshotVelocity(projection)` after its `projection.snapshot = { … }` assignment; there `projection` is the departing lead.
+
+Remove the `test.fail()` line and its comment from "A thrown card hands its velocity to a layoutId element".
+
+**Verify**: `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id/throw.spec.ts` → all tests PASS, including "A thrown card hands its velocity…" (`Math.max(...samples.slice(0, 3)) > atSwap + 4`), "A layoutId tween starts from rest" (`< atSwap + 1`) and "A thrown card keeps its size…" (width stays within 99 to 401).
+
+If "hands its velocity" still fails after Step 3 passed, print `lead.snapshot.velocity` at the call. If entries 4 and 5 are 0, the drag's `x` value had stopped reporting velocity by the time of the mount (its last update was more than a frame ago): STOP and report the timing you measured.
+
+### Step 5: Changeset and gate
+
+Create `.changeset/thrown-card-handoff.md` (`patch`): "A dragged element that hands off to another element with the same `layoutId` now starts from where it was released, and a spring layout transition continues the throw."
+
+Run `pnpm check`, `pnpm test:only`, the shared-layout e2e group from the commands table, then `trunk fmt` and `trunk check` on the changed files.
+
+**Verify**: 0 errors; all unit tests pass; the e2e group passes except known skips and any remaining `test.fail()` cases owned by plan 005. Re-run a failing spec alone once before reporting it. An existing `layoutId` spec that fails after Step 3 or 4 and passed before is a STOP.
+
+## Test plan
+
+- **Red-first anchor**: "the detail view starts where the card was released" (Step 1), failing by about 90 px on current code, in both spring and tween variants.
+- **Flipped from expected-failure to passing**: upstream's "A thrown card hands its velocity to a layoutId element".
+- **Guards that must stay green**: upstream's "A layoutId tween starts from rest" and "A thrown card keeps its size between the card and the detail view"; the whole of `e2e/layout-id`.
+- Unit: if Step 3 extracts a method that can run in jsdom with a fake box, add cases for it beside the existing adapter tests; otherwise say in your report that the behaviour is covered by e2e only and why.
+
+## Done criteria
+
+- [ ] `e2e/layout-id/throw.spec.ts` passes with no `test.fail()` in it (`grep -c "test.fail" e2e/layout-id/throw.spec.ts` → `0`)
+- [ ] The Step 1 test exists and was recorded failing before Step 3
+- [ ] `pnpm check` → 0 errors; `pnpm test:only` → all pass
+- [ ] `e2e/layout-id`, `e2e/layout`, `e2e/animate-presence`, `e2e/drag`, `e2e/reorder` → no new failures
+- [ ] `grep -n "console.debug" src/lib/utils/motionDomProjection.ts` → no output
+- [ ] `git status` shows only in-scope files
+
+## STOP conditions
+
+- `recordSnapshotVelocity` does not exist in `motionDomProjection.ts` (plan 003 is not merged into your base).
+- The Step 1 test passes on unmodified code.
+- Step 2 finds case (c), or case (b) with the cause outside the two in-scope functions.
+- The fix needs a change to `onScreenSnapshot()`, `measurementsFromRect()` or `_MotionContainer.svelte`.
+- An existing `layoutId`, presence, drag or Reorder spec regresses.
+
+## Maintenance notes
+
+- The comment in `takeOverLiveLeadOnMount` records why a cached box is used at all (a mount that already moved the lead's layout). Whoever changes that fallback again must keep both properties: the layout box from before the mount, and the transforms the element was drawn with.
+- Plan 005 edits `onScreenSnapshot()` and the commit path in the same file. If both lanes run at once, merge this plan first and have 005 rebase.
+- A `Reorder.Item` dragged and released does not go through this path (it is one element, not a `layoutId` pair).
+- Reviewer: confirm the velocity is read from the lead, and that no threshold in `throw.spec.ts` differs from upstream's.
