@@ -123,6 +123,22 @@ test.describe('Layout velocity', () => {
         expect(Math.max(...samples)).toBeLessThan(atSwap + 1)
     })
 
+    // Not upstream: our own red-first check for plan 004 (motion-14-14-0). The
+    // detail view's first frame is where the card was released, give or take
+    // one frame of throw travel, not back at the card's undragged place. The
+    // tween variant takes no velocity, so it checks the start box alone.
+    for (const [variant, query] of [
+        ['spring', ''],
+        ['tween', 'tween&']
+    ] as const) {
+        test(`the detail view starts where the card was released (${variant})`, async ({
+            page
+        }) => {
+            const { atSwap, samples } = await throwCard(page, query)
+            expect(Math.abs(samples[0] - atSwap)).toBeLessThan(20)
+        })
+    }
+
     test('A thrown card keeps its size between the card and the detail view', async ({ page }) => {
         await startDrag(page, 'resize&')
         const widths = await page.evaluate(async () => {
