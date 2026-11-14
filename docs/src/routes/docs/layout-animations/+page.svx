@@ -122,6 +122,39 @@ Layout animations can travel along a curve instead of a straight FLIP interpolat
 <SharedLayoutAnimationExample />
 </Example>
 
+## Spring velocity
+
+With a spring layout transition, an element that is interrupted mid-animation starts the next layout animation at the speed it was already moving, instead of stopping and starting again. Added in Motion 14.13.
+
+```svelte
+<motion.div layout transition={{ type: 'spring', visualDuration: 0.4, bounce: 0.2 }} />
+```
+
+Only some transitions carry velocity:
+
+| Layout transition | When interrupted |
+|---|---|
+| `type: 'spring'` with `visualDuration` / `bounce`, or `stiffness` / `damping` | Carries its velocity into the next animation |
+| `type: 'spring'` with `duration` | Starts from rest, so it ends on time |
+| A tween, including the default layout transition | Starts from rest |
+| Any transition with `repeat` | Starts from rest |
+
+Each edge of the box has its own spring, so an edge that does not move in either layout stays still while the others keep their speed. A child that animates inside an animating parent keeps its place in the parent and carries only its own velocity relative to it.
+
+With shared layout, an element with the same `layoutId` continues the motion of the one it replaces.
+
+### `mass: "auto"`
+
+Set `mass: 'auto'` to size the spring's mass from the element:
+
+```svelte
+<motion.div layout transition={{ type: 'spring', visualDuration: 0.45, bounce: 0, mass: 'auto' }} />
+```
+
+A 300 px square has mass 1. Mass follows the element's size (the square root of width × height) between 0.25 and 2. Damping is scaled with it, so the bounce stays the same and bigger elements settle later. `"auto"` only has an effect in layout animations; anywhere else it behaves like the default mass of 1.
+
+See the [layout velocity example](/examples/layout-velocity).
+
 ## Scrolling and layout animations
 
 Layout measurements are taken in **page space**: the element's position in the document, independent of how far the window is scrolled. Scrolling the page between two layout changes — or while a layout animation is playing — can never masquerade as a layout delta, so layout animations run identically whether or not the user has scrolled. This also applies to elements that change layout while scrolled offscreen: they animate to their new position like any other element instead of snapping.
@@ -198,6 +231,13 @@ Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner"
 |---|---|---|
 | `onLayoutAnimationStart` | `() => void` | Called when this element's layout animation starts, as in Motion. |
 | `onLayoutAnimationComplete` | `() => void` | Called when this element's layout animation completes, as in Motion. |
+
+### Layout transition
+
+| Prop | Type | Description |
+|---|---|---|
+| `transition.type` | `'spring'` | A spring layout transition carries the element's velocity through an interrupt. |
+| `transition.mass` | `'auto'` | Sets the spring's mass from the element's size. Layout animations only. |
 
 ### `layoutRoot` and `layoutAnchor`
 
