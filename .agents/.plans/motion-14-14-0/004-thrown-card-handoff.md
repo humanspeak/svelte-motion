@@ -6,6 +6,8 @@
 >
 > **Port rule**: this lane's Playwright port is **4274**. Prefix every Playwright command with `PW_PORT=4274`. Never use or kill port 4198. Never set `PW_REUSE_SERVER`.
 >
+> **Revision 2026-11-14 (dispatcher, pre-flight for wave 3):** plan 003 marked test 13 ("A thrown card hands its velocity to a layoutId element") with `test.fixme()`, not `test.fail()`, and changed `atSwap` to start at the card's left edge at release (Svelte applies the swap before the spec's first rAF sample). Plans 002 and 007 changed `_MotionContainer.svelte`; this plan doesn't touch it. Plan 005 runs **in parallel** from the same base. Skip any full-suite run and run the layout family instead: `e2e/layout e2e/layout-id e2e/animate-presence e2e/reorder e2e/projection e2e/animate-layout`.
+>
 > **Drift check (run first)**: `git diff --stat 4665b907..HEAD -- src/lib/utils/motionDomProjection.ts e2e/layout-id/throw.spec.ts src/routes/tests/layout-id/throw`
 > Expected changes: plan 003 added `readSnapshotVelocity` / `recordSnapshotVelocity` to `motionDomProjection.ts` (shifting later line numbers by roughly 60) and created the spec and the page. Find the functions named below by name, not by line. If `takeOverLiveLeadOnMount` or `seedDepartingLeadSnapshot` themselves changed, compare against the excerpts; on a mismatch, STOP.
 
