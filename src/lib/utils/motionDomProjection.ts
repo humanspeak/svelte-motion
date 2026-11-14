@@ -2136,6 +2136,10 @@ export class MotionDomProjectionAdapter {
      * in, for a caller holding a raw rect: it is rebased by any scroll since
      * (plan 015a). Omit it for a rect already rebased with
      * {@link rebaseRect}. Cached snapshots are always rebased.
+     * @param options.onScreenSnapshot This node's on-screen box, taken with
+     * {@link captureOnScreenSnapshot} before the caller flushed the
+     * frameloop. Used as the committer's snapshot, with the velocity it
+     * carries, in place of the box the flushed animation has since moved to.
      * @returns Nothing.
      *
      * @example
@@ -2145,7 +2149,11 @@ export class MotionDomProjectionAdapter {
      */
     commitObservedLayoutChange(
         previousRect?: RectLike,
-        options?: { ownSubtreeChanged?: boolean; previousBasis?: ScrollBasis }
+        options?: {
+            ownSubtreeChanged?: boolean
+            previousBasis?: ScrollBasis
+            onScreenSnapshot?: Measurements
+        }
     ): void {
         // A `layoutId`-only node counts: it has a measured layout (`seedLayout`
         // runs on mount regardless of props) and motion-dom already knows its
@@ -2166,16 +2174,23 @@ export class MotionDomProjectionAdapter {
         // lead (plan 012 A5, a completed exit's `onExitComplete` re-rendering
         // a counter); a plain `layout` slide jumped to its end (plan 012 A6,
         // its content growing mid slide).
+        //
+        // A caller that flushes the frameloop before committing (the reactive
+        // commit) captures the on-screen box first: the flush ticks the running
+        // animation one frame on, past the box that was painted (plan 005).
         const projection = this.projection
+        const captured = options?.onScreenSnapshot
         const onScreen = projection.currentAnimation && projection.target
-        const snapshot = onScreen
-            ? this.onScreenSnapshot()
-            : previousRect
-              ? measurementsFromRect(
-                    this.rebaseRect(previousRect, options?.previousBasis)!,
-                    this.lastLayout ?? this.projection.layout
-                )
-              : this.rebasedMeasurements(this.lastLayout, this.lastLayoutBasis)
+        const snapshot = captured
+            ? captured
+            : onScreen
+              ? this.onScreenSnapshot()
+              : previousRect
+                ? measurementsFromRect(
+                      this.rebaseRect(previousRect, options?.previousBasis)!,
+                      this.lastLayout ?? this.projection.layout
+                  )
+                : this.rebasedMeasurements(this.lastLayout, this.lastLayoutBasis)
         if (!snapshot) {
             this.seedLayout()
             return
@@ -2191,6 +2206,12 @@ export class MotionDomProjectionAdapter {
             snapshot,
             options?.ownSubtreeChanged ?? false
         )
+        // The seed recorded the velocity after the flush; a captured snapshot
+        // carries the velocity of the instant its box was painted.
+        if (captured && projection.snapshot) {
+            const { velocity, relativeVelocity } = captured
+            Object.assign(projection.snapshot, { velocity, relativeVelocity })
+        }
         // (b): the other members of this node's LayoutGroup node group.
         this.seedCachedSnapshotsForGroup()
         this.projection.root?.didUpdate()
@@ -2699,6 +2720,40 @@ export class MotionDomProjectionAdapter {
         recordSnapshotVelocity(projection)
         projection.isLayoutDirty = true
         return 1
+    }
+
+    /**
+     * This node's on-screen box and velocity, captured now, while the node is
+     * mid a layout animation. Upstream's `willUpdate()` → `updateSnapshot()`
+     * measures the element as painted, with its velocity, before anything
+     * else runs (create-projection-node.ts:1046-1091 @ v14.14.0); its
+     * `update()` flushes the frame steps only afterwards, to measure the new
+     * layout. A caller that flushes the frameloop before committing must call
+     * this before the flush: the flush ticks the running animation to now,
+     * one frame past the box that was painted, and an interrupt restarted
+     * from there travels on before it turns.
+     *
+     * @returns The on-screen measurements (rebased for scroll, as
+     * {@link onScreenSnapshot}), with the node's velocity, as a new object
+     * that later frames don't change; `undefined` when the node is not mid a
+     * layout animation.
+     *
+     * @example
+     * ```ts
+     * const painted = adapter.captureOnScreenSnapshot()
+     * flushFrameSteps()
+     * adapter.commitObservedLayoutChange(previous, { onScreenSnapshot: painted })
+     * ```
+     */
+    captureOnScreenSnapshot(): Measurements | undefined {
+        const projection = this.projection
+        if (!(projection.currentAnimation && projection.target)) return undefined
+        const snapshot = this.onScreenSnapshot()
+        if (!snapshot) return undefined
+        return Object.assign(
+            snapshot,
+            readSnapshotVelocity(projection as unknown as SnapshotVelocitySource)
+        )
     }
 
     /**

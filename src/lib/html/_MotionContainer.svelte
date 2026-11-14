@@ -2743,11 +2743,24 @@
     const scheduledReactiveCommit = () => {
         reactiveCommitQueued = false
         if (!reactiveCommitPrevious) return
+        // The box as painted, before the flush ticks a running layout
+        // animation one frame on: upstream's `willUpdate()` snapshots it before
+        // `update()` flushes (create-projection-node.ts:1046 @ v14.14.0), so an
+        // interrupt restarts from where the element was seen (plan 005).
+        const painted = motionDomProjection?.captureOnScreenSnapshot()
         flushFrameSteps()
-        runReactiveCommit()
+        runReactiveCommit(painted)
     }
 
-    const runReactiveCommit = () => {
+    /**
+     * Measure and commit the pending reactive layout change.
+     *
+     * @param painted The node's on-screen box captured before the frameloop
+     * flush, or `undefined` when it was not mid a layout animation.
+     */
+    const runReactiveCommit = (
+        painted?: ReturnType<MotionDomProjectionAdapter['captureOnScreenSnapshot']>
+    ) => {
         const prev = reactiveCommitPrevious
         reactiveCommitPrevious = null
         if (!(element && prev)) return
@@ -2790,7 +2803,10 @@
             // including ones in a separate LayoutGroup (Step 4b-d). A live
             // drag compensates in its own projection `didUpdate` listener
             // (`VisualElementDragControls.addListeners`).
-            motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
+            motionDomProjection?.commitObservedLayoutChange(prev, {
+                ownSubtreeChanged: true,
+                onScreenSnapshot: painted
+            })
             return
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The

@@ -57,15 +57,11 @@ test.describe('Layout velocity', () => {
     })
 
     test('An interrupted layout tween starts from rest', async ({ page }) => {
-        // Plan 005 (motion-14-14-0): the interrupt restarts one frame past the painted box.
-        test.fixme()
         const { atInterrupt, samples } = await interrupt(page, '&tween')
         expect(Math.max(...samples)).toBeLessThan(atInterrupt + 1)
     })
 
     test('An interrupted layout spring with a duration starts from rest', async ({ page }) => {
-        // Plan 005 (motion-14-14-0): the interrupt restarts one frame past the painted box.
-        test.fixme()
         const { atInterrupt, samples } = await interrupt(page, '&duration')
         expect(Math.max(...samples)).toBeLessThan(atInterrupt + 1)
     })
@@ -174,8 +170,6 @@ test.describe('Layout velocity', () => {
     })
 
     test('An interrupted spring with a delay holds still during the delay', async ({ page }) => {
-        // Plan 005 (motion-14-14-0): the interrupt restarts one frame past the painted box.
-        test.fixme()
         await page.goto(url('fixed-edge&delay'))
         await page.waitForTimeout(200)
         await page.click('#box', { position: { x: 10, y: 10 } })
@@ -247,8 +241,6 @@ test.describe('Layout velocity', () => {
     })
 
     test('An interrupted mirror spring goes back to where it was interrupted', async ({ page }) => {
-        // Plan 005 (motion-14-14-0): the interrupt restarts one frame past the painted box.
-        test.fixme()
         const { atInterrupt, samples } = await interrupt(page, '&mirror', 120, 90)
         // The spring reaches the left, then mirrors back to the point of the
         // interrupt and not past it.

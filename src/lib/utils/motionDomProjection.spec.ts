@@ -1351,6 +1351,118 @@ describe('MotionDomProjectionAdapter.commitObservedLayoutChange mid a shared ani
 })
 
 /**
+ * Plan 005 (motion-14-14-0): the reactive commit captures the painted box
+ * before it flushes the frameloop, as upstream's `updateSnapshot()` measures
+ * before `update()` flushes (create-projection-node.ts:1046 @ v14.14.0).
+ */
+describe('MotionDomProjectionAdapter.captureOnScreenSnapshot', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    /** Drawn 60px above its 100px slot. */
+    const onScreenTarget = () => ({ x: { min: 10, max: 110 }, y: { min: 40, max: 90 } })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('returns undefined for a node with no running layout animation', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        // A stale target with no animation is not on screen.
+        adapter.projection.target = onScreenTarget()
+
+        expect(adapter.captureOnScreenSnapshot()).toBeUndefined()
+        await flush()
+        adapter.unmount()
+    })
+
+    it('returns the target box at the time of the call, unchanged by later frames', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        const projection = adapter.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        const captured = adapter.captureOnScreenSnapshot()
+        expect(captured?.layoutBox).toEqual(onScreenTarget())
+
+        // The next frame moves the animation on.
+        projection.target.x.min += 12
+        projection.target.x.max += 12
+        projection.target.y.min += 12
+        projection.target.y.max += 12
+        expect(captured?.layoutBox).toEqual(onScreenTarget())
+        expect(captured?.measuredBox).toEqual(onScreenTarget())
+
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+
+    it('carries the velocity of the instant it was captured', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        const projection = adapter.projection as typeof adapter.projection & {
+            animationEdges?: number[]
+            edgeValues?: number[]
+            edgeVelocity?: (index: number) => number
+        }
+        projection.currentAnimation = { state: 'running' } as never
+        projection.target = onScreenTarget()
+        projection.animationEdges = [1, 1, 1, 1]
+        projection.edgeValues = [0, 0, 0, 0]
+        projection.edgeVelocity = (i: number) => (i + 1) * 100
+
+        expect(adapter.captureOnScreenSnapshot()?.velocity).toEqual([100, 200, 300, 400, 0, 0])
+
+        projection.animationEdges = undefined
+        projection.edgeValues = undefined
+        projection.edgeVelocity = undefined
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+
+    it('is the committer snapshot, velocity included, when passed to the commit', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        const element = mount(adapter, 100)
+        const projection = adapter.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+        const painted = adapter.captureOnScreenSnapshot()!
+        painted.velocity = [1, 2, 3, 4, 0, 0]
+
+        // The frameloop flush moves the animation 12px on before the commit.
+        projection.target.y.min += 12
+        projection.target.y.max += 12
+        place(element, 101)
+        adapter.commitObservedLayoutChange(
+            { left: 10, top: 100, width: 100, height: 50 },
+            { onScreenSnapshot: painted }
+        )
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        expect(projection.snapshot?.velocity).toEqual([1, 2, 3, 4, 0, 0])
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+})
+
+/**
  * LayoutGroup `forceRender` (plan 007 D7): `commitGroup` re-commits every
  * member of a node group from cached / on-screen snapshots.
  */
