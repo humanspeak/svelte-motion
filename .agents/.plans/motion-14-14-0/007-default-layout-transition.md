@@ -6,6 +6,8 @@
 >
 > **Port rule**: this lane's Playwright port is **4276**. Prefix every Playwright command with `PW_PORT=4276`. Port 4198 belongs to the maintainer; never use or kill it. Never set `PW_REUSE_SERVER`.
 >
+> **Revision 2026-11-14 (dispatcher, after the first run stopped at Step 2):** the planned fix alone still measured 355 ms. Upstream's chain has a second link, `visualElement.getDefaultTransition()` (= `props.transition`), and our `buildMotionNodeProps` in `_MotionContainer.svelte` (`:684`, `transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),`) also sets that to `{}` when nothing is configured. React leaves `props.transition` `undefined` in that case (`motion/index.tsx:124-128`), and motion-dom handles `undefined` on every path (`visual-element-target.ts:45-48`, `motion-value.ts:29` `getValueTransition(...) || {}`, `visual-element-variant.ts:23` `|| {}`). **Scope now includes that one line**: make it `undefined` when neither `motionConfig?.transition` nor `transitionProp` is set, otherwise the same `mergeTransitions(...)` call. Keep the two `updateOptions` changes too: they keep `projection.options.transition` empty, which is the first link. The executor's experiment showed 3/3 passing with both. Step 3 must now also run the full unit suite, and Step 5's layout-family specs plus `e2e/animate*/`, `e2e/variants/`, `e2e/gestures/` (whatever exists), because this line also feeds `animate` / `while*` animations.
+>
 > **Drift check (run first)**: `git diff --stat 6c34537b..HEAD -- src/lib/html/_MotionContainer.svelte src/routes/+page.svelte e2e/layout src/routes/tests/layout`
 > Expected: no output, or only changes from plans 001, 002 and 003 of this batch (002 edits `derivedAttrs`, 003 adds `tests/layout/velocity` and `e2e/layout/velocity.spec.ts` and a link after `overdamped-spring`). If the "Current state" excerpts below no longer match the live code, STOP.
 
@@ -89,7 +91,7 @@ If the global `pnpm` cannot switch to 12.6.0, use `npx -y pnpm@12.6.0`. Trunk is
 ## Scope
 
 **In scope:**
-- `src/lib/html/_MotionContainer.svelte`: one new `$derived` next to `mergedTransition`, and the two layout `updateOptions` `transition:` lines
+- `src/lib/html/_MotionContainer.svelte`: one new `$derived` next to `mergedTransition`, the two layout `updateOptions` `transition:` lines, and the `transition:` line in `buildMotionNodeProps` (`:684`, see the revision note)
 - `src/routes/tests/layout/default-transition/+page.svelte` (create)
 - `e2e/layout/default-transition.spec.ts` (create)
 - `src/routes/+page.svelte`: one link
@@ -194,7 +196,7 @@ Then `trunk fmt` and `trunk check` on the changed files → no new issues. Rever
 ## STOP conditions
 
 - `#default` passes before the fix.
-- The fix needs a change in `motionDomProjection.ts` or to `mergedTransition` itself.
+- The fix needs a change in `motionDomProjection.ts` or to `mergedTransition` itself (the `buildMotionNodeProps` line is in scope, see the revision note).
 - `pnpm check` reports a type error in `src/lib`.
 - A unit test outside this plan's files fails.
 
