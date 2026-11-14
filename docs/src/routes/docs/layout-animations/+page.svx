@@ -236,6 +236,7 @@ Nested groups chain by default (`inherit={true}`), so a `<LayoutGroup id="inner"
 
 | Prop | Type | Description |
 |---|---|---|
+| `transition` (unset) | — | With no `transition` on the element or a `MotionConfig`, a layout animation uses Motion's default: a 0.45 s tween eased with `[0.4, 0, 0.1, 1]`. |
 | `transition.type` | `'spring'` | A spring layout transition carries the element's velocity through an interrupt. |
 | `transition.mass` | `'auto'` | Sets the spring's mass from the element's size. Layout animations only. |
 
