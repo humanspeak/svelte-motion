@@ -105,6 +105,28 @@ describe('LazyMotion.svelte', () => {
         expect(tapActivates(screen.getByTestId('tap'))).toBe(true)
     })
 
+    // Upstream 14.14.0 fixed React discarding server HTML here
+    // (`components/LazyMotion/index.tsx:63-68`). Svelte never re-creates the
+    // children when the loader resolves, and this test keeps it that way.
+    it('keeps the rendered element when an async loader resolves', async () => {
+        const features = createDeferred<typeof domAnimation>()
+
+        render(LazyMotionProbe, {
+            props: { features: async () => features.promise }
+        })
+        await flushTimers()
+
+        const before = screen.getByTestId('box')
+        expect(hasNode(before)).toBe(false)
+
+        features.resolve(domAnimation)
+        await flushTimers()
+
+        const after = screen.getByTestId('box')
+        expect(after).toBe(before)
+        expect(after.isConnected).toBe(true)
+    })
+
     // Upstream has no `.catch`: a rejected loader never publishes a renderer.
     it('gives m no VisualElement when an async loader rejects', async () => {
         render(LazyMotionProbe, {

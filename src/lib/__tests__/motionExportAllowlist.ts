@@ -177,6 +177,7 @@ export const MOTION_EXPORTS_NOT_REEXPORTED: ReadonlySet<string> = new Set<string
     'getDefaultTransition',
     'getFinalKeyframe',
     'getOriginIndex',
+    'getSpringOptions',
     'getValueTransition',
     'GroupAnimation',
     'GroupAnimationWithThen',
