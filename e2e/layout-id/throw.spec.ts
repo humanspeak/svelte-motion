@@ -1,0 +1,151 @@
+import { expect, test, type Page } from '@playwright/test'
+
+/**
+ * A card thrown with drag hands its velocity to the `layoutId` element that
+ * replaces it, when the transition is a spring. Tweens take no velocity.
+ *
+ * Port of the three drag tests of upstream
+ * `packages/framer-motion/cypress/integration/layout-velocity.ts` @ `v14.14.0`
+ * (Motion 14.13, PR #4047), with their names, waits and thresholds, against
+ * `src/routes/tests/layout-id/throw` (a port of
+ * `dev/react/src/tests/layout-velocity-drag-layout-id.tsx` and, with
+ * `?resize`, `layout-velocity-throw-resize.tsx`). The other twelve tests are in
+ * `e2e/layout/velocity.spec.ts`.
+ *
+ * The pointer events are upstream's synthetic ones, dispatched from inside the
+ * page, one move per animation frame.
+ */
+
+test.use({ viewport: { width: 1280, height: 720 } })
+
+const url = (query: string) => `/tests/layout-id/throw?${query}@isPlaywright=true`
+
+/** Installs upstream's `dispatchPointer` and `afterFrame` helpers on `window`. */
+const installHelpers = (page: Page) =>
+    page.evaluate(() => {
+        const w = window as unknown as Record<string, unknown>
+        w.dispatchPointer = (type: string, x: number, y: number) => {
+            const target = type === 'pointerdown' ? document.getElementById('box')! : window
+            target.dispatchEvent(
+                new PointerEvent(type, {
+                    clientX: x,
+                    clientY: y,
+                    pointerId: 1,
+                    pointerType: 'mouse',
+                    isPrimary: true,
+                    button: 0,
+                    buttons: type === 'pointerup' ? 0 : 1,
+                    bubbles: true,
+                    cancelable: true
+                })
+            )
+        }
+        w.afterFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    })
+
+type ThrowWindow = Window & {
+    dispatchPointer: (type: string, x: number, y: number) => void
+    afterFrame: () => Promise<void>
+}
+
+/**
+ * Visits the page, waits two frames, then presses on the card at (350, 150)
+ * and moves it 10px. Waits 50ms after the next frame, as upstream does.
+ */
+const startDrag = async (page: Page, query: string) => {
+    await page.goto(url(query))
+    await page.waitForTimeout(200)
+    await installHelpers(page)
+    await page.evaluate(async () => {
+        const w = window as unknown as ThrowWindow
+        await w.afterFrame()
+        await w.afterFrame()
+        w.dispatchPointer('pointerdown', 350, 150)
+        w.dispatchPointer('pointermove', 360, 150)
+        await w.afterFrame()
+    })
+    await page.waitForTimeout(50)
+}
+
+/**
+ * Drag the card right with a fast flick. Release swaps it for a detail view
+ * with the same layoutId, down and to the left. Returns the card's left edge
+ * just before the swap and the detail view's first frames.
+ */
+const throwCard = async (page: Page, query: string) => {
+    await startDrag(page, query)
+    return page.evaluate(async () => {
+        const w = window as unknown as ThrowWindow
+        const leftOfBox = () => document.getElementById('box')!.getBoundingClientRect().left
+        for (const x of [380, 400, 420, 440]) {
+            w.dispatchPointer('pointermove', x, 150)
+            await w.afterFrame()
+        }
+        w.dispatchPointer('pointerup', 440, 150)
+        // Sample the card until the detail view replaces it, then sample the
+        // detail view.
+        //
+        // Svelte deviation: `atSwap` starts at the card's left edge at the
+        // release, not upstream's 0. `onDragEnd` runs in motion's
+        // `frame.postRender`, inside the next frame's first rAF callback, and
+        // Svelte flushes the swap in a microtask before this loop's first
+        // callback in that frame, so the loop never sees the card. React
+        // renders the swap in a later task, so upstream's first sample is the
+        // card. Left at 0, both tests would compare against 0.
+        const atRelease = leftOfBox()
+        return new Promise<{ atSwap: number; samples: number[] }>((resolve) => {
+            const samples: number[] = []
+            let atSwap = atRelease
+            const tick = () => {
+                const box = document.getElementById('box')!
+                if (box.style.backgroundColor === 'blue') samples.push(leftOfBox())
+                else atSwap = leftOfBox()
+                if (samples.length < 6) requestAnimationFrame(tick)
+                else resolve({ atSwap, samples })
+            }
+            requestAnimationFrame(tick)
+        })
+    })
+}
+
+test.describe('Layout velocity', () => {
+    test('A thrown card hands its velocity to a layoutId element', async ({ page }) => {
+        // Plan 004 (motion-14-14-0): the layoutId twin starts at the card's undragged place, without the throw.
+        test.fixme()
+        const { atSwap, samples } = await throwCard(page, '')
+        // The detail view is to the left, but the first frames follow the
+        // throw to the right.
+        expect(Math.max(...samples.slice(0, 3))).toBeGreaterThan(atSwap + 4)
+    })
+
+    test('A layoutId tween starts from rest', async ({ page }) => {
+        const { atSwap, samples } = await throwCard(page, 'tween&')
+        expect(Math.max(...samples)).toBeLessThan(atSwap + 1)
+    })
+
+    test('A thrown card keeps its size between the card and the detail view', async ({ page }) => {
+        await startDrag(page, 'resize&')
+        const widths = await page.evaluate(async () => {
+            const w = window as unknown as ThrowWindow
+            for (const x of [400, 440, 480, 520]) {
+                w.dispatchPointer('pointermove', x, 150)
+                await w.afterFrame()
+            }
+            w.dispatchPointer('pointerup', 520, 150)
+            const widths: number[] = []
+            for (let i = 0; i < 40; i++) {
+                await w.afterFrame()
+                const box = document.getElementById('box')!
+                if (box.style.backgroundColor === 'blue') {
+                    widths.push(box.getBoundingClientRect().width)
+                }
+            }
+            return widths
+        })
+        // The throw moves the edges together, so the width only travels from
+        // the card's 100px to the detail's 400px.
+        expect(widths.length).toBeGreaterThan(10)
+        expect(Math.min(...widths)).toBeGreaterThan(99)
+        expect(Math.max(...widths)).toBeLessThan(401)
+    })
+})
