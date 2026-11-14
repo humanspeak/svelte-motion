@@ -70,48 +70,56 @@ const startDrag = async (page: Page, query: string) => {
 /**
  * Drag the card right with a fast flick. Release swaps it for a detail view
  * with the same layoutId, down and to the left. Returns the card's left edge
- * just before the swap and the detail view's first frames.
+ * where the DOM had it when it was removed, and the detail view's first
+ * frames.
  */
 const throwCard = async (page: Page, query: string) => {
     await startDrag(page, query)
     return page.evaluate(async () => {
         const w = window as unknown as ThrowWindow
         const leftOfBox = () => document.getElementById('box')!.getBoundingClientRect().left
+        // `atSwap` is the card where the DOM has it when it is removed, which
+        // is what upstream's departing-lead snapshot (`willUpdate()`) reads.
+        //
+        // Svelte deviation: drag inertia writes one more `x` step in the frame
+        // after the release, and Svelte swaps in the detail view in that same
+        // frame, before paint, so that step is never painted and no rAF
+        // sample sees the card there. React renders the swap in a later task,
+        // so upstream's last sample of the card is that position. Reading the
+        // removed card's own `translateX` gives the same value here: 300 is
+        // its undragged `left`.
+        const card = document.getElementById('box')!
+        const removed = new Promise<number>((resolve) => {
+            const observer = new MutationObserver(() => {
+                if (card.isConnected) return
+                observer.disconnect()
+                const tx = /translateX\((-?[\d.]+)px\)/.exec(card.style.transform)
+                resolve(300 + (tx ? Number(tx[1]) : 0))
+            })
+            observer.observe(card.parentElement!, { childList: true, subtree: true })
+        })
         for (const x of [380, 400, 420, 440]) {
             w.dispatchPointer('pointermove', x, 150)
             await w.afterFrame()
         }
         w.dispatchPointer('pointerup', 440, 150)
-        // Sample the card until the detail view replaces it, then sample the
-        // detail view.
-        //
-        // Svelte deviation: `atSwap` starts at the card's left edge at the
-        // release, not upstream's 0. `onDragEnd` runs in motion's
-        // `frame.postRender`, inside the next frame's first rAF callback, and
-        // Svelte flushes the swap in a microtask before this loop's first
-        // callback in that frame, so the loop never sees the card. React
-        // renders the swap in a later task, so upstream's first sample is the
-        // card. Left at 0, both tests would compare against 0.
-        const atRelease = leftOfBox()
-        return new Promise<{ atSwap: number; samples: number[] }>((resolve) => {
+        // Sample the detail view's first frames.
+        const samples = await new Promise<number[]>((resolve) => {
             const samples: number[] = []
-            let atSwap = atRelease
             const tick = () => {
                 const box = document.getElementById('box')!
                 if (box.style.backgroundColor === 'blue') samples.push(leftOfBox())
-                else atSwap = leftOfBox()
                 if (samples.length < 6) requestAnimationFrame(tick)
-                else resolve({ atSwap, samples })
+                else resolve(samples)
             }
             requestAnimationFrame(tick)
         })
+        return { atSwap: await removed, samples }
     })
 }
 
 test.describe('Layout velocity', () => {
     test('A thrown card hands its velocity to a layoutId element', async ({ page }) => {
-        // Plan 004 (motion-14-14-0): the layoutId twin starts at the card's undragged place, without the throw.
-        test.fixme()
         const { atSwap, samples } = await throwCard(page, '')
         // The detail view is to the left, but the first frames follow the
         // throw to the right.
@@ -122,6 +130,22 @@ test.describe('Layout velocity', () => {
         const { atSwap, samples } = await throwCard(page, 'tween&')
         expect(Math.max(...samples)).toBeLessThan(atSwap + 1)
     })
+
+    // Not upstream: our own red-first check for plan 004 (motion-14-14-0). The
+    // detail view's first frame is where the card was released, give or take
+    // one frame of throw travel, not back at the card's undragged place. The
+    // tween variant takes no velocity, so it checks the start box alone.
+    for (const [variant, query] of [
+        ['spring', ''],
+        ['tween', 'tween&']
+    ] as const) {
+        test(`the detail view starts where the card was released (${variant})`, async ({
+            page
+        }) => {
+            const { atSwap, samples } = await throwCard(page, query)
+            expect(Math.abs(samples[0] - atSwap)).toBeLessThan(20)
+        })
+    }
 
     test('A thrown card keeps its size between the card and the detail view', async ({ page }) => {
         await startDrag(page, 'resize&')

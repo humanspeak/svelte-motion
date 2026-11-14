@@ -528,6 +528,13 @@ export class MotionDomProjectionAdapter {
      */
     private latestLayoutKeepsTransforms = true
     /**
+     * The node's own `x` / `y` when {@link latestLayoutBox} was read, or
+     * `undefined` when either was not a finite number. A box that kept the
+     * transforms shows them as they were then, so the departing-lead
+     * snapshot shifts it by any change since, e.g. a drag (plan 004).
+     */
+    private latestLayoutOwnTranslate: { x: number; y: number } | undefined
+    /**
      * Whether {@link latestLayoutBox} already shows `latestValues`
      * transforms, for {@link currentVisualPageRect} (plan 015a, from 007):
      * `seedLayout` reads without resetting anything, so a seed taken while
@@ -1355,9 +1362,10 @@ export class MotionDomProjectionAdapter {
      * `measure()` would read a zero box, which `updateSnapshot()` drops. The
      * box comes from cache instead: the animating target, else the last
      * layout read, rebased by any scroll since (plan 015a). Both are
-     * scroll-removed. A read that kept the style transforms is already where
-     * the element was drawn; a transform-free one gets its transforms
-     * applied (`applyTransform`, transform only). The page box is then that
+     * scroll-removed. A read that kept the style transforms is where the
+     * element was drawn then, shifted by any change in its own translate
+     * since (a drag); a transform-free one gets its transforms applied
+     * (`applyTransform`, transform only). The page box is then that
      * box with the element scroll added back.
      */
     private seedDepartingLeadSnapshot(element: HTMLElement): void {
@@ -1377,7 +1385,9 @@ export class MotionDomProjectionAdapter {
             removeElementScroll(box: Box): Box
             removeTransform(box: Box): Box
         }
-        const drawn = keepsTransforms ? box : projection.applyTransform(box, true)
+        const drawn = keepsTransforms
+            ? this.shiftByOwnTranslateSinceRead(box)
+            : projection.applyTransform(box, true)
         const pageBox = this.addElementScroll(drawn)
         const layoutBox = node.removeTransform(node.removeElementScroll(pageBox))
         roundBox(layoutBox)
@@ -1388,8 +1398,32 @@ export class MotionDomProjectionAdapter {
             latestValues: { ...projection.latestValues },
             source: projection.id
         }
+        // `updateSnapshot()` (1059-1091 @ v14.14.0) records the departing
+        // lead's velocity, which `setAnimationOrigin` hands to a shared
+        // layout animation (the throw).
+        recordSnapshotVelocity(projection)
         // `willUpdate()` returns before measuring a layout-dirty node.
         projection.isLayoutDirty = true
+    }
+
+    /**
+     * A copy of a cached box that kept the transforms, moved by how far the
+     * node's own `x` / `y` changed since it was read. An unstripped seed
+     * shows the transforms as they were at the read, so a drag that moved
+     * the element since (the thrown card, plan 004) must be added.
+     * Ancestors and the node's scale and rotate are assumed unchanged since
+     * the read, as before. With either translate unknown, no shift.
+     */
+    private shiftByOwnTranslateSinceRead(box: Box): Box {
+        const shifted = createBox()
+        copyBoxInto(shifted, box)
+        const read = this.latestLayoutOwnTranslate
+        const current = this.ownTranslate()
+        if (read && current) {
+            translateAxis(shifted.x, current.x - read.x)
+            translateAxis(shifted.y, current.y - read.y)
+        }
+        return shifted
     }
 
     /**
@@ -1910,6 +1944,20 @@ export class MotionDomProjectionAdapter {
         return undefined
     }
 
+    /**
+     * The node's own `x` / `y` from `latestValues`, or `undefined` unless
+     * both are finite numbers.
+     */
+    private ownTranslate(): { x: number; y: number } | undefined {
+        const { x = 0, y = 0 } = this.projection.latestValues
+        return typeof x === 'number' &&
+            Number.isFinite(x) &&
+            typeof y === 'number' &&
+            Number.isFinite(y)
+            ? { x, y }
+            : undefined
+    }
+
     private rememberLayoutBox(
         box: Box,
         basis: ScrollBasis | undefined,
@@ -1920,6 +1968,7 @@ export class MotionDomProjectionAdapter {
         copyBoxInto(this.latestLayoutBox, box)
         this.lastReadScrollBasis = basis
         this.latestLayoutKeepsTransforms = keepsTransforms
+        this.latestLayoutOwnTranslate = this.ownTranslate()
         this.latestLayoutIsDrawn = isDrawn
     }
 
