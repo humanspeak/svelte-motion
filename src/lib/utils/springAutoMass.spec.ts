@@ -15,7 +15,7 @@ import { spring } from '../index.js'
 describe('spring mass "auto"', () => {
     it("a spring with mass 'auto' does not warn", () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-        spring({ keyframes: [0, 100], stiffness: 100, damping: 10, mass: 'auto' as never })
+        spring({ keyframes: [0, 100], stiffness: 100, damping: 10, mass: 'auto' })
         expect(warn).not.toHaveBeenCalled()
         warn.mockRestore()
     })
@@ -33,7 +33,7 @@ describe('spring mass "auto"', () => {
             keyframes: [0, 100],
             stiffness: 100,
             damping: 10,
-            mass: 'auto' as never
+            mass: 'auto'
         })
         const fallback = spring({ keyframes: [0, 100], stiffness: 100, damping: 10 })
         expect(auto.next(100).value).toBeCloseTo(fallback.next(100).value, 6)
