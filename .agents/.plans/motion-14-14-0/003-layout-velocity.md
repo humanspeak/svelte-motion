@@ -6,6 +6,11 @@
 >
 > **Port rule**: this lane's Playwright port is **4273**. Prefix every Playwright command with `PW_PORT=4273`. Never use or kill port 4198. Never set `PW_REUSE_SERVER`.
 >
+> **Revision 2026-11-14 (dispatcher, after the first run stopped at Step 2):**
+> - **Red anchor is test 6 only.** On build + preview, test 1 passed before the port in 5 of 7 runs: the box carried no velocity (it fell back from the first frame), but its first sample started 4–14 px past the painted box. That is plan 005's one-frame-late start, which clears upstream's +5 px threshold on its own. Test 6 failed 7 of 7. So test 1 is **not** a red anchor in this lane. Do not change its threshold (it is upstream's). Instead, after Step 3, test 1 must pass `--repeat-each=5` five out of five, and your report must show its six post-click samples before the port (falling back from the first frame) and after it (still moving forward for at least two frames). Test 1 passing before Step 3 is no longer a STOP; test 6 passing before Step 3 still is.
+> - **Use `test.fixme()`, not `test.fixme()`,** for the tests owned by plans 004 and 005 (2, 3, 8, 12 → 005; 13 → 004). Tests 3 and 8 flip between pass and fail under load, so `test.fixme()` would make the suite flaky. Mark all five with `test.fixme()` and the comment naming the owning plan, whether or not they failed in your run. Plans 004 and 005 remove those lines.
+> - **Accepted deviations from the first run:** `atSwap` in `throw.spec.ts` starts at the card's left edge at the moment of release, because Svelte applies the swap before the spec's first rAF sample and React doesn't (upstream calls `onDragEnd` from `frame.postRender`, `VisualElementDragControls.ts:360` @ v14.14.0). The two home-page links go after `reflow-mid-animation`, the real end of the Layout section. Both fixture pages wrap their fixtures in an absolutely positioned top-left container.
+>
 > **Drift check (run first)**: `git diff --stat 4665b907..HEAD -- src/lib/utils/motionDomProjection.ts src/lib/utils/motionDomProjection.spec.ts src/routes/tests/layout src/routes/tests/layout-id src/routes/+page.svelte e2e/layout e2e/layout-id`
 > Plan 001 touches none of these paths; plan 002 adds one link in `src/routes/+page.svelte`'s "Motion" section. If anything else changed, compare the "Current state" excerpts against the live code. On a mismatch, STOP.
 
@@ -193,7 +198,7 @@ Tests and who owns them:
 
 | # | Test (upstream name) | Fixture | Expected after Step 2 | Owner |
 | --- | --- | --- | --- | --- |
-| 1 | An interrupted layout animation keeps its velocity | `interrupt` | **FAILS** (red anchor) | this plan |
+| 1 | An interrupted layout animation keeps its velocity | `interrupt` | not a reliable red (see revision); must pass 5/5 after Step 3 | this plan |
 | 2 | An interrupted layout tween starts from rest | `interrupt&tween` | fails | plan 005 |
 | 3 | An interrupted layout spring with a duration starts from rest | `interrupt&duration` | fails | plan 005 |
 | 4 | An interrupted spring keeps an edge that doesn't move still | `fixed-edge` | passes | guard |
@@ -211,14 +216,14 @@ Tests and who owns them:
 
 (Upstream has 15 tests. Rows 13 to 15 are its three drag tests and go in `throw.spec.ts`; rows 1 to 12 go in `velocity.spec.ts`. The numbering here is ours, not upstream's order.)
 
-Run the two specs once with every test plain, and record the result of each in your report. Then mark the tests owned by plans 004 and 005 that failed with `test.fail()` as the first line of the test body, with a comment naming the plan, for example `// Plan 005 (motion-14-14-0): the interrupt starts one frame late.` A test from that list that already passes stays plain; say so in your report.
+Run the two specs once with every test plain, and record the result of each in your report. Then mark the tests owned by plans 004 and 005 that failed with `test.fixme()` as the first line of the test body, with a comment naming the plan, for example `// Plan 005 (motion-14-14-0): the interrupt starts one frame late.` A test from that list that already passes stays plain; say so in your report.
 
 **Verify**: `PW_PORT=4273 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts e2e/layout-id/throw.spec.ts`:
 - test 1 FAILS: `Math.max(...samples.slice(0, 4))` is not greater than `atInterrupt + 5` (measured at planning time: about +2);
 - test 6 FAILS: the maximum offset is not greater than `atInterrupt + 3` (measured: about −0.2);
-- every guard test PASSES; every `test.fail()` test is reported as an expected failure.
+- every guard test PASSES; every `test.fixme()` test is reported as skipped.
 
-If test 1 or test 6 passes before Step 3, the reproduction is wrong: STOP. If a guard test fails, STOP and report it (it worked on a 14.14.0 scratch build at planning time).
+If test 6 passes before Step 3, the reproduction is wrong: STOP. (Test 1: see the revision note.) If a guard test fails, STOP and report it (it worked on a 14.14.0 scratch build at planning time).
 
 Commit: `test(layout): port upstream's layout velocity fixtures and tests (red)`.
 
@@ -271,7 +276,7 @@ Call `recordSnapshotVelocity(projection)` on the line after each of these four a
 Each call's node is the one whose snapshot was just set (`projection` in all four). Add one comment at the first site explaining why (the excerpt under "Why upstream's own recording is lost").
 
 **Verify**:
-- `PW_PORT=4273 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts e2e/layout-id/throw.spec.ts` → tests 1 and 6 PASS; guards PASS; `test.fail()` tests still fail as expected. If a `test.fail()` test now passes, Playwright reports it as an error: remove its annotation and note it in your report.
+- `PW_PORT=4273 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts e2e/layout-id/throw.spec.ts` → tests 1 and 6 PASS; guards PASS; `test.fixme()` tests are skipped. Also run `PW_PORT=4273 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts -g "keeps its velocity" --repeat-each=5` → 5 passed.
 - `pnpm check` → 0 errors.
 
 ### Step 4: Unit tests for the helper
@@ -295,7 +300,7 @@ Create `.changeset/layout-velocity.md` (`minor`): "Layout animations with a spri
 
 Run `pnpm check`, `pnpm test:only`, `pnpm build`, the layout e2e group from the commands table, then the full chromium e2e while no other lane is running Playwright, then `trunk fmt` and `trunk check` on the changed files.
 
-**Verify**: 0 errors; all unit tests pass; e2e passes except known skips and the expected `test.fail()` cases. Re-run a failing spec alone once before reporting it, and say that it was re-run. `e2e/animate-presence/pop-layout-container-move.spec.ts:282` is a known intermittent failure on `main`; a failure there alone is not a STOP. Any other existing spec that fails after Step 3 and passed before it is a STOP: report the spec, the assertion and what the page shows.
+**Verify**: 0 errors; all unit tests pass; e2e passes except known skips and the expected `test.fixme()` cases. Re-run a failing spec alone once before reporting it, and say that it was re-run. `e2e/animate-presence/pop-layout-container-move.spec.ts:282` is a known intermittent failure on `main`; a failure there alone is not a STOP. Any other existing spec that fails after Step 3 and passed before it is a STOP: report the spec, the assertion and what the page shows.
 
 Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
@@ -303,7 +308,7 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
 - **Red-first anchors**: e2e tests 1 and 6 fail on the unmodified adapter with motion-dom 14.14.0 and pass after Step 3.
 - **Guards**: e2e tests 4, 5, 7, 9, 10, 11, 14, 15 (free with the pin; they keep it that way).
-- **Handed to other plans**: tests 2, 3, 8, 12 (plan 005) and 13 (plan 004), marked `test.fail()` so they turn into errors the moment they start passing.
+- **Handed to other plans**: tests 2, 3, 8, 12 (plan 005) and 13 (plan 004), marked `test.fixme()` (skipped) until their owning plan removes the annotation.
 - **Unit**: six cases for `readSnapshotVelocity`.
 - Not ported: `packages/motion-dom/src/projection/animation/__tests__/layout-velocity.test.ts` tests `resolveAutoMass` and `pointToProgressVelocity`, which motion-dom does not export. E2e tests 9 to 11 cover `resolveAutoMass`'s effect. `pointToProgressVelocity` (velocity along a curved `arc()` layout path) has no upstream browser test and none here.
 
@@ -333,4 +338,4 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 - `motionDomProjection.ts` is also edited by plans 004 and 005 (different functions; merge 003 first).
 - Velocity applies only to `type: 'spring'` layout transitions without `repeat`. The default layout transition is a tween, so apps that never set a layout spring see no change.
 - Sign-off: the maintainer drives both pages against an upstream twin (see the batch README). The dispatcher builds the twin from upstream's seven `dev/react/src/tests/layout-velocity-*.tsx` fixtures with the same buttons in the same order.
-- Reviewer: check that no upstream threshold was changed, and that the `test.fail()` annotations each name plan 004 or 005.
+- Reviewer: check that no upstream threshold was changed, and that the `test.fixme()` annotations each name plan 004 or 005.

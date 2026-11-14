@@ -25,7 +25,7 @@ Upstream's layout-velocity tests include a card that is dragged, thrown, and rep
 
 ## Current state
 
-- **Fixture and tests** (created by plan 003): `src/routes/tests/layout-id/throw/+page.svelte` and `e2e/layout-id/throw.spec.ts`. The red card (`#box`, `layoutId="card"`, `drag`, at `left: 300px; top: 100px`) is replaced on drag end by a blue `#box` with the same `layoutId` at `left: 50px; top: 400px`. Plan 003 marked "A thrown card hands its velocity to a layoutId element" with `test.fail()` and a comment naming this plan.
+- **Fixture and tests** (created by plan 003): `src/routes/tests/layout-id/throw/+page.svelte` and `e2e/layout-id/throw.spec.ts`. The red card (`#box`, `layoutId="card"`, `drag`, at `left: 300px; top: 100px`) is replaced on drag end by a blue `#box` with the same `layoutId` at `left: 50px; top: 400px`. Plan 003 marked "A thrown card hands its velocity to a layoutId element" with `test.fixme()` and a comment naming this plan.
 - **Measured at planning time** (scratch copy of the fixture, vite dev server, Chromium; `R`/`B` is the red or blue box, then its left edge and width per frame). The card is dragged from 300 to 390 and released:
   ```
   R310 R330 R350 R370 R390  UP  B300 B300 B297 B292 B285 B278 …
@@ -84,7 +84,7 @@ Upstream's layout-velocity tests include a card that is dragged, thrown, and rep
 
 **In scope:**
 - `src/lib/utils/motionDomProjection.ts`: `takeOverLiveLeadOnMount()` and `seedDepartingLeadSnapshot()` only
-- `e2e/layout-id/throw.spec.ts`: one new test, and removing one `test.fail()`
+- `e2e/layout-id/throw.spec.ts`: one new test, and removing one `test.fixme()`
 - `src/lib/components/presenceSharedLayout.spec.ts` or `src/lib/utils/motionDomProjection.spec.ts`: unit coverage, if the fix adds or changes a function that can be tested without a browser
 - `.changeset/thrown-card-handoff.md` (create)
 
@@ -133,7 +133,7 @@ Decide between "keep `measured` when only its transform-free `layoutBox` matches
 
 In `takeOverLiveLeadOnMount`, after the lead's snapshot is final and before `projection.snapshot = lead.snapshot`, call `recordSnapshotVelocity(lead)`: the velocity must be read from the **lead** (the dragged element's `x`/`y` motion values and any layout animation it was running), not from the mounting node. In `seedDepartingLeadSnapshot`, call `recordSnapshotVelocity(projection)` after its `projection.snapshot = { … }` assignment; there `projection` is the departing lead.
 
-Remove the `test.fail()` line and its comment from "A thrown card hands its velocity to a layoutId element".
+Remove the `test.fixme()` line and its comment from "A thrown card hands its velocity to a layoutId element".
 
 **Verify**: `PW_PORT=4274 pnpm exec playwright test --project=chromium e2e/layout-id/throw.spec.ts` → all tests PASS, including "A thrown card hands its velocity…" (`Math.max(...samples.slice(0, 3)) > atSwap + 4`), "A layoutId tween starts from rest" (`< atSwap + 1`) and "A thrown card keeps its size…" (width stays within 99 to 401).
 
@@ -145,7 +145,7 @@ Create `.changeset/thrown-card-handoff.md` (`patch`): "A dragged element that ha
 
 Run `pnpm check`, `pnpm test:only`, the shared-layout e2e group from the commands table, then `trunk fmt` and `trunk check` on the changed files.
 
-**Verify**: 0 errors; all unit tests pass; the e2e group passes except known skips and any remaining `test.fail()` cases owned by plan 005. Re-run a failing spec alone once before reporting it. An existing `layoutId` spec that fails after Step 3 or 4 and passed before is a STOP.
+**Verify**: 0 errors; all unit tests pass; the e2e group passes except known skips and any remaining `test.fixme()` cases owned by plan 005. Re-run a failing spec alone once before reporting it. An existing `layoutId` spec that fails after Step 3 or 4 and passed before is a STOP.
 
 ## Test plan
 
@@ -156,7 +156,7 @@ Run `pnpm check`, `pnpm test:only`, the shared-layout e2e group from the command
 
 ## Done criteria
 
-- [ ] `e2e/layout-id/throw.spec.ts` passes with no `test.fail()` in it (`grep -c "test.fail" e2e/layout-id/throw.spec.ts` → `0`)
+- [ ] `e2e/layout-id/throw.spec.ts` passes with no `test.fixme()` in it (`grep -c "test.fixme" e2e/layout-id/throw.spec.ts` → `0`)
 - [ ] The Step 1 test exists and was recorded failing before Step 3
 - [ ] `pnpm check` → 0 errors; `pnpm test:only` → all pass
 - [ ] `e2e/layout-id`, `e2e/layout`, `e2e/animate-presence`, `e2e/drag`, `e2e/reorder` → no new failures

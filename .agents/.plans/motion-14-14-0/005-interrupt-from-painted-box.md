@@ -25,7 +25,7 @@ When a layout animation is interrupted, Motion starts the new one from the box t
 
 ## Current state
 
-- **The four tests** (created by plan 003 in `e2e/layout/velocity.spec.ts`, each marked `test.fail()` with a comment naming this plan, unless plan 003's report says one already passed):
+- **The four tests** (created by plan 003 in `e2e/layout/velocity.spec.ts`, each marked `test.fixme()` with a comment naming this plan, (plan 003 marks all four with `test.fixme()`, revision 2026-11-14)):
   - "An interrupted layout tween starts from rest": `Math.max(...samples) < atInterrupt + 1`
   - "An interrupted layout spring with a duration starts from rest": same assertion
   - "An interrupted spring with a delay holds still during the delay": every sampled width within 2 px of the width at the interrupt
@@ -110,7 +110,7 @@ When a layout animation is interrupted, Motion starts the new one from the box t
 **In scope:**
 - `src/lib/html/_MotionContainer.svelte`: `scheduledReactiveCommit` and `runReactiveCommit` only (around `:2721-2775`)
 - `src/lib/utils/motionDomProjection.ts`: `commitObservedLayoutChange()` and `onScreenSnapshot()`, plus at most one new small method
-- `e2e/layout/velocity.spec.ts`: removing `test.fail()` lines
+- `e2e/layout/velocity.spec.ts`: removing `test.fixme()` lines
 - `src/lib/utils/motionDomProjection.spec.ts`: unit tests for any new method
 - `.changeset/interrupt-from-painted-box.md` (create)
 
@@ -130,9 +130,9 @@ When a layout animation is interrupted, Motion starts the new one from the box t
 
 ### Step 1: Confirm the red tests
 
-Remove the `test.fail()` line from each of the four tests locally (do not commit yet) and run the spec three times.
+Remove the `test.fixme()` line from each of the four tests locally (do not commit yet) and run the spec three times.
 
-**Verify**: `PW_PORT=4275 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts --repeat-each=3` → record, for each of the four tests, how many of three runs fail and by how much (`Math.max(...samples) − atInterrupt`, the worst width difference, `back − atInterrupt`). At least the tween and duration tests must fail in all three runs. If all four pass in all three runs, the divergence does not reproduce on a built package: commit the removal of the `test.fail()` lines, skip to Step 5, and say so in your report.
+**Verify**: `PW_PORT=4275 pnpm exec playwright test --project=chromium e2e/layout/velocity.spec.ts --repeat-each=3` → record, for each of the four tests, how many of three runs fail and by how much (`Math.max(...samples) − atInterrupt`, the worst width difference, `back − atInterrupt`). At least the tween and duration tests must fail in all three runs. If all four pass in all three runs, the divergence does not reproduce on a built package: commit the removal of the `test.fixme()` lines, skip to Step 5, and say so in your report.
 
 ### Step 2: Investigation gate
 
@@ -146,7 +146,7 @@ Run the tween fixture once with the console captured.
 - (a) `projection.target.x.min` changes across `flushFrameSteps()` by about the size of the test's failure, and `commitObservedLayoutChange` is reached from `runReactiveCommit` (the hypothesis); or
 - (b) the target does not move across the flush, or the commit comes from another path (the observer at `:3308`, or `:3154`).
 
-For (b), restore the `test.fail()` lines, STOP, and report the numbers. Do not try another fix.
+For (b), restore the `test.fixme()` lines, STOP, and report the numbers. Do not try another fix.
 
 ### Step 3: Snapshot before the flush
 
@@ -172,9 +172,9 @@ Add tests for the new adapter method in `src/lib/utils/motionDomProjection.spec.
 
 Create `.changeset/interrupt-from-painted-box.md` (`patch`): "An interrupted layout animation now restarts from the position that was last painted. Before, a tween or a delayed spring travelled on for up to one frame before turning."
 
-Commit the removal of the four `test.fail()` lines with the fix. Run `pnpm check`, `pnpm test:only`, `pnpm build`, the layout e2e group, then the full chromium e2e while no other lane is running Playwright, then `trunk fmt` and `trunk check` on the changed files.
+Commit the removal of the four `test.fixme()` lines with the fix. Run `pnpm check`, `pnpm test:only`, `pnpm build`, the layout e2e group, then the full chromium e2e while no other lane is running Playwright, then `trunk fmt` and `trunk check` on the changed files.
 
-**Verify**: 0 errors; all unit tests pass; e2e passes except known skips. Re-run a failing spec alone once before reporting it. `e2e/animate-presence/pop-layout-container-move.spec.ts:282` is a known intermittent failure on `main`. Any other existing spec that fails after Step 3 and passed before it is a STOP: restore the code, keep the `test.fail()` lines, and report the spec and the assertion.
+**Verify**: 0 errors; all unit tests pass; e2e passes except known skips. Re-run a failing spec alone once before reporting it. `e2e/animate-presence/pop-layout-container-move.spec.ts:282` is a known intermittent failure on `main`. Any other existing spec that fails after Step 3 and passed before it is a STOP: restore the code, keep the `test.fixme()` lines, and report the spec and the assertion.
 
 Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
@@ -187,14 +187,14 @@ Revert any change `pnpm build` makes to `docs/static/r/animated-tabs.json`.
 
 ## Done criteria
 
-- [ ] `grep -c "test.fail" e2e/layout/velocity.spec.ts` → `0`
+- [ ] `grep -c "test.fixme" e2e/layout/velocity.spec.ts` → `0`
 - [ ] `e2e/layout/velocity.spec.ts --repeat-each=3` → all pass
 - [ ] `pnpm check` → 0 errors; `pnpm test:only` → all pass
 - [ ] Full chromium e2e → no new failures
 - [ ] `grep -n "console.debug" src/lib/html/_MotionContainer.svelte src/lib/utils/motionDomProjection.ts` → no output
 - [ ] `git status` shows only in-scope files
 
-(If the plan ended at a STOP in Step 1, 2 or 5, the done criterion is the report: the measurements, which case was found, and the `test.fail()` lines left in place.)
+(If the plan ended at a STOP in Step 1, 2 or 5, the done criterion is the report: the measurements, which case was found, and the `test.fixme()` lines left in place.)
 
 ## STOP conditions
 
