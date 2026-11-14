@@ -1870,9 +1870,12 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
     const mount = (
         options: { layoutId?: string; layout?: boolean; layoutScroll?: boolean },
         rect: DOMRect,
-        parent?: MotionDomProjectionAdapter
+        parent?: MotionDomProjectionAdapter,
+        // Values the element is drawn with before its seed read.
+        latestValues?: { x?: number }
     ) => {
         const adapter = new MotionDomProjectionAdapter(parent ? { parent } : {})
+        if (latestValues) Object.assign(adapter.projection.latestValues, latestValues)
         const element = document.createElement('div')
         document.body.appendChild(element)
         rects.set(element, rect)
@@ -1924,12 +1927,15 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
     })
 
     it('removes the transforms from the layout box but keeps them in the measured box', () => {
+        // Drawn 80px right of its layout slot by its own `x` when the seed
+        // read it, so the read (90) already shows the transform.
         const { adapter: lead, element } = mount(
             { layoutId: 'a1-transform' },
-            new DOMRect(90, 20, 100, 50)
+            new DOMRect(90, 20, 100, 50),
+            undefined,
+            { x: 80 }
         )
-        // Drawn 80px right of its layout slot by its own `x`.
-        lead.projection.latestValues.x = 80
+        expect(lead.projection.latestValues.x).toBe(80)
         element.remove()
         lead.unmount()
 
@@ -1938,6 +1944,25 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
         const snapshot = adapter.projection.resumeFrom?.snapshot
         expect(snapshot?.measuredBox.x.min).toBe(90)
         expect(snapshot?.layoutBox.x.min).toBe(10)
+    })
+
+    it('applies a transform added after an untransformed seed (thrown card)', () => {
+        // Seeded at 90 with no transform, then dragged 80px right: the seed
+        // read is the transform-free layout, so the drag still has to be
+        // applied to find where the element was drawn (plan 004).
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-thrown' },
+            new DOMRect(90, 20, 100, 50)
+        )
+        lead.projection.latestValues.x = 80
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-thrown' }, new DOMRect(300, 20, 100, 50))
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(170)
+        expect(snapshot?.layoutBox.x.min).toBe(90)
     })
 
     it('hands over a page-space measuredBox under a scrolled layoutScroll ancestor', () => {
