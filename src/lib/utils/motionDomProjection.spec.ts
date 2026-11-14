@@ -12,7 +12,9 @@ import { observeLayoutChanges } from './layout.js'
 import {
     MotionDomProjectionAdapter,
     layoutMeasureStats,
-    type ExitLayoutHold
+    readSnapshotVelocity,
+    type ExitLayoutHold,
+    type SnapshotVelocitySource
 } from './motionDomProjection.js'
 import { readScrollBasis } from './scrollBasis.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -2961,5 +2963,89 @@ describe('MotionDomProjectionAdapter.seedOwnSnapshotFromCache (plan 015c)', () =
         adapter.refreshLayout({ silent: true })
         expect(adapter.ownCacheIsCurrent()).toBe(true)
         stop()
+    })
+})
+
+/**
+ * Layout velocity (Motion 14.13, plan 003 of motion-14-14-0): the port of
+ * `updateSnapshot()`'s velocity block (create-projection-node.ts 1059-1091 @
+ * v14.14.0) for the snapshots the adapter builds by hand.
+ */
+describe('readSnapshotVelocity', () => {
+    const value = (velocity: number) => ({ getVelocity: () => velocity })
+    const fakeNode = (
+        fields: Partial<SnapshotVelocitySource> = {},
+        values: Record<string, number> = {}
+    ): SnapshotVelocitySource => ({
+        options: {
+            visualElement: {
+                getValue: (key: string) => value(values[key] ?? 0)
+            }
+        },
+        ...fields
+    })
+    const running = { currentAnimation: { state: 'running' } }
+
+    it('returns nothing for an idle node with still values', () => {
+        expect(readSnapshotVelocity(fakeNode())).toEqual({})
+    })
+
+    it('scales the edges by the progress velocity when there are no edge values', () => {
+        const node = fakeNode({
+            ...running,
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500)
+        })
+        expect(readSnapshotVelocity(node).velocity).toEqual([-5, -10, -15, -20, 0, 0])
+    })
+
+    it('reads each edge velocity from the edge values when they exist', () => {
+        const node = fakeNode({
+            ...running,
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500),
+            edgeValues: [0, 0, 0, 0],
+            edgeVelocity: (i: number) => i + 1
+        })
+        expect(readSnapshotVelocity(node).velocity?.slice(0, 4)).toEqual([1, 2, 3, 4])
+    })
+
+    it('hands on no edge velocity from a paused animation, only the x and y values', () => {
+        const paused = fakeNode({
+            currentAnimation: { state: 'paused' },
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500)
+        })
+        expect(readSnapshotVelocity(paused)).toEqual({})
+
+        const movingX = fakeNode(
+            {
+                currentAnimation: { state: 'paused' },
+                animationEdges: [10, 20, 30, 40],
+                motionValue: value(500)
+            },
+            { x: 300 }
+        )
+        expect(readSnapshotVelocity(movingX).velocity).toEqual([0, 0, 0, 0, 300, 0])
+    })
+
+    it('copies the relative velocity of a node inside an animating parent', () => {
+        const relativeVelocity = [1, 2, 3, 4]
+        const result = readSnapshotVelocity(
+            fakeNode({ ...running, relativeTarget: {}, relativeVelocity })
+        )
+        expect(result.relativeVelocity).toEqual([1, 2, 3, 4])
+        expect(result.relativeVelocity).not.toBe(relativeVelocity)
+
+        expect(
+            readSnapshotVelocity(fakeNode({ ...running, relativeTarget: {} })).relativeVelocity
+        ).toEqual([])
+    })
+
+    it('leaves out the relative velocity without a relative target', () => {
+        const result = readSnapshotVelocity(
+            fakeNode({ ...running, relativeVelocity: [1, 2, 3, 4] })
+        )
+        expect(result).not.toHaveProperty('relativeVelocity')
     })
 })

@@ -1478,6 +1478,22 @@
                         layout — a reflow mid animation keeps sliding from the painted box
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/velocity') + searchParams}
+                    >
+                        Layout velocity: an interrupted spring keeps its speed (Motion 14.13)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/throw') + searchParams}
+                    >
+                        layoutId: a thrown card hands its velocity on (Motion 14.13)
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

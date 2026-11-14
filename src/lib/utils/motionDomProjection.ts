@@ -209,6 +209,72 @@ const measurementsFromRect = (rect: RectLike, base: Measurements | undefined): M
     source: base?.source ?? 0
 })
 
+/** The fields of a motion-dom projection node that layout velocity reads. */
+export type SnapshotVelocitySource = {
+    currentAnimation?: { state?: string }
+    animationEdges?: number[]
+    edgeValues?: number[]
+    edgeVelocity?: (index: number) => number
+    relativeTarget?: unknown
+    relativeVelocity?: number[]
+    motionValue?: { getVelocity(): number }
+    options: {
+        visualElement?: { getValue(key: string): { getVelocity(): number } | undefined }
+    }
+}
+
+/**
+ * How fast a projection node is moving, in the shape motion-dom stores on a
+ * snapshot. A port of `updateSnapshot()`'s velocity block
+ * (create-projection-node.ts 1059-1091 @ v14.14.0) for the snapshots this
+ * adapter builds itself, which motion-dom's `updateSnapshot()` never sees.
+ *
+ * @param node The projection node the snapshot describes.
+ * @returns `velocity` as `[x min, x max, y min, y max, x value, y value]` in
+ * px/s when anything moves, and `relativeVelocity` when the node animates
+ * inside an animating parent.
+ *
+ * @example
+ * ```ts
+ * Object.assign(projection.snapshot, readSnapshotVelocity(projection))
+ * ```
+ */
+export const readSnapshotVelocity = (
+    node: SnapshotVelocitySource
+): Pick<Measurements, 'velocity' | 'relativeVelocity'> => {
+    const result: Pick<Measurements, 'velocity' | 'relativeVelocity'> = {}
+    const { visualElement } = node.options
+    // A paused or stopped animation hands on no velocity.
+    const isRunning = node.currentAnimation?.state === 'running'
+    const edges = isRunning && node.animationEdges
+    // A child moving inside its parent hands on only its velocity relative
+    // to the parent.
+    if (isRunning && node.relativeTarget) {
+        result.relativeVelocity = node.relativeVelocity?.slice() || []
+    }
+    const progress = (edges && node.motionValue?.getVelocity()) || 0
+    const velocity = [0, 1, 2, 3, 4, 5].map(
+        (i) =>
+            (i < 4
+                ? edges && (node.edgeValues ? node.edgeVelocity!(i) : (-edges[i] * progress) / 1000)
+                : visualElement?.getValue(i < 5 ? 'x' : 'y')?.getVelocity()) || 0
+    )
+    if (velocity.some(Boolean)) result.velocity = velocity
+    return result
+}
+
+/**
+ * Records the node's velocity on the snapshot this adapter just assigned to
+ * it, as motion-dom's `updateSnapshot()` does for its own snapshots.
+ */
+const recordSnapshotVelocity = (projection: { snapshot?: Measurements }) => {
+    if (!projection.snapshot) return
+    Object.assign(
+        projection.snapshot,
+        readSnapshotVelocity(projection as unknown as SnapshotVelocitySource)
+    )
+}
+
 const near = (a: number, b: number) => Math.abs(a - b) <= 0.5
 const sameSize = (a: RectLike, b: RectLike) => near(a.width, b.width) && near(a.height, b.height)
 const rectsMatch = (a: RectLike, b: RectLike) =>
@@ -2165,6 +2231,12 @@ export class MotionDomProjectionAdapter {
             const projection = follower.projection
             follower.prepareSnapshotPath(projection as unknown as ProjectionTreeNode)
             projection.snapshot = snapshot
+            // motion-dom's `updateSnapshot()` records the node's velocity on its
+            // own snapshot, but the adapter replaces it with this hand-built one
+            // (e.g. `willUpdate()` before a reactive patch, then the commit's
+            // `seedCachedSnapshotsForSubtree` overwrites it), so record it here
+            // too or an interrupted layout spring starts from rest.
+            recordSnapshotVelocity(projection)
             projection.isLayoutDirty = true
             follower.presenceSeeded = true
         }
@@ -2468,6 +2540,7 @@ export class MotionDomProjectionAdapter {
             if (!snapshot) continue
             this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
+            recordSnapshotVelocity(projection)
             projection.isLayoutDirty = true
             seeded += 1
         }
@@ -2574,6 +2647,7 @@ export class MotionDomProjectionAdapter {
         if (!snapshot) return 0
         this.prepareSnapshotPath(projection)
         projection.snapshot = snapshot
+        recordSnapshotVelocity(projection)
         projection.isLayoutDirty = true
         return 1
     }
@@ -2667,6 +2741,7 @@ export class MotionDomProjectionAdapter {
         if (snapshot && !keepsOwn && (projection.options.layout || projection.options.layoutId)) {
             this.prepareSnapshotPath(projection)
             projection.snapshot = snapshot
+            recordSnapshotVelocity(projection)
             projection.isLayoutDirty = true
         }
 
