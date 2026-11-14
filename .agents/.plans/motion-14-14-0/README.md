@@ -63,7 +63,7 @@ The graph is a narrow diamond because the velocity code only exists in motion-do
 | [003](003-layout-velocity.md) | Spring layout animations keep their velocity: adapter port, fixtures, upstream's 15 tests | 2 | P1 | M–L | 001 | `utils/motionDomProjection.ts` (new helper + four calls) + spec, new `tests/layout/velocity`, new `tests/layout-id/throw`, new `e2e/layout/velocity.spec.ts`, new `e2e/layout-id/throw.spec.ts`, `+page.svelte` (Layout section), changeset | DONE (guard PASS 2026-11-14 after one amendment, see 003 guard log) |
 | [004](004-thrown-card-handoff.md) | A dragged card's `layoutId` twin starts where the card was released and keeps the throw | 3 | P2 | M | 003 | `utils/motionDomProjection.ts` (`takeOverLiveLeadOnMount`, `seedDepartingLeadSnapshot`), `e2e/layout-id/throw.spec.ts`, changeset (patch) | TODO |
 | [005](005-interrupt-from-painted-box.md) | An interrupted layout animation restarts from the painted box (investigation gate) | 3 | P3 | M | 003 | `_MotionContainer.svelte` (`scheduledReactiveCommit`, `runReactiveCommit`), `utils/motionDomProjection.ts` (`commitObservedLayoutChange`, `onScreenSnapshot`) + spec, `e2e/layout/velocity.spec.ts`, changeset (patch) | TODO |
-| [006](006-layout-velocity-docs.md) | Layout velocity and `mass: "auto"` docs, with an example page | 3 | P2 | M | 003 | docs `layout-animations`, docs `use-spring` (one row), new `docs/src/lib/examples/layout-velocity/demos/*`, new `docs/src/routes/examples/layout-velocity`, `examplesIndex.ts` | TODO |
+| [006](006-layout-velocity-docs.md) | Layout velocity and `mass: "auto"` docs, with an example page | 3 | P2 | M | 003 | docs `layout-animations`, docs `use-spring` (one row), new `docs/src/lib/examples/layout-velocity/demos/*`, new `docs/src/routes/examples/layout-velocity`, `examplesIndex.ts` | DONE (guard PASS 2026-11-14, see 006 guard log) |
 | [007](007-default-layout-transition.md) | A layout animation with no transition uses upstream's 0.45 s default | 2 | P2 | S | 001 | `_MotionContainer.svelte` (new `layoutTransition` + two layout `updateOptions` lines), new `tests/layout/default-transition`, new `e2e/layout/default-transition.spec.ts`, `+page.svelte` (before `layout/scroll`), changeset | DONE (guard PASS 2026-11-14 after one amendment, see 007 guard log) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (reason) | SUPERSEDED (by).
@@ -123,6 +123,10 @@ Twins needed:
 - 006: `/docs/layout-animations` (the new "Spring velocity" section) and `/examples/layout-velocity` — twin is `layout-velocity-interrupt.tsx` and `layout-velocity-auto-mass.tsx`.
 - 002: `motion/fx-prop` — a `<motion.div fx />` in the React twin with a toggle button; compare the attribute in devtools. There is nothing to see on screen.
 - 001: the existing `pinch/vanilla?drag&max=1.5` page against upstream's `dev/html/public/playwright/gestures/pinch.html`. Zoom past the limit on a trackpad, then start dragging as it snaps back.
+
+## Wave-2 integration check (dispatcher, 2026-11-14)
+
+On `feat/motion-14.14.0` after merging 001, 002, 003 and 007: `pnpm check` 0 errors; `pnpm test:only` 1727/1727; full chromium e2e (`PW_PORT=4270`) 973 passed, 7 skipped (2 long-standing + 5 `test.fixme()` owned by 004/005), 0 failed, 33.0 min.
 
 ## Full verification (after the last merge, CONTRIBUTING.md "Full verification" order)
 
