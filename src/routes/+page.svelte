@@ -1368,6 +1368,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/default-transition') + searchParams}
+                    >
+                        Default layout transition (0.45 s, upstream parity)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container

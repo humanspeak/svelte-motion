@@ -681,7 +681,15 @@
             // VisualElement tree honours `inherit={false}` too (motion b63833cb0).
             inherit: inheritProp,
             custom: effectiveCustom,
-            transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
+            // `undefined` when nothing is configured, as React's `props.transition`
+            // (framer-motion motion/index.tsx:124-128 @ v14.14.0). `{}` would be
+            // truthy in the projection's layout-transition chain
+            // (`getDefaultTransition()`, create-projection-node.ts:670-673) and
+            // skip upstream's 0.45 s `defaultLayoutTransition`.
+            transition:
+                motionConfig?.transition === undefined && transitionProp === undefined
+                    ? undefined
+                    : mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
             whileHover: filterReducedMotionDefinition(whileHoverProp),
             whileTap: filterReducedMotionDefinition(whileTapProp),
             whileFocus: filterReducedMotionDefinition(whileFocusProp),
@@ -846,6 +854,16 @@
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
         mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {})
+    )
+
+    // Layout animations fall back to upstream's 0.45 s `defaultLayoutTransition`
+    // only when no transition is configured (create-projection-node.ts:670-673,
+    // :2926-2929 @ v14.14.0). `mergedTransition` is `{}` in that case, and `{}`
+    // is truthy, so hand the projection `undefined` instead.
+    const layoutTransition = $derived<AnimationOptions | undefined>(
+        motionConfig?.transition === undefined && transitionProp === undefined
+            ? undefined
+            : mergedTransition
     )
 
     // The presence teardown (plan 012, P6). A script-level `$effect.pre` is a
@@ -2262,7 +2280,7 @@
             layoutDependency: layoutDependencyProp,
             // Plan 015b (R7): part D never seeds a gated node.
             measurementGated: layoutMeasurementGated,
-            transition: mergedTransition as never,
+            transition: layoutTransition as never,
             style: styleProp,
             alwaysMeasureLayout: upstreamAlwaysMeasureLayout
         })
@@ -2300,7 +2318,7 @@
                 layoutAnchor: layoutAnchorProp,
                 layoutDependency: layoutDependencyProp,
                 measurementGated: layoutMeasurementGated,
-                transition: mergedTransition as never,
+                transition: layoutTransition as never,
                 style: styleProp,
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
             })
