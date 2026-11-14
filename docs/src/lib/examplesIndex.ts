@@ -150,6 +150,11 @@ const EXAMPLES: Record<string, ExampleEntry> = {
         description:
             'A tab underline glides one tab while the whole tab bar jumps, and a centred child stays centred while its parent resizes.'
     },
+    'layout-velocity': {
+        title: 'Layout velocity',
+        description:
+            'A spring layout animation keeps its speed when interrupted, and mass: "auto" makes bigger elements move heavier.'
+    },
     'lazy-motion': {
         title: 'LazyMotion',
         description: 'Load Svelte Motion feature bundles with LazyMotion and the m namespace.'
