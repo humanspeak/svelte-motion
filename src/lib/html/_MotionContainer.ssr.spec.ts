@@ -169,4 +169,14 @@ describe('_MotionContainer SSR styles', () => {
         expect(container.innerHTML).toContain('"duration":1200')
         expect(container.innerHTML).not.toContain('"duration":9000')
     })
+
+    // Upstream `render/dom/utils/filter-props.ts:32-39` @ v14.14.0: `fx`
+    // renders as an empty attribute in the server markup too.
+    it('renders fx as an empty attribute on the server', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', fx: true }
+        })
+        expect(container.innerHTML).toContain(' fx=""')
+        expect(container.innerHTML).not.toContain('fx="true"')
+    })
 })

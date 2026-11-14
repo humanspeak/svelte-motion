@@ -1932,6 +1932,10 @@
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...spreadAttrs,
+        // Upstream `render/dom/utils/filter-props.ts:32-39` @ v14.14.0: `fx` marks
+        // the element for an `<FX>` canvas layer. A truthy value renders an empty
+        // attribute; anything else renders none.
+        ...('fx' in spreadAttrs ? { fx: spreadAttrs.fx ? '' : undefined } : {}),
         // Upstream `render/html/use-props.ts:76-81`: `tabIndex = 0` from props
         // alone when none is set and `onTap`, `onTapStart` or `whileTap` is
         // truthy. Raw prop truthiness (an unresolved `whileTap` label counts),
