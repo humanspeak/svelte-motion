@@ -128,6 +128,10 @@ Twins needed:
 
 On `feat/motion-14.14.0` after merging 001, 002, 003 and 007: `pnpm check` 0 errors; `pnpm test:only` 1727/1727; full chromium e2e (`PW_PORT=4270`) 973 passed, 7 skipped (2 long-standing + 5 `test.fixme()` owned by 004/005), 0 failed, 33.0 min.
 
+## Final full verification (dispatcher, 2026-11-14)
+
+On `feat/motion-14.14.0` at `1bb1c056` (all seven plans merged), the 13 steps below: build + publint ok; `pnpm check` 0 errors; package ok; `pnpm test` (coverage) ok; consumer-vite6 ok; docs build ok; docs check 0 errors; docs test ok; geo-SEO ok; docs Playwright 12/12; **chromium e2e 980 passed, 2 skipped (long-standing), 0 failed (35.3 min)**; trunk no new issues; `git diff --check` clean. Remaining before PR: the 0.45 s default row in the docs (006 follow-up) and the maintainer's live sign-off against upstream twins.
+
 ## Full verification (after the last merge, CONTRIBUTING.md "Full verification" order)
 
 1. `pnpm build`
