@@ -55,11 +55,11 @@ export default defineConfig({
                 ...devices['Desktop Chrome'],
                 launchOptions: resolveChromiumLaunchOptions(chromium.executablePath())
             }
+        },
+        {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] }
         }
-        // {
-        //     name: 'firefox',
-        //     use: { ...devices['Desktop Firefox'] }
-        // },
         // {
         //     name: 'webkit',
         //     use: { ...devices['Desktop Safari'] }

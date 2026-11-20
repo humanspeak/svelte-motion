@@ -211,7 +211,7 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.1(jiti@2.7.0)(supports-color@10.2.2))
       '@playwright/test':
-        specifier: ^1.62.1
+        specifier: 1.62.1
         version: 1.62.1
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1

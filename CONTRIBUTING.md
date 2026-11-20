@@ -61,11 +61,11 @@ Run commands in this order. Each step prepares what the next one needs.
 | 8    | Docs units            | `pnpm --dir docs test`                                         |
 | 9    | Docs build output     | `pnpm --dir docs test:geo-seo`                                 |
 | 10   | Docs browser projects | `pnpm exec playwright test --config docs/playwright.config.ts` |
-| 11   | Root e2e              | `pnpm exec playwright test --project=chromium`                 |
+| 11   | Root e2e              | `pnpm exec playwright test` (Chromium and Firefox)             |
 | 12   | Format and lint       | `trunk fmt <files>` then `trunk check <files>`                 |
 | 13   | Whitespace integrity  | `git diff --check`                                             |
 
-Ordering matters. The root build emits the package that `docs/` and the consumer fixture import, and `pnpm check` runs after it for the same reason. The docs build generates inputs (GitHub stats, registry) that `pnpm --dir docs check` relies on, so an isolated docs typecheck on a fresh checkout is unreliable. The docs build-output and browser tests run against that build rather than rebuilding, so rebuild docs before rerunning them after a change. The library runs through `.github/workflows/pr-build.yml` and `run-tests.yml`; the docs site runs through `.github/workflows/docs.yml`, which follows steps 6–10 in this order and deploys from `main` only after they pass.
+Ordering matters. The root build emits the package that `docs/` and the consumer fixture import, and `pnpm check` runs after it for the same reason. The docs build generates inputs (GitHub stats, registry) that `pnpm --dir docs check` relies on, so an isolated docs typecheck on a fresh checkout is unreliable. The docs build-output and browser tests run against that build rather than rebuilding, so rebuild docs before rerunning them after a change. The library runs through `.github/workflows/pr-build.yml` and `run-tests.yml`. CI runs root e2e in Chromium and Firefox, three shards each, inside the `mcr.microsoft.com/playwright` image that matches the exact `@playwright/test` version in `package.json`, so keep that dependency pinned without a range; the docs site runs through `.github/workflows/docs.yml`, which follows steps 6–10 in this order and deploys from `main` only after they pass.
 
 ### Test layout
 
