@@ -14,7 +14,9 @@
      *
      * Svelte deviations: the fixture sits in a `position: absolute` wrapper at
      * the page's top left (the test harness centres its content), and the
-     * tester panel adds Throw / Reset buttons.
+     * tester panel adds Throw / Reset buttons. Reset cancels a Throw that is
+     * still in flight: it stops the scripted pointer events and remounts the
+     * fixture, so a late `onDragEnd` can't reopen the detail view.
      *
      * @component
      */
@@ -34,6 +36,12 @@
           : { type: 'spring' as const, visualDuration: 0.8, bounce: 0 }
 
     let open = $state(false)
+    /**
+     * Bumped by Reset. A Throw checks it between frames and stops when it
+     * changed, and the fixture is keyed on it, so Reset also drops a drag the
+     * Throw had started.
+     */
+    let generation = $state(0)
 
     const base = resolve('/tests/layout-id/throw')
     const fixtures = ['', '?tween', '?resize']
@@ -67,6 +75,8 @@
     /** Upstream's `throwCard`: a fast flick to the right, released while moving. */
     const throwCard = async () => {
         if (open) return
+        const started = generation
+        const cancelled = () => generation !== started
         const y = 150
         const xs = resize ? [400, 440, 480, 520] : [380, 400, 420, 440]
         dispatchPointer('pointerdown', 350, y)
@@ -74,13 +84,16 @@
         await afterFrame()
         await new Promise((done) => setTimeout(done, 50))
         for (const x of xs) {
+            if (cancelled()) return
             dispatchPointer('pointermove', x, y)
             await afterFrame()
         }
+        if (cancelled()) return
         dispatchPointer('pointerup', xs[xs.length - 1], y)
     }
 
     const reset = () => {
+        generation += 1
         open = false
         redLast = null
         blueFirst = null
@@ -124,43 +137,45 @@
 </svelte:head>
 
 <div class="fixture">
-    {#if open}
-        <motion.div
-            id="box"
-            layoutId="card"
-            {transition}
-            style={{
-                position: 'absolute',
-                top: '400px',
-                left: '50px',
-                width: resize ? '400px' : '100px',
-                height: '100px',
-                background: 'blue'
-            }}
-        />
-    {:else}
-        <motion.div
-            id="box"
-            layoutId="card"
-            drag
-            {transition}
-            onDragEnd={() => (open = true)}
-            style={{
-                position: 'absolute',
-                top: '100px',
-                left: '300px',
-                width: '100px',
-                height: '100px',
-                background: 'red'
-            }}
-        />
-    {/if}
+    {#key generation}
+        {#if open}
+            <motion.div
+                id="box"
+                layoutId="card"
+                {transition}
+                style={{
+                    position: 'absolute',
+                    top: '400px',
+                    left: '50px',
+                    width: resize ? '400px' : '100px',
+                    height: '100px',
+                    background: 'blue'
+                }}
+            />
+        {:else}
+            <motion.div
+                id="box"
+                layoutId="card"
+                drag
+                {transition}
+                onDragEnd={() => (open = true)}
+                style={{
+                    position: 'absolute',
+                    top: '100px',
+                    left: '300px',
+                    width: '100px',
+                    height: '100px',
+                    background: 'red'
+                }}
+            />
+        {/if}
+    {/key}
 </div>
 
 <TesterPanel
     eyebrow="Motion 14.13 · layout velocity"
     title="A thrown card hands its velocity on"
-    status="New in Motion 14.13. The detail view jumping back to the card's undragged place is a known divergence (plan 004)."
+    status="New in Motion 14.13. The detail view starts where the card was released and keeps the throw (plan 004). Throwing again before the last handoff settles can start the blue card well away from the red one; Motion 14.14.0 does the same."
     {steps}
 >
     {#snippet summary()}
