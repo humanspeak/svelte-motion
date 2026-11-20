@@ -159,7 +159,7 @@ Customize the spring physics by passing options:
 | ------------- | ------- | ------------------------------------------------------ |
 | `stiffness`   | `100`   | Higher = snappier                                      |
 | `damping`     | `10`    | Higher = less oscillation                              |
-| `mass`        | `1`     | Higher = more lethargic                                |
+| `mass`        | `1`     | Higher = more lethargic. `"auto"` is accepted in layout transitions only; see [Layout Animations](/docs/layout-animations#spring-velocity). |
 | `restDelta`   | `0.001` | Position threshold to settle                           |
 | `restSpeed`   | `0.01`  | Velocity threshold to settle                           |
 | `velocity`    | `0`     | Initial velocity                                       |

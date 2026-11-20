@@ -285,4 +285,30 @@ test.describe('pinch with a trackpad', () => {
 
         await expect.poll(() => events(page)).toEqual(['start', 'end:wheel'])
     })
+
+    /**
+     * Port of upstream `pinch.test.ts` "a drag during the spring back still
+     * settles scale (#4076)" (Motion v14.13, commit `5e243b4a4`): a drag that
+     * starts mid-snap used to stop the whole snap, leaving scale past `max`.
+     */
+    test('a drag during the snap back still settles scale (#4076)', async ({ page }) => {
+        await open(page, '?drag&max=1.5')
+        // A trackpad zoom past max; it ends once the wheels stop.
+        await page.mouse.move(150, 150)
+        await page.keyboard.down('Control')
+        for (let i = 0; i < 10; i++) {
+            await page.mouse.wheel(0, -7)
+            await frames(page, 1)
+        }
+        await page.keyboard.up('Control')
+        expect((await rect(page, '#box')).width).toBeGreaterThan(150)
+        // Wait for the wheel gesture to end and the snap back to start.
+        await page.waitForTimeout(200)
+        // A drag starts while scale springs back.
+        await page.mouse.down()
+        await page.mouse.move(180, 150, { steps: 3 })
+        await page.waitForTimeout(1500)
+        expect((await rect(page, '#box')).width).toBeCloseTo(150, 0)
+        await page.mouse.up()
+    })
 })

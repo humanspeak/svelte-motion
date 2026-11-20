@@ -681,7 +681,15 @@
             // VisualElement tree honours `inherit={false}` too (motion b63833cb0).
             inherit: inheritProp,
             custom: effectiveCustom,
-            transition: mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
+            // `undefined` when nothing is configured, as React's `props.transition`
+            // (framer-motion motion/index.tsx:124-128 @ v14.14.0). `{}` would be
+            // truthy in the projection's layout-transition chain
+            // (`getDefaultTransition()`, create-projection-node.ts:670-673) and
+            // skip upstream's 0.45 s `defaultLayoutTransition`.
+            transition:
+                motionConfig?.transition === undefined && transitionProp === undefined
+                    ? undefined
+                    : mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
             whileHover: filterReducedMotionDefinition(whileHoverProp),
             whileTap: filterReducedMotionDefinition(whileTapProp),
             whileFocus: filterReducedMotionDefinition(whileFocusProp),
@@ -846,6 +854,16 @@
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
         mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {})
+    )
+
+    // Layout animations fall back to upstream's 0.45 s `defaultLayoutTransition`
+    // only when no transition is configured (create-projection-node.ts:670-673,
+    // :2926-2929 @ v14.14.0). `mergedTransition` is `{}` in that case, and `{}`
+    // is truthy, so hand the projection `undefined` instead.
+    const layoutTransition = $derived<AnimationOptions | undefined>(
+        motionConfig?.transition === undefined && transitionProp === undefined
+            ? undefined
+            : mergedTransition
     )
 
     // The presence teardown (plan 012, P6). A script-level `$effect.pre` is a
@@ -1932,6 +1950,10 @@
     // Derived attributes to keep both branches in sync (focusability, data flags, style, class)
     const derivedAttrs = $derived<Record<string, unknown>>({
         ...spreadAttrs,
+        // Upstream `render/dom/utils/filter-props.ts:32-39` @ v14.14.0: `fx` marks
+        // the element for an `<FX>` canvas layer. A truthy value renders an empty
+        // attribute; anything else renders none.
+        ...('fx' in spreadAttrs ? { fx: spreadAttrs.fx ? '' : undefined } : {}),
         // Upstream `render/html/use-props.ts:76-81`: `tabIndex = 0` from props
         // alone when none is set and `onTap`, `onTapStart` or `whileTap` is
         // truthy. Raw prop truthiness (an unresolved `whileTap` label counts),
@@ -2258,7 +2280,7 @@
             layoutDependency: layoutDependencyProp,
             // Plan 015b (R7): part D never seeds a gated node.
             measurementGated: layoutMeasurementGated,
-            transition: mergedTransition as never,
+            transition: layoutTransition as never,
             style: styleProp,
             alwaysMeasureLayout: upstreamAlwaysMeasureLayout
         })
@@ -2296,7 +2318,7 @@
                 layoutAnchor: layoutAnchorProp,
                 layoutDependency: layoutDependencyProp,
                 measurementGated: layoutMeasurementGated,
-                transition: mergedTransition as never,
+                transition: layoutTransition as never,
                 style: styleProp,
                 alwaysMeasureLayout: upstreamAlwaysMeasureLayout
             })
@@ -2721,11 +2743,24 @@
     const scheduledReactiveCommit = () => {
         reactiveCommitQueued = false
         if (!reactiveCommitPrevious) return
+        // The box as painted, before the flush ticks a running layout
+        // animation one frame on: upstream's `willUpdate()` snapshots it before
+        // `update()` flushes (create-projection-node.ts:1046 @ v14.14.0), so an
+        // interrupt restarts from where the element was seen (plan 005).
+        const painted = motionDomProjection?.captureOnScreenSnapshot()
         flushFrameSteps()
-        runReactiveCommit()
+        runReactiveCommit(painted)
     }
 
-    const runReactiveCommit = () => {
+    /**
+     * Measure and commit the pending reactive layout change.
+     *
+     * @param painted The node's on-screen box captured before the frameloop
+     * flush, or `undefined` when it was not mid a layout animation.
+     */
+    const runReactiveCommit = (
+        painted?: ReturnType<MotionDomProjectionAdapter['captureOnScreenSnapshot']>
+    ) => {
         const prev = reactiveCommitPrevious
         reactiveCommitPrevious = null
         if (!(element && prev)) return
@@ -2768,7 +2803,10 @@
             // including ones in a separate LayoutGroup (Step 4b-d). A live
             // drag compensates in its own projection `didUpdate` listener
             // (`VisualElementDragControls.addListeners`).
-            motionDomProjection?.commitObservedLayoutChange(prev, { ownSubtreeChanged: true })
+            motionDomProjection?.commitObservedLayoutChange(prev, {
+                ownSubtreeChanged: true,
+                onScreenSnapshot: painted
+            })
             return
         }
         // No delta from THIS path's snapshot: leave `lastRect` alone. The

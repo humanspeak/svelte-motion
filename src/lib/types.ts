@@ -720,6 +720,17 @@ export type MotionProps = {
      * ```
      */
     transformTemplate?: TransformTemplate
+    /**
+     * Mark this element so an `<FX>` canvas layer it is inside draws it on
+     * its own and can apply effects to it. Renders an empty `fx` attribute
+     * and has no effect without such a layer.
+     *
+     * @example
+     * ```svelte
+     * <motion.li fx animate={{ x: 300 }} />
+     * ```
+     */
+    fx?: boolean
     /** Called when a true hover gesture starts (not emulated by touch) */
     onHoverStart?: MotionOnHoverStart
     /** Called when a true hover gesture ends */

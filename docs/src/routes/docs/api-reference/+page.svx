@@ -117,6 +117,14 @@ Type aliases like `MotionWhileHover` accept the same shape as the corresponding 
 </motion.button>
 ```
 
+## Advanced props
+
+Props on every `motion.<tag>` component that don't have a page of their own:
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `fx` | `boolean` | Renders an empty `fx` attribute that marks the element for an `<FX>` canvas layer (Motion 14.14). No effect without one. |
+
 ## Re-exports from `motion`
 
 To keep your dependency graph small, Svelte Motion re-exports the low-level imperative API from the `motion` package so you don't need a second runtime dependency.

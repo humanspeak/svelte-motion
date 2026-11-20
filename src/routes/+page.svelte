@@ -334,6 +334,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/fx-prop') + searchParams}
+                    >
+                        fx prop: renders an fx attribute (Motion 14.14)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/spring-velocity') + searchParams}
                     >
                         Spring velocity through an interrupt (Motion 14.12)
@@ -1360,6 +1368,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/default-transition') + searchParams}
+                    >
+                        Default layout transition (0.45 s, upstream parity)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/layout/scroll') + searchParams}
                     >
                         layoutScroll — single container
@@ -1468,6 +1484,22 @@
                         href={resolve('/tests/layout/reflow-mid-animation') + searchParams}
                     >
                         layout — a reflow mid animation keeps sliding from the painted box
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/velocity') + searchParams}
+                    >
+                        Layout velocity: an interrupted spring keeps its speed (Motion 14.13)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout-id/throw') + searchParams}
+                    >
+                        layoutId: a thrown card hands its velocity on (Motion 14.13)
                     </a>
                 </li>
             </ul>

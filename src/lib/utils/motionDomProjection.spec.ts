@@ -12,7 +12,9 @@ import { observeLayoutChanges } from './layout.js'
 import {
     MotionDomProjectionAdapter,
     layoutMeasureStats,
-    type ExitLayoutHold
+    readSnapshotVelocity,
+    type ExitLayoutHold,
+    type SnapshotVelocitySource
 } from './motionDomProjection.js'
 import { readScrollBasis } from './scrollBasis.js'
 import { createMotionVisualElement } from './visualElementCore.js'
@@ -1349,6 +1351,118 @@ describe('MotionDomProjectionAdapter.commitObservedLayoutChange mid a shared ani
 })
 
 /**
+ * Plan 005 (motion-14-14-0): the reactive commit captures the painted box
+ * before it flushes the frameloop, as upstream's `updateSnapshot()` measures
+ * before `update()` flushes (create-projection-node.ts:1046 @ v14.14.0).
+ */
+describe('MotionDomProjectionAdapter.captureOnScreenSnapshot', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layout: true })
+        adapter.mount(element)
+        return element
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    /** Drawn 60px above its 100px slot. */
+    const onScreenTarget = () => ({ x: { min: 10, max: 110 }, y: { min: 40, max: 90 } })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+    })
+
+    it('returns undefined for a node with no running layout animation', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        // A stale target with no animation is not on screen.
+        adapter.projection.target = onScreenTarget()
+
+        expect(adapter.captureOnScreenSnapshot()).toBeUndefined()
+        await flush()
+        adapter.unmount()
+    })
+
+    it('returns the target box at the time of the call, unchanged by later frames', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        const projection = adapter.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+
+        const captured = adapter.captureOnScreenSnapshot()
+        expect(captured?.layoutBox).toEqual(onScreenTarget())
+
+        // The next frame moves the animation on.
+        projection.target.x.min += 12
+        projection.target.x.max += 12
+        projection.target.y.min += 12
+        projection.target.y.max += 12
+        expect(captured?.layoutBox).toEqual(onScreenTarget())
+        expect(captured?.measuredBox).toEqual(onScreenTarget())
+
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+
+    it('carries the velocity of the instant it was captured', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        mount(adapter, 100)
+        const projection = adapter.projection as typeof adapter.projection & {
+            animationEdges?: number[]
+            edgeValues?: number[]
+            edgeVelocity?: (index: number) => number
+        }
+        projection.currentAnimation = { state: 'running' } as never
+        projection.target = onScreenTarget()
+        projection.animationEdges = [1, 1, 1, 1]
+        projection.edgeValues = [0, 0, 0, 0]
+        projection.edgeVelocity = (i: number) => (i + 1) * 100
+
+        expect(adapter.captureOnScreenSnapshot()?.velocity).toEqual([100, 200, 300, 400, 0, 0])
+
+        projection.animationEdges = undefined
+        projection.edgeValues = undefined
+        projection.edgeVelocity = undefined
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+
+    it('is the committer snapshot, velocity included, when passed to the commit', async () => {
+        const adapter = new MotionDomProjectionAdapter()
+        const element = mount(adapter, 100)
+        const projection = adapter.projection
+        projection.currentAnimation = {} as never
+        projection.target = onScreenTarget()
+        const painted = adapter.captureOnScreenSnapshot()!
+        painted.velocity = [1, 2, 3, 4, 0, 0]
+
+        // The frameloop flush moves the animation 12px on before the commit.
+        projection.target.y.min += 12
+        projection.target.y.max += 12
+        place(element, 101)
+        adapter.commitObservedLayoutChange(
+            { left: 10, top: 100, width: 100, height: 50 },
+            { onScreenSnapshot: painted }
+        )
+
+        expect(projection.snapshot?.layoutBox.y.min).toBe(40)
+        expect(projection.snapshot?.velocity).toEqual([1, 2, 3, 4, 0, 0])
+        projection.currentAnimation = undefined
+        await flush()
+        adapter.unmount()
+    })
+})
+
+/**
  * LayoutGroup `forceRender` (plan 007 D7): `commitGroup` re-commits every
  * member of a node group from cached / on-screen snapshots.
  */
@@ -1868,9 +1982,12 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
     const mount = (
         options: { layoutId?: string; layout?: boolean; layoutScroll?: boolean },
         rect: DOMRect,
-        parent?: MotionDomProjectionAdapter
+        parent?: MotionDomProjectionAdapter,
+        // Values the element is drawn with before its seed read.
+        latestValues?: { x?: number }
     ) => {
         const adapter = new MotionDomProjectionAdapter(parent ? { parent } : {})
+        if (latestValues) Object.assign(adapter.projection.latestValues, latestValues)
         const element = document.createElement('div')
         document.body.appendChild(element)
         rects.set(element, rect)
@@ -1922,12 +2039,15 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
     })
 
     it('removes the transforms from the layout box but keeps them in the measured box', () => {
+        // Drawn 80px right of its layout slot by its own `x` when the seed
+        // read it, so the read (90) already shows the transform.
         const { adapter: lead, element } = mount(
             { layoutId: 'a1-transform' },
-            new DOMRect(90, 20, 100, 50)
+            new DOMRect(90, 20, 100, 50),
+            undefined,
+            { x: 80 }
         )
-        // Drawn 80px right of its layout slot by its own `x`.
-        lead.projection.latestValues.x = 80
+        expect(lead.projection.latestValues.x).toBe(80)
         element.remove()
         lead.unmount()
 
@@ -1936,6 +2056,25 @@ describe('MotionDomProjectionAdapter departing-lead snapshot (#1935 A1)', () => 
         const snapshot = adapter.projection.resumeFrom?.snapshot
         expect(snapshot?.measuredBox.x.min).toBe(90)
         expect(snapshot?.layoutBox.x.min).toBe(10)
+    })
+
+    it('applies a transform added after an untransformed seed (thrown card)', () => {
+        // Seeded at 90 with no transform, then dragged 80px right: the seed
+        // read is the transform-free layout, so the drag still has to be
+        // applied to find where the element was drawn (plan 004).
+        const { adapter: lead, element } = mount(
+            { layoutId: 'a1-thrown' },
+            new DOMRect(90, 20, 100, 50)
+        )
+        lead.projection.latestValues.x = 80
+        element.remove()
+        lead.unmount()
+
+        const { adapter } = mount({ layoutId: 'a1-thrown' }, new DOMRect(300, 20, 100, 50))
+
+        const snapshot = adapter.projection.resumeFrom?.snapshot
+        expect(snapshot?.measuredBox.x.min).toBe(170)
+        expect(snapshot?.layoutBox.x.min).toBe(90)
     })
 
     it('hands over a page-space measuredBox under a scrolled layoutScroll ancestor', () => {
@@ -2961,5 +3100,89 @@ describe('MotionDomProjectionAdapter.seedOwnSnapshotFromCache (plan 015c)', () =
         adapter.refreshLayout({ silent: true })
         expect(adapter.ownCacheIsCurrent()).toBe(true)
         stop()
+    })
+})
+
+/**
+ * Layout velocity (Motion 14.13, plan 003 of motion-14-14-0): the port of
+ * `updateSnapshot()`'s velocity block (create-projection-node.ts 1059-1091 @
+ * v14.14.0) for the snapshots the adapter builds by hand.
+ */
+describe('readSnapshotVelocity', () => {
+    const value = (velocity: number) => ({ getVelocity: () => velocity })
+    const fakeNode = (
+        fields: Partial<SnapshotVelocitySource> = {},
+        values: Record<string, number> = {}
+    ): SnapshotVelocitySource => ({
+        options: {
+            visualElement: {
+                getValue: (key: string) => value(values[key] ?? 0)
+            }
+        },
+        ...fields
+    })
+    const running = { currentAnimation: { state: 'running' } }
+
+    it('returns nothing for an idle node with still values', () => {
+        expect(readSnapshotVelocity(fakeNode())).toEqual({})
+    })
+
+    it('scales the edges by the progress velocity when there are no edge values', () => {
+        const node = fakeNode({
+            ...running,
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500)
+        })
+        expect(readSnapshotVelocity(node).velocity).toEqual([-5, -10, -15, -20, 0, 0])
+    })
+
+    it('reads each edge velocity from the edge values when they exist', () => {
+        const node = fakeNode({
+            ...running,
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500),
+            edgeValues: [0, 0, 0, 0],
+            edgeVelocity: (i: number) => i + 1
+        })
+        expect(readSnapshotVelocity(node).velocity?.slice(0, 4)).toEqual([1, 2, 3, 4])
+    })
+
+    it('hands on no edge velocity from a paused animation, only the x and y values', () => {
+        const paused = fakeNode({
+            currentAnimation: { state: 'paused' },
+            animationEdges: [10, 20, 30, 40],
+            motionValue: value(500)
+        })
+        expect(readSnapshotVelocity(paused)).toEqual({})
+
+        const movingX = fakeNode(
+            {
+                currentAnimation: { state: 'paused' },
+                animationEdges: [10, 20, 30, 40],
+                motionValue: value(500)
+            },
+            { x: 300 }
+        )
+        expect(readSnapshotVelocity(movingX).velocity).toEqual([0, 0, 0, 0, 300, 0])
+    })
+
+    it('copies the relative velocity of a node inside an animating parent', () => {
+        const relativeVelocity = [1, 2, 3, 4]
+        const result = readSnapshotVelocity(
+            fakeNode({ ...running, relativeTarget: {}, relativeVelocity })
+        )
+        expect(result.relativeVelocity).toEqual([1, 2, 3, 4])
+        expect(result.relativeVelocity).not.toBe(relativeVelocity)
+
+        expect(
+            readSnapshotVelocity(fakeNode({ ...running, relativeTarget: {} })).relativeVelocity
+        ).toEqual([])
+    })
+
+    it('leaves out the relative velocity without a relative target', () => {
+        const result = readSnapshotVelocity(
+            fakeNode({ ...running, relativeVelocity: [1, 2, 3, 4] })
+        )
+        expect(result).not.toHaveProperty('relativeVelocity')
     })
 })
