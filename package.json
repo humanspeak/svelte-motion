@@ -156,7 +156,7 @@
         "@changesets/cli": "^3.0.1",
         "@eslint/compat": "^2.1.0",
         "@eslint/js": "^10.0.1",
-        "@playwright/test": "^1.62.1",
+        "@playwright/test": "1.62.1",
         "@sveltejs/adapter-auto": "^7.0.1",
         "@sveltejs/kit": "^2.70.3",
         "@sveltejs/package": "^2.5.8",
