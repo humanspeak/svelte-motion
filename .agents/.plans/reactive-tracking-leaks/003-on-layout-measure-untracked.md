@@ -25,6 +25,7 @@
 
 ## Revision notes
 
+- **2026-11-21, Step 2c (maintainer decision after round 3).** Item 5 fixed `basic.spec.ts` (21/21), but `reorder.component.spec.ts` "projects each newly displaced sibling…" (`axis: 'x'`) then failed on the call's second argument only. The maintainer chose to make that spec assert the rect. If the Step 3–5 gate shows any other failure, the plan is deferred.
 - **2026-11-21, Step 2b item 5 (guard, round 3).** With items 1–4, `keyboard-grid` and the sequential-reorder unit spec passed, but `e2e/reorder/basic.spec.ts` "keeps a held item pinned during upward swaps after earlier reversals" failed 3/3 with about 19px of drift. With Step 2 alone it passed 3/3. The old leak only restarted items in groups without an `axis` prop, because `updateDetectedAxis` reads `values` only then. Item 5 sends the key only in those groups.
 - **2026-11-21, Step 2b (guard, maintainer chose to fix in this release).** The first executor stopped at Step 3. With Step 2, `e2e/reorder/keyboard-grid.spec.ts` failed 3/3: a grid keyboard move sent an item to the wrong slot. Without Step 2 it passed 2/2. `reorder.component.spec.ts` "projects each newly displaced sibling…" also failed 3/3, because its commits came from the MutationObserver path instead of the restart path. The removed leak was what restarted every Reorder item's layout observer on each reorder. Step 2b restores that restart explicitly, for Reorder only, with an internal `__layoutRemeasureKey` prop following the `__motionKind` pattern, so neither spec should need an edit.
 - **2026-11-20, depends on 012**: while writing plan 012, we found that a `Reorder.Item` that gets a new value object under a stable key is only re-registered in the group's layout slots today because of the leak this plan removes. The seed call runs tracked and re-runs whenever `value` or the group's `values` change. If this plan landed alone, dragging and keyboard-moving such items would silently break, and no existing Reorder spec would catch it. Plan 012 re-registers both the element and the slot explicitly, so land 012 first. Step 3 already covers 012's tests, because it runs `e2e/reorder`, where 012 adds `immutable-values.spec.ts`, and `src/lib/components/Reorder`, where 012 adds `objectValues.component.spec.ts`. Before starting, confirm both files exist on your branch. If they don't, 012 has not landed: STOP.
@@ -194,6 +195,9 @@ Notes:
 - `src/lib/components/Reorder/Group.svelte` and
   `src/lib/components/Reorder/context.ts` (Step 2b item 5 only: one getter
   and its type member)
+- `src/lib/components/Reorder/reorder.component.spec.ts`: Step 2c only, the
+  two assertions in "projects each newly displaced sibling across sequential
+  keyed reorders" (maintainer decision, 2026-11-21)
 - `src/routes/tests/layout/measure-state/+page.svelte` (create)
 - `e2e/layout/measure-state.spec.ts` (create)
 - `src/routes/+page.svelte` (one new link)
@@ -459,6 +463,38 @@ Restore the restart explicitly, for Reorder only:
 If either Reorder spec still fails, STOP and report it. Don't edit the
 specs.
 
+### Step 2c: Assert the committed rect, not the commit path (maintainer decision, 2026-11-21)
+
+In `reorder.component.spec.ts`, the test "projects each newly displaced
+sibling across sequential keyed reorders" uses an `axis: 'x'` group, so it no
+longer gets a keyed restart. Its commits now come from the MutationObserver
+path, which passes a second argument, `{ ownSubtreeChanged: false }`. The
+rect is still correct; round 1 checked it. The maintainer chose to make the
+spec check the observable result, the committed rect, rather than which path
+committed it.
+
+Change both `expect(projectionCommit).toHaveBeenCalledWith({ … })`
+assertions in that test to check the first argument only, keeping the same
+rects:
+
+```ts
+        expect(projectionCommit.mock.calls.map(([rect]) => rect)).toContainEqual({
+            left: 200,
+            top: 0,
+            width: 100,
+            height: 100
+        })
+```
+
+(and `left: 100` for the second). Then replace the comment "Its old x=100
+slot must survive the observer effect restart and seed a new projection
+animation…" with "Its old x=100 slot must still seed a new projection
+animation against its new x=200 layout (via the observer restart or the
+MutationObserver commit)." Change nothing else in the file.
+
+**Verify**: `pnpm exec vitest run src/lib/components/Reorder` → all pass.
+If anything else fails, STOP.
+
 ### Step 3: Prove Reorder and layout still work
 
 Reorder registers every item's slot through this callback, and until now each
@@ -515,7 +551,7 @@ then `git diff --check`.
 - [ ] `grep -c "measure-state" src/routes/+page.svelte` prints `1`
 - [ ] `grep -c "waitForTimeout" e2e/layout/measure-state.spec.ts` prints `0`
 - [ ] `trunk check` on the changed files reports no issues
-- [ ] `git status --short` lists only the six in-scope files
+- [ ] `git status --short` lists only the in-scope files (Steps 1–2c)
 - [ ] The status row in `.agents/.plans/reactive-tracking-leaks/README.md` is updated
 
 ## STOP conditions
