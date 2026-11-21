@@ -16,6 +16,14 @@
 > at about lines 3078–3096). Changes outside the line ranges quoted below are
 > not a mismatch.
 
+> **Revision (2026-11-20, guard):** the first executor stopped at Step 3's
+> e2e. With the strip gone, the SSR optimized-appear script included the
+> `transform` tween, and the bootstrap drove it with WAAPI, outside the
+> VisualElement. The `'always'` enter test sampled -200 → 200 over 1.2 s.
+> Step 3 item 9 now turns the appear handoff off under reduced motion, the
+> same way `skipAnimations` already does. This is the only edit allowed
+> outside the quoted ranges.
+
 ## Status
 
 - **Priority**: P2
@@ -546,6 +554,36 @@ In `src/lib/html/_MotionContainer.svelte`:
 8. Change the import at lines 18–21 to
    `import { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig.svelte'`.
 
+9. **(2026-11-20 amendment)** Turn off the optimized-appear handoff under
+   reduced motion, in the `optimizedAppearId` `$derived` (about line 1624,
+   next to `!skipAnimations`). The appear bootstrap drives WAAPI directly and
+   never reaches the VisualElement, so `shouldReduceMotion` can't stop it.
+   With the filter gone, the SSR appear entries now include the `transform`
+   tween. Change the tail of the condition from
+
+   ```ts
+               !skipAnimations
+   ```
+
+   to
+
+   ```ts
+               !skipAnimations &&
+               // Same reason as skipAnimations: the bootstrap would tween
+               // transforms that reduced motion makes instant.
+               !reducedMotion
+   ```
+
+   and extend the comment above it to say it covers both `skipAnimations`
+   and reduced motion. Change nothing else in that derived, and don't edit
+   `createOptimizedAppearData` or `optimizedAppearEntries`. The element then
+   mounts without an appear script, and the main-thread enter, which goes
+   through the VisualElement, applies the instant rule. Known limitation:
+   on the server `reducedMotion` is false for the `'user'` policy, since
+   there is no `matchMedia`, so a first SSR load under `'user'` with the OS
+   setting on can still tween in the appear bootstrap. That was already true
+   before this plan. Record it in Maintenance notes; don't fix it here.
+
 **Verify**:
 
 - `grep -c "filterReducedMotion" src/lib/html/_MotionContainer.svelte` prints `0`.
@@ -556,6 +594,10 @@ If the e2e exit test still fails while the enter tests pass, check whether the
 exit box's clone was "held" (it should not be: it has no `layout`). STOP and
 report if `reduceMotion` on the transition does not reach the clone's
 animation.
+
+Item 9 note: under `'always'`, opacity no longer gets its WAAPI-accelerated
+appear either; it fades on the main thread instead, as under `skipAnimations`.
+That's expected.
 
 ### Step 4: Delete the dead helper
 
