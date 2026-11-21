@@ -32,7 +32,7 @@ Only 012 → 003 and 006 → 014 are real code dependencies. The other edges onl
 
 | Plan | Title | Wave | Priority | Effort | Depends on | Touches | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| [001](001-declare-esm-env-dependency.md) | Every bare import the published package makes is a declared dependency (`esm-env`) | 1 | P1 | S | none | `package.json`, `pnpm-lock.yaml`, `src/lib/__tests__/declaredImports.spec.ts` | TODO |
+| [001](001-declare-esm-env-dependency.md) | Every bare import the published package makes is a declared dependency (`esm-env`) | 1 | P1 | S | none | `package.json`, `pnpm-lock.yaml`, `src/lib/__tests__/declaredImports.spec.ts` | DONE (guard PASS 2026-11-20, see 001 guard log; `96a6a979`) |
 | [002](002-motion-value-set-untracked.md) | Writing to a motion value inside `$effect` no longer subscribes the effect to it | 1 | P1 | S–M | none | `src/lib/utils/augmentMotionValue.svelte.ts` + spec | TODO |
 | [003](003-on-layout-measure-untracked.md) | `onLayoutMeasure` may read and write `$state` without looping | 2 | P1 | S | 012 | `src/lib/html/_MotionContainer.svelte` (one effect), `src/routes/tests/layout/measure-state`, `e2e/layout/measure-state.spec.ts`, `src/routes/+page.svelte` | TODO |
 | [004](004-animation-controls-plain-set.md) | `controls.start()` in an `$effect` does not re-run on subscribe/unsubscribe | 1 | P2 | S | none | `src/lib/utils/animationControls.svelte.ts`, new `animationControls.svelte.spec.ts` | TODO |
