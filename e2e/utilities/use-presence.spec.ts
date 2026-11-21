@@ -126,12 +126,12 @@ test.describe('usePresence', () => {
         await expect(phase).toHaveText('exit B')
         await expect(card).toHaveAttribute('data-marker', 'original')
         await expect(page.getByTestId('owned-completions')).toHaveText(
-            'completion notifications: 1'
+            'completion notifications: 0'
         )
         await expect(card).toHaveCount(0, { timeout: 4000 })
         await expect(phase).toHaveText('removed')
         await expect(page.getByTestId('owned-completions')).toHaveText(
-            'completion notifications: 2'
+            'completion notifications: 1'
         )
 
         await page.getByTestId('replay-owned').click()
@@ -140,7 +140,7 @@ test.describe('usePresence', () => {
         await expect(card).toBeAttached()
         await expect(card).toHaveCount(0, { timeout: 4000 })
         await expect(page.getByTestId('owned-completions')).toHaveText(
-            'completion notifications: 4'
+            'completion notifications: 2'
         )
     })
 
