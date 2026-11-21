@@ -132,6 +132,10 @@ real, user-visible, both in `_MotionContainer.svelte`, so they should be one
 plan each in separate waves or one combined plan), then 8, 9, 10, and a small
 housekeeping plan for 20–22.
 
+## Seen during execution
+
+- **Possible load flake:** `_MotionContainer.transitionOut.spec.ts` › "initial's out transition is used for the mount animation only" failed once on a full `pnpm test:only` run in two lanes (001 and 006), while about ten lanes shared the machine. It passed alone each time. Check whether it reproduces in the batch's final full run on an idle machine.
+
 ## Found while writing plans 006–016 (not planned)
 
 - **Finding 13's "size and inset keys still tween" is probably wrong.** Reading motion-dom, the node already has `shouldReduceMotion`, so `width`/`height`/inset are already instant. Only the transform keys our filter strips are affected. 013's red tests are written against the observable behavior either way.
