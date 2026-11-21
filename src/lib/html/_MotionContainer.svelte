@@ -169,6 +169,13 @@
         /** @internal Injected by the `m` namespace; `motion` components omit it. */
         __motionKind?: MotionKind
         /**
+         * @internal Set by `Reorder.Item`: a value that changes whenever its
+         * group's order changes. The layout observer effect reads it, so
+         * every item re-measures its slot in the same flush as a reorder, as
+         * upstream re-measures every re-rendered item in that commit.
+         */
+        __layoutRemeasureKey?: unknown
+        /**
          * @internal Upstream's name: set by the main `Reorder`, so strict mode
          * warns once instead of throwing.
          */
@@ -182,6 +189,7 @@
         children,
         motionValueChild,
         __motionKind: motionKindProp = 'motion',
+        __layoutRemeasureKey: layoutRemeasureKeyProp,
         ignoreStrict: ignoreStrictProp = false,
         tag = 'div',
         key: keyProp,
@@ -3048,12 +3056,20 @@
     // before the first layout change.
     $effect(() => {
         if (!(element && onLayoutMeasureProp && motionDomProjection)) return
+        const notify = onLayoutMeasureProp
         // Seed from the adapter's cache (mount() already ran seedLayout());
         // fall back to a fresh read only when no cached rect exists yet.
         const seed = motionDomProjection.lastMeasuredRect ?? measureLayoutRect()
-        const off = motionDomProjection.onMeasure((rect) => onLayoutMeasureProp(boxFromRect(rect)))
+        // Untracked on both paths: the adapter calls listeners synchronously from
+        // whichever effect measured, and a consumer that reads and writes `$state`
+        // here would otherwise re-run that effect. Upstream notifies from the
+        // projection update, outside any render
+        // (create-projection-node.ts:1085-1092 @ v14.12.0).
+        const off = motionDomProjection.onMeasure((rect) =>
+            untrack(() => notify(boxFromRect(rect)))
+        )
         if (seed) {
-            onLayoutMeasureProp(boxFromRect(seed))
+            untrack(() => notify(boxFromRect(seed)))
         }
         return () => {
             off()
@@ -3103,6 +3119,9 @@
     // observers, and real layout changes now diff scroll-clean rects —
     // including offscreen, which animates like upstream instead of snapping.
     $effect(() => {
+        // Reorder.Item's order key (Step 2b): a reorder restarts this effect
+        // so the slot is re-measured now, not on the next MutationObserver.
+        void layoutRemeasureKeyProp
         const observedElement = element
         const layoutMode =
             layoutProp && isLoaded === 'ready' && hasLayoutFeatures ? layoutProp : false

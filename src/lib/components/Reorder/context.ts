@@ -45,6 +45,11 @@ export interface ReorderContextProps<V> {
     /** The group's reorder axis. Items drag-lock to this by default. */
     readonly axis: ReorderAxis
     /**
+     * Whether the group detects its axis from its items' layouts (no
+     * `axis` prop). Items only re-measure on a reorder then (plan 003).
+     */
+    readonly detectsAxis: boolean
+    /**
      * The group's component kind, `motion` or `m`, for its items to render —
      * upstream `ReorderContextProps.proxy`.
      */

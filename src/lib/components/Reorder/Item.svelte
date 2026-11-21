@@ -59,6 +59,19 @@
     const reorderAxis = $derived(context.axis)
 
     /**
+     * In a group that detects its axis (no `axis` prop), a fresh object
+     * whenever the group's order changes (`trackOrder` reads every entry of
+     * `values`), passed to `MotionContainer` so this item re-measures its slot
+     * in the same flush as the reorder. `undefined` in an `axis`-locked group,
+     * matching which items the old accidental dependency restarted.
+     */
+    const layoutRemeasureKey = $derived.by(() => {
+        if (!context.detectsAxis) return undefined
+        context.trackOrder()
+        return {}
+    })
+
+    /**
      * The enclosing `Reorder.Board`, if any. Its groups are identified by
      * their context objects (Motion 14.10.1 `Item.tsx` `board`).
      */
@@ -336,6 +349,7 @@
     onLayoutMeasure={handleLayoutMeasure}
     {motionValueChild}
     __motionKind={context.kind}
+    __layoutRemeasureKey={layoutRemeasureKey}
     ignoreStrict={context.kind === 'motion'}
 >
     {@render childSnippet?.()}

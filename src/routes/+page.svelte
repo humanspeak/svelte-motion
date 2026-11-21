@@ -278,6 +278,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/measure-state') + searchParams}
+                    >
+                        onLayoutMeasure writing $state
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/aspect-ratio') + searchParams}
                     >
                         Aspect Ratio
