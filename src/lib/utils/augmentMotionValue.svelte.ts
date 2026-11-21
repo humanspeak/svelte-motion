@@ -1,4 +1,5 @@
 import { isMotionValue, motionValue, type MotionValue } from 'motion-dom'
+import { untrack } from 'svelte'
 import { get, type Readable } from 'svelte/store'
 
 /**
@@ -110,13 +111,22 @@ export const isAugmentedMotionValue = <T>(
  *    motion-dom's own teardown (and only once, guarded against re-entrant
  *    or duplicate destroy calls).
  *
+ * 4. The write methods `.set()`, `.jump()` and `.setWithVelocity()` run
+ *    under Svelte's `untrack`. motion-dom reads `this.current` inside its
+ *    write paths (`updateAndNotify`: `this.prev = this.current`), and with
+ *    `current` backed by `$state` that read would subscribe the caller. A
+ *    write such as `$effect(() => x.set(target))` would then re-run whenever
+ *    anything else moved `x` and overwrite it. Reads through `.current` and
+ *    `.get()` stay tracked.
+ *
  * The returned reference is the same `MotionValue` passed in, only retyped —
  * so identity checks (`isMotionValue`, `===`) still work and motion-dom's
  * own machinery (animation, follow, composition) is untouched.
  *
  * **Call once per MotionValue.** This function mutates the value (rewrites
- * `current`, `subscribe`, `destroy`). Calling it twice would re-define the
- * accessors and the first call's `dispose` would be discarded.
+ * `current`, `subscribe`, `destroy`, and the write methods). Calling it
+ * twice would re-define the accessors and the first call's `dispose` would
+ * be discarded.
  *
  * @template T The value type — typically `number` or `string`.
  * @param value The motion-dom `MotionValue` to augment.
@@ -155,6 +165,16 @@ export const augmentMotionValue = <T>(
         enumerable: true,
         configurable: true
     })
+
+    // motion-dom reads `this.current` inside its write paths (`updateAndNotify`:
+    // `this.prev = this.current`). With `current` backed by `$state`, a write
+    // made inside an `$effect` would otherwise subscribe that effect to this value.
+    const set = value.set.bind(value)
+    value.set = (v) => untrack(() => set(v))
+    const jump = value.jump.bind(value)
+    value.jump = (v, endAnimation) => untrack(() => jump(v, endAnimation))
+    const setWithVelocity = value.setWithVelocity.bind(value)
+    value.setWithVelocity = (prev, next, delta) => untrack(() => setWithVelocity(prev, next, delta))
 
     const originalDestroy = value.destroy.bind(value)
     let destroyed = false

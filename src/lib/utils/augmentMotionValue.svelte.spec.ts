@@ -1,4 +1,5 @@
 import { isMotionValue, motionValue } from 'motion-dom'
+import { flushSync } from 'svelte'
 import { writable } from 'svelte/store'
 import { describe, expect, it } from 'vitest'
 import {
@@ -106,6 +107,114 @@ describe('utils/augmentMotionValue:augmentMotionValue', () => {
             aug.destroy()
             expect(disposeCount).toBe(1)
         })
+        stop()
+    })
+})
+
+describe('utils/augmentMotionValue: writes are untracked', () => {
+    // motion-dom's write paths read `this.current` (`updateAndNotify`:
+    // `this.prev = this.current`). With `current` backed by `$state`, a write
+    // inside an `$effect` would subscribe that effect to the value it writes,
+    // so any outside change would re-run the effect and overwrite it.
+    it('set() in an effect does not re-run the effect on an outside write', () => {
+        const mv = augmentMotionValue(motionValue(0))
+        let runs = 0
+        const stop = $effect.root(() => {
+            $effect(() => {
+                runs += 1
+                mv.set(10)
+            })
+        })
+        flushSync()
+        expect(runs).toBe(1)
+        mv.set(50)
+        flushSync()
+        expect(runs).toBe(1)
+        expect(mv.get()).toBe(50)
+        stop()
+    })
+
+    it('jump() in an effect does not re-run the effect on an outside write', () => {
+        const mv = augmentMotionValue(motionValue(0))
+        let runs = 0
+        const stop = $effect.root(() => {
+            $effect(() => {
+                runs += 1
+                mv.jump(10)
+            })
+        })
+        flushSync()
+        expect(runs).toBe(1)
+        mv.set(50)
+        flushSync()
+        expect(runs).toBe(1)
+        expect(mv.get()).toBe(50)
+        stop()
+    })
+
+    it('setWithVelocity() in an effect does not re-run the effect on an outside write', () => {
+        const mv = augmentMotionValue(motionValue(0))
+        let runs = 0
+        const stop = $effect.root(() => {
+            $effect(() => {
+                runs += 1
+                mv.setWithVelocity(0, 10, 16)
+            })
+        })
+        flushSync()
+        expect(runs).toBe(1)
+        mv.set(50)
+        flushSync()
+        expect(runs).toBe(1)
+        expect(mv.get()).toBe(50)
+        stop()
+    })
+
+    it('reads through .current and .get() stay tracked', () => {
+        const mv = augmentMotionValue(motionValue(0))
+        const seenCurrent: number[] = []
+        const seenGet: number[] = []
+        const stop = $effect.root(() => {
+            $effect(() => {
+                seenCurrent.push(mv.current)
+            })
+            $effect(() => {
+                seenGet.push(mv.get())
+            })
+        })
+        flushSync()
+        mv.set(5)
+        flushSync()
+        expect(seenCurrent).toEqual([0, 5])
+        expect(seenGet).toEqual([0, 5])
+        stop()
+    })
+
+    it("does not attribute a change subscriber's reads to the writing effect", () => {
+        const mv = augmentMotionValue(motionValue(0))
+        const other = augmentMotionValue(motionValue(0))
+        const off = mv.on('change', () => {
+            void other.current
+        })
+        let n = $state(1)
+        let runs = 0
+        const stop = $effect.root(() => {
+            $effect(() => {
+                runs += 1
+                mv.set(n)
+            })
+        })
+        flushSync()
+        expect(runs).toBe(1)
+        other.set(99)
+        flushSync()
+        expect(runs).toBe(1)
+        // The effect still follows the state it reads.
+        n = 2
+        flushSync()
+        expect(runs).toBe(2)
+        expect(mv.get()).toBe(2)
+        off()
         stop()
     })
 })
