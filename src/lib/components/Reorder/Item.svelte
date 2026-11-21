@@ -159,8 +159,37 @@
         element = node
         ref = node
     }
-    // svelte-ignore state_referenced_locally
-    context.elements.set(value, () => element)
+
+    /**
+     * The box this item last measured, kept so a new value object can take
+     * over the slot straight away. Plain `let`: written by the measure
+     * callback, read untracked.
+     */
+    let lastLayout: LayoutMeasurePayload | undefined
+
+    /**
+     * Register this item's element, and its last measured slot, under its
+     * current `value`. Upstream does this on every render
+     * (Motion 14.14.0 `Reorder/Item.tsx:141`, and its re-measure re-registers
+     * the slot). An immutable update under a stable `{#each}` key keeps this
+     * component but changes `value`, and the group prunes the old object, so
+     * re-register here. A pre-effect runs before the group's `checkTabStop`
+     * and prune effects in the same flush, so the tab stop never sees the new
+     * object unregistered. Old entries are left to the group's pruning: the
+     * old object may still be in `values` under another item.
+     */
+    $effect.pre(() => {
+        const current = value
+        untrack(() => {
+            context.elements.set(current, () => element)
+            if (lastLayout) context.registerItem(current, lastLayout)
+        })
+    })
+
+    const handleLayoutMeasure = (box: LayoutMeasurePayload) => {
+        lastLayout = box
+        context.registerItem(value, box)
+    }
 
     $effect(() => {
         return () => {
@@ -304,7 +333,7 @@
     onDragStart={handleDragStart}
     onDrag={handleDrag}
     onDragEnd={handleDragEnd}
-    onLayoutMeasure={(box: LayoutMeasurePayload) => context.registerItem(value, box)}
+    onLayoutMeasure={handleLayoutMeasure}
     {motionValueChild}
     __motionKind={context.kind}
     ignoreStrict={context.kind === 'motion'}

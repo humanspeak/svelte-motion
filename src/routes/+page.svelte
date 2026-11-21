@@ -807,6 +807,14 @@
                         Reorder: Board, drag items between groups (Motion 14.10)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/immutable-values') + searchParams}
+                    >
+                        Reorder: replaced value objects stay focusable and reorderable
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
