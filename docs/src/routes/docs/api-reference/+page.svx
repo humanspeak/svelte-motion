@@ -48,11 +48,16 @@ import type {
     DragInfo,
     DragTransition,
 
-    // Drag/in-view event handlers
+    // Gesture event handlers
     MotionOnDirectionLock,
     MotionOnDragTransitionEnd,
+    MotionOnViewportEnter,
+    MotionOnViewportLeave,
     MotionOnInViewStart,
     MotionOnInViewEnd,
+    EventInfo,
+    TapInfo,
+    ViewportEventHandler,
 
     // Motion values
     MotionValue,

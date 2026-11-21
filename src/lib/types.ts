@@ -4,9 +4,12 @@ import type { AnimationOptions, DOMKeyframesDefinition } from 'motion'
 import type {
     DragConstraintsFunction,
     DragControlOptions,
+    EventInfo,
     PinchProps,
     PressOptions,
     ResolvedValues,
+    TapInfo,
+    ViewportEventHandler,
     VisualElementDragControls
 } from 'motion-dom'
 import type { Snippet } from 'svelte'
@@ -462,22 +465,48 @@ export type MotionAnimationComplete =
  */
 export type MotionOnUpdate = ((latest: ResolvedValues) => void) | undefined
 
-/** Hover lifecycle callbacks */
-export type MotionOnHoverStart = (() => void) | undefined
-export type MotionOnHoverEnd = (() => void) | undefined
+/**
+ * Hover lifecycle callback. Mirrors Motion's `onHoverStart`/`onHoverEnd`.
+ *
+ * @param event - The pointer event that started or ended the hover.
+ * @param info - `info.point` is the pointer position relative to the page.
+ */
+export type MotionOnHoverStart = ((event: PointerEvent, info: EventInfo) => void) | undefined
+/** Hover end callback. Same arguments as {@link MotionOnHoverStart}. */
+export type MotionOnHoverEnd = ((event: PointerEvent, info: EventInfo) => void) | undefined
 
 /** Focus lifecycle callbacks */
 export type MotionOnFocusStart = (() => void) | undefined
 export type MotionOnFocusEnd = (() => void) | undefined
 
-/** InView lifecycle callbacks */
-export type MotionOnInViewStart = (() => void) | undefined
-export type MotionOnInViewEnd = (() => void) | undefined
+/**
+ * Viewport callback. Mirrors Motion's `onViewportEnter`/`onViewportLeave`.
+ *
+ * @param entry - The IntersectionObserver entry that reported the change.
+ */
+export type MotionOnViewportEnter = ViewportEventHandler | undefined
+/** Viewport leave callback. Same argument as {@link MotionOnViewportEnter}. */
+export type MotionOnViewportLeave = ViewportEventHandler | undefined
+/** Alias of {@link MotionOnViewportEnter}, for the `onInViewStart` prop. */
+export type MotionOnInViewStart = ViewportEventHandler | undefined
+/** Alias of {@link MotionOnViewportLeave}, for the `onInViewEnd` prop. */
+export type MotionOnInViewEnd = ViewportEventHandler | undefined
 
-/** Tap lifecycle callbacks */
-export type MotionOnTapStart = (() => void) | undefined
-export type MotionOnTap = (() => void) | undefined
-export type MotionOnTapCancel = (() => void) | undefined
+/**
+ * Tap lifecycle callback. Mirrors Motion's `onTapStart`/`onTap`/`onTapCancel`.
+ *
+ * @param event - The originating pointer event (the press for `onTapStart`
+ *   and for each `repeat`, the release otherwise).
+ * @param info - `info.point` is the pointer position relative to the page.
+ */
+export type MotionOnTapStart =
+    ((event: MouseEvent | TouchEvent | PointerEvent, info: TapInfo) => void) | undefined
+/** Tap callback. Same arguments as {@link MotionOnTapStart}. */
+export type MotionOnTap =
+    ((event: MouseEvent | TouchEvent | PointerEvent, info: TapInfo) => void) | undefined
+/** Tap cancel callback. Same arguments as {@link MotionOnTapStart}. */
+export type MotionOnTapCancel =
+    ((event: MouseEvent | TouchEvent | PointerEvent, info: TapInfo) => void) | undefined
 
 /** Drag specific types */
 export type DragPoint = { x: number; y: number }
@@ -731,23 +760,27 @@ export type MotionProps = {
      * ```
      */
     fx?: boolean
-    /** Called when a true hover gesture starts (not emulated by touch) */
+    /** Called with `(event, info)` when a true hover gesture starts (not emulated by touch) */
     onHoverStart?: MotionOnHoverStart
-    /** Called when a true hover gesture ends */
+    /** Called with `(event, info)` when a true hover gesture ends */
     onHoverEnd?: MotionOnHoverEnd
     /** Called when element receives keyboard focus */
     onFocusStart?: MotionOnFocusStart
     /** Called when element loses keyboard focus */
     onFocusEnd?: MotionOnFocusEnd
-    /** Called when element enters viewport */
+    /** Called when the element enters the viewport, with the IntersectionObserver entry. Mirrors Motion. */
+    onViewportEnter?: MotionOnViewportEnter
+    /** Called when the element leaves the viewport, with the IntersectionObserver entry. Mirrors Motion. */
+    onViewportLeave?: MotionOnViewportLeave
+    /** Alias of `onViewportEnter`, kept for existing code. Called right after it, with the same entry. */
     onInViewStart?: MotionOnInViewStart
-    /** Called when element leaves viewport */
+    /** Alias of `onViewportLeave`, kept for existing code. Called right after it, with the same entry. */
     onInViewEnd?: MotionOnInViewEnd
-    /** Called when a tap gesture starts (pointerdown recognized) */
+    /** Called with `(event, info)` when a tap gesture starts (the press event) */
     onTapStart?: MotionOnTapStart
-    /** Called when a tap gesture ends successfully (pointerup) */
+    /** Called with `(event, info)` when a tap gesture ends successfully (the release event) */
     onTap?: MotionOnTap
-    /** Called when a tap gesture is cancelled (pointercancel) */
+    /** Called with `(event, info)` when a tap gesture is cancelled (the release event) */
     onTapCancel?: MotionOnTapCancel
     /**
      * Options for the tap gesture, applied to `onTapStart`, `onTap`,

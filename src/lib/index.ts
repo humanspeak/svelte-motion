@@ -170,6 +170,8 @@ export { useScopeMotion } from '$lib/utils/scopeMotion.svelte'
 export type { MotionScopeAttachment, UseScopeMotionOptions } from '$lib/utils/scopeMotion.svelte'
 export { scopeMotion, toMediaQuery } from 'motion'
 export type { MediaConditions, MotionScope, ScopeOptions, ScopeSetup, ScopeState } from 'motion-dom'
+// Gesture callback argument types, as Motion exports them.
+export type { EventInfo, TapInfo, ViewportEventHandler } from 'motion-dom'
 
 // Curved motion paths for `transition.path` (upstream Motion 13 `arc()`),
 // wrapped with a numeric-endpoint guard — see `$lib/utils/arc`.
@@ -201,6 +203,8 @@ export type {
     MotionOnInViewStart,
     MotionOnProjectionUpdate,
     MotionOnUpdate,
+    MotionOnViewportEnter,
+    MotionOnViewportLeave,
     MotionTransformPoint,
     MotionTransition,
     MotionWhileDrag,

@@ -342,6 +342,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/gesture-callback-args') + searchParams}
+                    >
+                        Gesture callback arguments (event, info, entry)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/fx-prop') + searchParams}
                     >
                         fx prop: renders an fx attribute (Motion 14.14)

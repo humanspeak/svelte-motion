@@ -214,6 +214,8 @@
         onHoverEnd: onHoverEndProp,
         onFocusStart: onFocusStartProp,
         onFocusEnd: onFocusEndProp,
+        onViewportEnter: onViewportEnterProp,
+        onViewportLeave: onViewportLeaveProp,
         onInViewStart: onInViewStartProp,
         onInViewEnd: onInViewEndProp,
         onTapStart: onTapStartProp,
@@ -3593,7 +3595,15 @@
         latchFocus(!!(whileFocusProp || onFocusStartProp || onFocusEndProp))
     )
     const inViewEnabled = $derived(
-        latchInView(!!(whileInViewProp || onInViewStartProp || onInViewEndProp))
+        latchInView(
+            !!(
+                whileInViewProp ||
+                onViewportEnterProp ||
+                onViewportLeaveProp ||
+                onInViewStartProp ||
+                onInViewEndProp
+            )
+        )
     )
     // Upstream restarts the in-view observer only when one of these changes
     // (viewport/index.ts:77-88 @ v14.14.0). Deriveds compare by value, so a
@@ -3659,6 +3669,12 @@
         if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
         if (!inViewEnabled) return
         const gesture = createInViewGesture(element, visualElement, () => viewportProp, {
+            get onViewportEnter() {
+                return onViewportEnterProp
+            },
+            get onViewportLeave() {
+                return onViewportLeaveProp
+            },
             get onInViewStart() {
                 return onInViewStartProp
             },

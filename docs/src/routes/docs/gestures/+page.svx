@@ -38,7 +38,25 @@ Every `motion.<tag>` component accepts four gesture props that animate to a targ
 | `whileFocus` | Focus enters/leaves | Pairs with `:focus-visible` for accessibility |
 | `whileInView` | Element enters/leaves viewport | Backed by `IntersectionObserver` |
 
-Each gesture prop has companion lifecycle callbacks (`onHoverStart` / `onHoverEnd`, `onTapStart` / `onTap` / `onTapCancel`, `onFocusStart` / `onFocusEnd`, `onInViewStart` / `onInViewEnd`) for side effects that aren't expressible as style changes (analytics, focus management, etc.).
+Each gesture prop has companion lifecycle callbacks (`onHoverStart` / `onHoverEnd`, `onTapStart` / `onTap` / `onTapCancel`, `onFocusStart` / `onFocusEnd`, `onViewportEnter` / `onViewportLeave`) for side effects that aren't expressible as style changes (analytics, focus management, etc.).
+
+### Callback arguments
+
+The callbacks receive the same arguments as in Motion:
+
+- `onHoverStart`, `onHoverEnd`, `onTapStart`, `onTap` and `onTapCancel` receive `(event, info)`. `info.point` is the pointer's `{ x, y }` relative to the page. `onTapStart` gets the press event, `onTap` and `onTapCancel` the release (a `repeat` passes the press), as in Motion.
+- `onViewportEnter` / `onViewportLeave` receive the `IntersectionObserverEntry`.
+- `onInViewStart` / `onInViewEnd` still work as aliases, called right after the Motion names with the same entry.
+- `onFocusStart` / `onFocusEnd` take no arguments. They are a svelte-motion addition; Motion has no focus callbacks.
+
+```svelte
+<motion.button
+    whileTap={{ scale: 0.95 }}
+    onTap={(event, info) => console.log(event.type, info.point.x, info.point.y)}
+>
+    Tap me
+</motion.button>
+```
 
 ## `whileHover`
 
@@ -47,7 +65,7 @@ Animate while the pointer is over the element.
 ```svelte
 <motion.button
     whileHover={{ scale: 1.05, backgroundColor: '#3b82f6' }}
-    onHoverStart={() => console.log('hover start')}
+    onHoverStart={(event, info) => console.log('hover start at', info.point)}
     onHoverEnd={() => console.log('hover end')}
 >
     Hover me
@@ -166,8 +184,8 @@ Animate when the element enters the viewport. Backed by `IntersectionObserver`.
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true, amount: 0.5, margin: '-50px' }}
     transition={{ duration: 0.6 }}
-    onInViewStart={() => console.log('entered viewport')}
-    onInViewEnd={() => console.log('left viewport')}
+    onViewportEnter={(entry) => console.log('entered', entry?.intersectionRatio)}
+    onViewportLeave={() => console.log('left viewport')}
 >
     Fades in on scroll
 </motion.div>

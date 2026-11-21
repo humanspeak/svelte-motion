@@ -1534,3 +1534,122 @@ describe('gesture props changing during the gesture (plan 006)', () => {
         expect(onHoverEnd2).toHaveBeenCalledTimes(1)
     })
 })
+
+describe('gesture callback arguments (plan 014)', () => {
+    /** Enable a true-hover environment, as the existing whileHover test does. */
+    const stubHoverMedia = () => {
+        vi.stubGlobal('matchMedia', (query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        })
+    }
+
+    let observers: { callback: IntersectionObserverCallback }[]
+
+    /** Record every IntersectionObserver the component creates. */
+    const stubIntersectionObserver = () => {
+        observers = []
+        vi.stubGlobal(
+            'IntersectionObserver',
+            class {
+                constructor(callback: IntersectionObserverCallback) {
+                    observers.push({ callback })
+                    Object.assign(this, {
+                        observe: vi.fn(),
+                        unobserve: vi.fn(),
+                        disconnect: vi.fn(),
+                        takeRecords: vi.fn(() => [])
+                    })
+                }
+            }
+        )
+    }
+
+    /** Drive the most recently created observer, returning the entry it reported. */
+    const intersect = (el: Element, isIntersecting: boolean) => {
+        const entry = { target: el, isIntersecting } as unknown as IntersectionObserverEntry
+        observers.at(-1)?.callback([entry], {} as IntersectionObserver)
+        return entry
+    }
+
+    it('onViewportEnter and onViewportLeave are accepted and get the entry', async () => {
+        stubIntersectionObserver()
+        const onViewportEnter = vi.fn()
+        const onViewportLeave = vi.fn()
+        const result = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', whileInView: { opacity: 1 }, onViewportEnter, onViewportLeave }
+        })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        const enterEntry = intersect(el, true)
+        expect(onViewportEnter).toHaveBeenCalledTimes(1)
+        expect(onViewportEnter).toHaveBeenCalledWith(enterEntry)
+
+        const leaveEntry = intersect(el, false)
+        expect(onViewportLeave).toHaveBeenCalledTimes(1)
+        expect(onViewportLeave).toHaveBeenCalledWith(leaveEntry)
+    })
+
+    it('onViewportEnter alone enables the gesture', async () => {
+        stubIntersectionObserver()
+        const onViewportEnter = vi.fn()
+        const result = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', onViewportEnter }
+        })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        expect(observers.length).toBe(1)
+        intersect(el, true)
+        expect(onViewportEnter).toHaveBeenCalledTimes(1)
+    })
+
+    it('the new props are not forwarded to the DOM', async () => {
+        stubIntersectionObserver()
+        const result = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                whileInView: { opacity: 1 },
+                onViewportEnter: vi.fn(),
+                onViewportLeave: vi.fn()
+            }
+        })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        expect(el.hasAttribute('onviewportenter')).toBe(false)
+        expect(el.hasAttribute('onViewportEnter')).toBe(false)
+        expect(el.hasAttribute('onviewportleave')).toBe(false)
+    })
+
+    it('hover callbacks get (event, info) through the component', async () => {
+        stubHoverMedia()
+        const onHoverStart = vi.fn()
+        const result = render(MotionContainer as unknown as any, {
+            props: { tag: 'div', whileHover: { scale: 1.1 }, onHoverStart }
+        })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        expect(onHoverStart).toHaveBeenCalledTimes(1)
+        const [event, info] = onHoverStart.mock.calls[0] ?? []
+        expect(event?.type).toBe('pointerenter')
+        expect(typeof info?.point?.x).toBe('number')
+        expect(typeof info?.point?.y).toBe('number')
+    })
+})

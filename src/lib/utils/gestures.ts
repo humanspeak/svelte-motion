@@ -28,10 +28,14 @@
 import type { MotionViewport } from '$lib/types.js'
 import {
     addDomEvent,
+    extractEventInfo,
     frame,
     hover,
     press,
+    type EventInfo,
     type PointerEventOptions,
+    type TapInfo,
+    type ViewportEventHandler,
     type VisualElement
 } from 'motion-dom'
 
@@ -72,16 +76,26 @@ const setGestureActive = (
     void visualElement.animationState.setActive(type, isActive)
 }
 
-/** Fire a user callback after the current render, as upstream does. */
-const postRender = (callback: (() => void) | undefined): void => {
+/**
+ * Fire a user callback after the current render with its arguments, as
+ * upstream's `handleGestureEvent` does (gestures/hover.ts:28-33 @ v14.14.0).
+ * The callback is read by the caller at event time, so the latest prop wins.
+ */
+const postRender = <Args extends unknown[]>(
+    callback: ((...args: Args) => void) | undefined,
+    ...args: Args
+): void => {
     if (!callback) return
-    frame.postRender(() => callback())
+    frame.postRender(() => callback(...args))
 }
 
-/** Zero-argument lifecycle callbacks, matching this library's public types. */
+/**
+ * Hover lifecycle callbacks. The arguments match Motion's: the pointer event
+ * and `info.point`, its position relative to the page.
+ */
 export interface HoverGestureCallbacks {
-    onHoverStart?: () => void
-    onHoverEnd?: () => void
+    onHoverStart?: (event: PointerEvent, info: EventInfo) => void
+    onHoverEnd?: (event: PointerEvent, info: EventInfo) => void
 }
 
 /**
@@ -89,7 +103,9 @@ export interface HoverGestureCallbacks {
  *
  * Port of `framer-motion/src/gestures/hover.ts:22-32`. motion-dom's `hover()`
  * owns the pointer plumbing (pointerenter/leave with hover-capable media
- * gating), so this only flips the flag and fires callbacks.
+ * gating), so this only flips the flag and fires callbacks. Each callback
+ * gets the pointer event that started or ended the hover and
+ * `extractEventInfo(event)`, as upstream (hover.ts:14-34).
  *
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
@@ -107,27 +123,28 @@ export const attachHoverGesture = (
     visualElement: VisualElement,
     callbacks?: HoverGestureCallbacks
 ): (() => void) => {
-    return hover(element, () => {
+    return hover(element, (_element, startEvent) => {
         setGestureActive(visualElement, 'whileHover', true)
-        postRender(callbacks?.onHoverStart)
+        postRender(callbacks?.onHoverStart, startEvent, extractEventInfo(startEvent))
 
-        return () => {
+        return (endEvent) => {
             setGestureActive(visualElement, 'whileHover', false)
-            postRender(callbacks?.onHoverEnd)
+            postRender(callbacks?.onHoverEnd, endEvent, extractEventInfo(endEvent))
         }
     })
 }
 
 /**
- * Zero-argument tap lifecycle callbacks, matching this library's public types.
+ * Tap lifecycle callbacks. The arguments match Motion's: the pointer event and
+ * `info.point`, its position relative to the page.
  *
  * `attachPressGesture` reads these at event time, so a getter-backed object
  * can supply the latest callbacks without re-attaching `press()`.
  */
 export interface PressGestureCallbacks {
-    onTapStart?: () => void
-    onTap?: () => void
-    onTapCancel?: () => void
+    onTapStart?: (event: PointerEvent, info: TapInfo) => void
+    onTap?: (event: PointerEvent, info: TapInfo) => void
+    onTapCancel?: (event: PointerEvent, info: TapInfo) => void
 }
 
 /**
@@ -139,6 +156,10 @@ export interface PressGestureCallbacks {
  * AND keyboard activation (it uses `isElementKeyboardAccessible` internally),
  * which is what keeps the #414 keyboard-tap behaviour without any custom code
  * here — `e2e/armed-buttons` is the parity check.
+ *
+ * As upstream (press.ts:35-52 @ v14.14.0), `onTapStart` gets the press event,
+ * `onTap` and `onTapCancel` the release event, and a `repeat` fires `onTap`
+ * with the press event; each also gets `extractEventInfo(event)`.
  *
  * `press()` reads `options` on each press, and keeps an in-progress `count`
  * sequence per `press()` call. Callers that want option changes to apply
@@ -164,24 +185,29 @@ export const attachPressGesture = (
 
     return press(
         element,
-        () => {
+        (_element, startEvent) => {
             if (isDisabledButton()) return
             setGestureActive(visualElement, 'whileTap', true)
-            postRender(callbacks?.onTapStart)
+            postRender(callbacks?.onTapStart, startEvent, extractEventInfo(startEvent))
 
             return {
-                onComplete: (_endEvent, { success }) => {
+                onComplete: (endEvent, { success }) => {
                     if (isDisabledButton()) return
                     setGestureActive(visualElement, 'whileTap', false)
                     // `success` distinguishes a completed tap from a cancel
                     // (released outside, released before `hold`, an unfinished
                     // `count` sequence, or interrupted).
-                    postRender(success ? callbacks?.onTap : callbacks?.onTapCancel)
+                    postRender(
+                        success ? callbacks?.onTap : callbacks?.onTapCancel,
+                        endEvent,
+                        extractEventInfo(endEvent)
+                    )
                 },
                 // Upstream hover.ts `isRepeat`: fire onTap, keep whileTap active.
+                // A repeat passes the START event (upstream press.ts:47-48).
                 onRepeat: () => {
                     if (isDisabledButton()) return
-                    postRender(callbacks?.onTap)
+                    postRender(callbacks?.onTap, startEvent, extractEventInfo(startEvent))
                 }
             }
         },
@@ -247,10 +273,17 @@ export const attachFocusGesture = (
     }
 }
 
-/** Zero-argument in-view lifecycle callbacks, matching this library's public types. */
+/**
+ * In-view lifecycle callbacks. Each gets the IntersectionObserverEntry that
+ * reported the change, as Motion's `onViewportEnter`/`onViewportLeave` do.
+ */
 export interface InViewGestureCallbacks {
-    onInViewStart?: () => void
-    onInViewEnd?: () => void
+    onViewportEnter?: ViewportEventHandler
+    onViewportLeave?: ViewportEventHandler
+    /** Alias of `onViewportEnter`, called right after it. */
+    onInViewStart?: ViewportEventHandler
+    /** Alias of `onViewportLeave`, called right after it. */
+    onInViewEnd?: ViewportEventHandler
 }
 
 /** Upstream's `amount` → IntersectionObserver `threshold` mapping. */
@@ -277,7 +310,12 @@ export interface InViewGesture {
  * `observeIntersection`). `hasEnteredView` and `isInView` live for the
  * gesture's lifetime, as upstream's class fields do, so `startObserver()` can
  * restart the observer (upstream `update()` on an `amount`/`margin`/`root`
- * change) without the browser's initial report re-firing `onInViewStart`.
+ * change) without the browser's initial report re-firing `onViewportEnter`.
+ *
+ * `onViewportEnter`/`onViewportLeave` run synchronously inside the observer
+ * callback with the IntersectionObserverEntry, as upstream
+ * (viewport/index.ts:57-63). The aliases `onInViewStart`/`onInViewEnd` run
+ * right after them with the same entry.
  *
  * The `amount: 'some' | 'all' | number → threshold` mapping matches upstream's
  * `thresholdNames`. `once` latches on first entry: the leave half never runs
@@ -289,13 +327,14 @@ export interface InViewGesture {
  * @param visualElement Node whose animationState receives the flag.
  * @param getViewport Returns the current viewport options (`root`, `margin`,
  *   `amount`, `once`); read on each start.
- * @param callbacks Optional lifecycle callbacks. Read at event time, so a
- *   getter-backed object supplies the latest callbacks without restarting.
+ * @param callbacks Optional viewport callbacks, each called with the entry.
+ *   Read at event time, so a getter-backed object supplies the latest
+ *   callbacks without restarting.
  * @returns The gesture controller; call `startObserver()` to begin observing.
  *
  * @example
  * ```ts
- * const gesture = createInViewGesture(el, visualElement, () => viewport, { onInViewStart })
+ * const gesture = createInViewGesture(el, visualElement, () => viewport, { onViewportEnter })
  * gesture.startObserver()
  * // later, on an amount/margin/root change:
  * gesture.startObserver()
@@ -336,7 +375,16 @@ export const createInViewGesture = (
                 if (isIntersecting) hasEnteredView = true
 
                 setGestureActive(visualElement, 'whileInView', isIntersecting)
-                postRender(isIntersecting ? callbacks?.onInViewStart : callbacks?.onInViewEnd)
+                // Upstream calls these synchronously with the entry
+                // (viewport/index.ts:57-63 @ v14.14.0). `onInViewStart`/`onInViewEnd`
+                // are this library's older names, kept as aliases.
+                if (isIntersecting) {
+                    callbacks?.onViewportEnter?.(entry)
+                    callbacks?.onInViewStart?.(entry)
+                } else {
+                    callbacks?.onViewportLeave?.(entry)
+                    callbacks?.onInViewEnd?.(entry)
+                }
 
                 if (once && isIntersecting) observer.disconnect()
             },
@@ -381,7 +429,9 @@ export const createInViewGesture = (
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
  * @param viewport Observer options (`root`, `margin`, `amount`, `once`).
- * @param callbacks Optional lifecycle callbacks.
+ * @param callbacks Optional viewport callbacks, each called synchronously with
+ *   the IntersectionObserverEntry (`onViewportEnter`, `onViewportLeave` and
+ *   their aliases `onInViewStart`, `onInViewEnd`).
  * @returns Cleanup that detaches the observer.
  */
 export const attachInViewGesture = (
