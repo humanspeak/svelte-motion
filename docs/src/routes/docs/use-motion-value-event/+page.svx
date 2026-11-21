@@ -1,6 +1,6 @@
 ---
 title: "useMotionValueEvent"
-description: "Subscribe to motion value store changes with automatic cleanup."
+description: "Subscribe to a motion value's change and animation events."
 ---
 
 <script>
@@ -9,7 +9,7 @@ description: "Subscribe to motion value store changes with automatic cleanup."
   const seo = getSeoContext()
   if (seo) {
       seo.title = 'useMotionValueEvent | Docs | Svelte Motion'
-      seo.description = 'Subscribe to motion value changes like change, animationStart, and animationComplete with automatic cleanup on unmount in Svelte Motion.'
+      seo.description = 'Subscribe to motion value events (change, animationStart, animationComplete, animationCancel, destroy) in Svelte Motion. Returns an unsubscribe function for $effect or onDestroy.'
       seo.ogTitle = 'useMotionValueEvent'
       seo.ogTagline = 'Listen for motion value change events'
       seo.ogFeatures = ['Event Subscription', 'Auto Cleanup', 'Change Detection', 'Store Events']
@@ -19,7 +19,7 @@ description: "Subscribe to motion value store changes with automatic cleanup."
 
 # useMotionValueEvent
 
-`useMotionValueEvent` manages subscriptions to motion value store changes. It skips the initial synchronous emission that Svelte stores produce on subscribe, so the callback only fires on actual *changes*.
+`useMotionValueEvent` subscribes to a motion value's events: its changes, and when its animations start, finish or are cancelled. It mirrors Motion's hook of the same name. It also accepts a Svelte readable store for `'change'`, skipping the synchronous emission a store makes on subscribe, so the callback only fires on actual *changes*.
 
 ```svelte
 <script>
@@ -48,7 +48,7 @@ description: "Subscribe to motion value store changes with automatic cleanup."
 
 ### Subscribe to changes
 
-Pass a readable store, the event type `'change'`, and a callback:
+Pass a motion value (or any readable store), the event `'change'`, and a callback:
 
 ```svelte
 <script>
@@ -75,11 +75,48 @@ Pass a readable store, the event type `'change'`, and a callback:
 </div>
 ```
 
+### Animation events
+
+Listen for `animationStart` and `animationComplete` to know when a value is animating. Register both in one `$effect` and return a function that removes both:
+
+```svelte
+<script>
+  import { useMotionValueEvent, useSpring } from '@humanspeak/svelte-motion'
+
+  const x = useSpring(0)
+  let isAnimating = $state(false)
+
+  $effect(() => {
+    const offStart = useMotionValueEvent(x, 'animationStart', () => {
+      isAnimating = true
+    })
+    const offComplete = useMotionValueEvent(x, 'animationComplete', () => {
+      isAnimating = false
+    })
+
+    return () => {
+      offStart()
+      offComplete()
+    }
+  })
+</script>
+
+<button onclick={() => x.set(x.get() === 0 ? 200 : 0)}>
+  {isAnimating ? 'Animating…' : 'Move'}
+</button>
+```
+
 ### Available events
 
-| Event | Description |
-|-------|-------------|
-| `'change'` | Fires whenever the store value updates (after the initial emission). |
+| Event | Callback receives | Fires when |
+|-------|-------------------|------------|
+| `'change'` | The latest value | The value changes. Never on subscribe. Works with motion values and readable stores. |
+| `'animationStart'` | Nothing | An animation starts on the value. |
+| `'animationComplete'` | Nothing | An animation on the value finishes. |
+| `'animationCancel'` | Nothing | An animation is stopped or replaced before it finishes. |
+| `'destroy'` | Nothing | The value is destroyed. |
+
+Only `'change'` works with a plain Svelte readable store. The other events need a motion value.
 
 ### Cleanup
 
@@ -139,6 +176,16 @@ For full control you can use `store.subscribe()` directly. Note that Svelte stor
 ### Signature
 
 ```ts
+import type { MotionValueEventCallbacks } from 'motion-dom'
+
+// Motion values: every event
+useMotionValueEvent<V, EventName extends keyof MotionValueEventCallbacks<V>>(
+  value: MotionValue<V>,
+  event: EventName,
+  callback: MotionValueEventCallbacks<V>[EventName]
+): () => void
+
+// Svelte readable stores: 'change' only
 useMotionValueEvent<T>(
   store: Readable<T>,
   event: 'change',
@@ -148,9 +195,9 @@ useMotionValueEvent<T>(
 
 ### Parameters
 
-- **store** `Readable<T>` — any Svelte readable store (e.g. `useSpring`, `useTransform`, `useTime`)
-- **event** `'change'` — the event type to listen for
-- **callback** `(latest: T) => void` — invoked with the latest value on each change
+- **value** `MotionValue<V> | Readable<T>` — a motion value (the return value of any hook, such as `useSpring`, `useTransform` or `useTime`, or `motionValue()`), or, for `'change'` only, any Svelte readable store
+- **event** — one of `'change'`, `'animationStart'`, `'animationComplete'`, `'animationCancel'` or `'destroy'`
+- **callback** — receives the latest value for `'change'`, and no arguments for the other events
 
 ### Returns
 
