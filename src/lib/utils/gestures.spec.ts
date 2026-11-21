@@ -4,7 +4,8 @@ import {
     attachFocusGesture,
     attachHoverGesture,
     attachInViewGesture,
-    attachPressGesture
+    attachPressGesture,
+    createInViewGesture
 } from './gestures.js'
 
 /**
@@ -524,5 +525,133 @@ describe('attachInViewGesture', () => {
         expect(onInViewStart).toHaveBeenCalledTimes(1)
 
         stop()
+    })
+})
+
+describe('createInViewGesture', () => {
+    let element: HTMLElement
+    let observers: {
+        callback: IntersectionObserverCallback
+        options: IntersectionObserverInit | undefined
+        disconnect: ReturnType<typeof vi.fn>
+        unobserve: ReturnType<typeof vi.fn>
+    }[]
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        element = document.createElement('div')
+        document.body.appendChild(element)
+        observers = []
+        vi.stubGlobal(
+            'IntersectionObserver',
+            class {
+                constructor(
+                    callback: IntersectionObserverCallback,
+                    options?: IntersectionObserverInit
+                ) {
+                    const entry = {
+                        callback,
+                        options,
+                        disconnect: vi.fn(),
+                        unobserve: vi.fn()
+                    }
+                    observers.push(entry)
+                    Object.assign(this, {
+                        observe: vi.fn(),
+                        unobserve: entry.unobserve,
+                        disconnect: entry.disconnect,
+                        takeRecords: vi.fn(() => [])
+                    })
+                }
+            }
+        )
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        element.remove()
+    })
+
+    /** Drive the most recently created observer. */
+    const intersect = (isIntersecting: boolean) => {
+        const observer = observers.at(-1)
+        observer?.callback(
+            [{ target: element, isIntersecting } as unknown as IntersectionObserverEntry],
+            {} as IntersectionObserver
+        )
+    }
+
+    it('keeps its entry state across a restart, so the new report does not re-fire', async () => {
+        const { node, setActive } = makeNode({ whileInView: { opacity: 1 } })
+        const onInViewStart = vi.fn()
+        const gesture = createInViewGesture(element, node, () => undefined, { onInViewStart })
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.startObserver()
+        expect(observers).toHaveLength(2)
+        expect(observers[0].disconnect).toHaveBeenCalled()
+
+        intersect(true)
+        expect(setActive).toHaveBeenCalledTimes(1)
+        expect(setActive).toHaveBeenCalledWith('whileInView', true)
+        await flushPostRender()
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+
+        gesture.unmount()
+    })
+
+    it('reads getViewport on each start', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        let viewport: { amount: 'some' | 'all' } = { amount: 'some' }
+        const gesture = createInViewGesture(element, node, () => viewport)
+
+        gesture.startObserver()
+        expect(observers[0].options?.threshold).toBe(0)
+
+        viewport = { amount: 'all' }
+        gesture.startObserver()
+        expect(observers[1].options?.threshold).toBe(1)
+
+        gesture.unmount()
+    })
+
+    it('does not reopen a latched `once` gesture on restart', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const gesture = createInViewGesture(element, node, () => ({ once: true }))
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.startObserver()
+        expect(observers).toHaveLength(1)
+
+        gesture.unmount()
+    })
+
+    it('resets its entry state on unmount, so a remount is a new gesture', async () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const onInViewStart = vi.fn()
+        const gesture = createInViewGesture(element, node, () => undefined, { onInViewStart })
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.unmount()
+        expect(observers[0].disconnect).toHaveBeenCalled()
+
+        gesture.startObserver()
+        intersect(true)
+        await flushPostRender()
+        expect(onInViewStart).toHaveBeenCalledTimes(2)
+
+        gesture.unmount()
+    })
+
+    it('does not throw without IntersectionObserver', () => {
+        vi.stubGlobal('IntersectionObserver', undefined)
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const gesture = createInViewGesture(element, node, () => undefined)
+
+        expect(() => gesture.startObserver()).not.toThrow()
+        expect(() => gesture.unmount()).not.toThrow()
     })
 })

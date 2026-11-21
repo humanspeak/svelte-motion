@@ -16,6 +16,13 @@
  *
  * They replace ~1,400 lines of per-gesture animation machinery plus the
  * `gestureCoordinator` that hand-approximated setActive/protected-keys.
+ *
+ * Like upstream's one Feature per gesture, the component keeps one attachment
+ * per gesture for the element's lifetime and never re-attaches on a prop
+ * change: the `while*` definitions are read from `visualElement.getProps()`
+ * and the callbacks through getter-backed objects, both at event time. Only
+ * the in-view observer restarts, and only when `viewport.amount`, `margin` or
+ * `root` changes (`createInViewGesture`).
  */
 
 import type { MotionViewport } from '$lib/types.js'
@@ -86,7 +93,8 @@ export interface HoverGestureCallbacks {
  *
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
- * @param callbacks Optional lifecycle callbacks.
+ * @param callbacks Optional lifecycle callbacks. Read at event time, so a
+ *   getter-backed object supplies the latest callbacks without re-attaching.
  * @returns Cleanup that detaches the listeners.
  *
  * @example
@@ -197,7 +205,8 @@ export interface FocusGestureCallbacks {
  *
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
- * @param callbacks Optional lifecycle callbacks.
+ * @param callbacks Optional lifecycle callbacks. Read at event time, so a
+ *   getter-backed object supplies the latest callbacks without re-attaching.
  * @returns Cleanup that detaches the listeners.
  */
 export const attachFocusGesture = (
@@ -248,6 +257,113 @@ export interface InViewGestureCallbacks {
 const thresholdNames = { some: 0, all: 1 } as const
 
 /**
+ * A restartable in-view gesture, the shape of upstream's `InViewFeature`.
+ *
+ * @property startObserver Stops any current observer and starts a new one with
+ *   the latest viewport options, keeping `hasEnteredView`/`isInView`. A no-op
+ *   once a `once` gesture has latched.
+ * @property unmount Stops the observer and resets the entry state.
+ */
+export interface InViewGesture {
+    startObserver: () => void
+    unmount: () => void
+}
+
+/**
+ * Create the in-view gesture for an element without starting it.
+ *
+ * Port of `framer-motion/src/motion/features/viewport/index.ts:10-95`
+ * (v14.14.0), driving an IntersectionObserver directly (upstream's
+ * `observeIntersection`). `hasEnteredView` and `isInView` live for the
+ * gesture's lifetime, as upstream's class fields do, so `startObserver()` can
+ * restart the observer (upstream `update()` on an `amount`/`margin`/`root`
+ * change) without the browser's initial report re-firing `onInViewStart`.
+ *
+ * The `amount: 'some' | 'all' | number → threshold` mapping matches upstream's
+ * `thresholdNames`. `once` latches on first entry: the leave half never runs
+ * and the observer detaches, matching upstream's `hasEnteredView` guard and our
+ * documented behaviour. Upstream does not disconnect; ours does, and a restart
+ * after the latch is a no-op so it cannot reopen it.
+ *
+ * @param element Element to observe.
+ * @param visualElement Node whose animationState receives the flag.
+ * @param getViewport Returns the current viewport options (`root`, `margin`,
+ *   `amount`, `once`); read on each start.
+ * @param callbacks Optional lifecycle callbacks. Read at event time, so a
+ *   getter-backed object supplies the latest callbacks without restarting.
+ * @returns The gesture controller; call `startObserver()` to begin observing.
+ *
+ * @example
+ * ```ts
+ * const gesture = createInViewGesture(el, visualElement, () => viewport, { onInViewStart })
+ * gesture.startObserver()
+ * // later, on an amount/margin/root change:
+ * gesture.startObserver()
+ * // on teardown:
+ * gesture.unmount()
+ * ```
+ */
+export const createInViewGesture = (
+    element: Element,
+    visualElement: VisualElement,
+    getViewport: () => MotionViewport | undefined,
+    callbacks?: InViewGestureCallbacks
+): InViewGesture => {
+    let hasEnteredView = false
+    let isInView = false
+    let stopObserver: (() => void) | undefined
+
+    const startObserver = () => {
+        stopObserver?.()
+        stopObserver = undefined
+        if (typeof IntersectionObserver === 'undefined') return
+        const { root, margin: rootMargin, amount = 0, once } = getViewport() ?? {}
+        // Our `once` disconnects on first entry; a restart must not reopen it.
+        if (once && hasEnteredView) return
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const entry = entries[entries.length - 1]
+                if (!entry) return
+                const { isIntersecting } = entry
+
+                // No state change → nothing to do (upstream's early return).
+                if (isInView === isIntersecting) return
+                isInView = isIntersecting
+
+                // `once`: latch on first entry, never run the leave half.
+                if (once && !isIntersecting && hasEnteredView) return
+                if (isIntersecting) hasEnteredView = true
+
+                setGestureActive(visualElement, 'whileInView', isIntersecting)
+                postRender(isIntersecting ? callbacks?.onInViewStart : callbacks?.onInViewEnd)
+
+                if (once && isIntersecting) observer.disconnect()
+            },
+            {
+                root: (typeof root === 'function' ? (root as () => Element)() : root) as
+                    Element | undefined,
+                rootMargin,
+                threshold: typeof amount === 'number' ? amount : thresholdNames[amount]
+            }
+        )
+
+        observer.observe(element)
+        stopObserver = () => observer.disconnect()
+    }
+
+    return {
+        startObserver,
+        unmount: () => {
+            stopObserver?.()
+            stopObserver = undefined
+            hasEnteredView = false
+            isInView = false
+        }
+    }
+}
+
+/**
  * Attach viewport intersection → `setActive('whileInView', …)`.
  *
  * Port of `framer-motion/src/motion/features/viewport/index.ts:29-70`, driving an
@@ -258,6 +374,9 @@ const thresholdNames = { some: 0, all: 1 } as const
  * `once` latches on first entry: the leave half never runs and the observer
  * detaches, matching upstream's `hasEnteredView` guard and our documented
  * behaviour.
+ *
+ * This is `createInViewGesture` + `startObserver()`, for callers whose viewport
+ * options are fixed for the attachment's lifetime.
  *
  * @param element Element to observe.
  * @param visualElement Node whose animationState receives the flag.
@@ -271,40 +390,7 @@ export const attachInViewGesture = (
     viewport?: MotionViewport,
     callbacks?: InViewGestureCallbacks
 ): (() => void) => {
-    if (typeof IntersectionObserver === 'undefined') return () => {}
-
-    const { root, margin: rootMargin, amount = 0, once } = viewport ?? {}
-    let hasEnteredView = false
-    let isInView = false
-
-    const observer = new IntersectionObserver(
-        (entries) => {
-            const entry = entries[entries.length - 1]
-            if (!entry) return
-            const { isIntersecting } = entry
-
-            // No state change → nothing to do (upstream's early return).
-            if (isInView === isIntersecting) return
-            isInView = isIntersecting
-
-            // `once`: latch on first entry, never run the leave half.
-            if (once && !isIntersecting && hasEnteredView) return
-            if (isIntersecting) hasEnteredView = true
-
-            setGestureActive(visualElement, 'whileInView', isIntersecting)
-            postRender(isIntersecting ? callbacks?.onInViewStart : callbacks?.onInViewEnd)
-
-            if (once && isIntersecting) observer.disconnect()
-        },
-        {
-            root: (typeof root === 'function' ? (root as () => Element)() : root) as
-                Element | undefined,
-            rootMargin,
-            threshold: typeof amount === 'number' ? amount : thresholdNames[amount]
-        }
-    )
-
-    observer.observe(element)
-
-    return () => observer.disconnect()
+    const gesture = createInViewGesture(element, visualElement, () => viewport, callbacks)
+    gesture.startObserver()
+    return gesture.unmount
 }

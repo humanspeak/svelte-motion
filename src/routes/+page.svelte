@@ -334,6 +334,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/gesture-prop-change') + searchParams}
+                    >
+                        Gesture props changed mid-gesture
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/fx-prop') + searchParams}
                     >
                         fx prop: renders an fx attribute (Motion 14.14)

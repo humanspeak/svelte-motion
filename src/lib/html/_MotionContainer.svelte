@@ -62,8 +62,8 @@
     import {
         attachFocusGesture,
         attachHoverGesture,
-        attachInViewGesture,
-        attachPressGesture
+        attachPressGesture,
+        createInViewGesture
     } from '$lib/utils/gestures'
     import { readTransformChannels } from '$lib/utils/hover'
     import { observeMove } from '$lib/utils/observeMove'
@@ -3608,9 +3608,42 @@
         untrack(() => consumeLayoutIdHandoff(id))
     })
 
-    // ── Gestures (#449 plan 003) ─────────────────────────────────────────────
+    /**
+     * Upstream creates a gesture Feature the first time one of its props is
+     * truthy and never unmounts it while the component lives
+     * (`VisualElement.updateFeatures`, motion-dom/src/render/VisualElement.ts:657-688
+     * @ v14.14.0). The latch keeps the same rule: once enabled, the gesture's
+     * effect never re-runs for prop changes, so removing every hover prop
+     * mid-hover can't drop the pointerleave listener.
+     */
+    const createFeatureLatch = () => {
+        let enabled = false
+        return (wanted: boolean) => (enabled ||= wanted)
+    }
+    const latchHover = createFeatureLatch()
+    const latchFocus = createFeatureLatch()
+    const latchInView = createFeatureLatch()
+    // Enable lists as upstream `motion/features/definitions.ts`, plus our
+    // `onFocusStart`/`onFocusEnd` and `onInViewStart`/`onInViewEnd`.
+    const hoverEnabled = $derived(
+        latchHover(!!(whileHoverProp || onHoverStartProp || onHoverEndProp))
+    )
+    const focusEnabled = $derived(
+        latchFocus(!!(whileFocusProp || onFocusStartProp || onFocusEndProp))
+    )
+    const inViewEnabled = $derived(
+        latchInView(!!(whileInViewProp || onInViewStartProp || onInViewEndProp))
+    )
+    // Upstream restarts the in-view observer only when one of these changes
+    // (viewport/index.ts:77-88 @ v14.14.0). Deriveds compare by value, so a
+    // parent that re-creates an equal `viewport` object doesn't restart it.
+    const viewportAmount = $derived(viewportProp?.amount)
+    const viewportMargin = $derived(viewportProp?.margin)
+    const viewportRoot = $derived(viewportProp?.root)
+
+    // ── Gestures (#449 plan 003, split per gesture in 2.14.1) ────────────────
     //
-    // Four thin attachers, each of which only flips
+    // Thin attachers, each of which only flips
     // `animationState.setActive('whileX', …)`. The animationState owns priority
     // ordering (`variantPriorityOrder`) and protected keys, so the
     // `gestureCoordinator` that hand-approximated both — plus the per-gesture
@@ -3620,46 +3653,68 @@
     // MotionValue and `animateMotionValue` seeds each new generation with
     // `value.getVelocity()`.
     //
-    // The while* DEFINITIONS are not passed here — the attachers read them from
-    // `ve.props`, which `buildMotionNodeProps` supplies raw (variant labels
-    // included, resolved by the animationState). Only `element`, the node and the
-    // callback props are needed.
+    // One effect per gesture, as upstream keeps one Feature per gesture
+    // (`framer-motion/src/gestures/hover.ts:36-50`, `gestures/focus.ts:4-42`,
+    // `motion/features/viewport/index.ts` @ v14.14.0). Nothing a gesture reads
+    // at event time is a dependency of its effect: the while* DEFINITIONS come
+    // from `ve.getProps()` (which `buildMotionNodeProps` supplies raw, variant
+    // labels included), and the callbacks through getters. That matters
+    // because a re-attach is not harmless: cancelling motion-dom's `hover()`
+    // aborts its pointerleave listener without running the hover-end half
+    // (motion-dom/src/gestures/hover.ts:112-145), a fresh focus attacher has
+    // forgotten it was active and ignores the next blur, and a fresh
+    // IntersectionObserver re-fires `onInViewStart` on its initial report.
+    // Each effect reads only element/visualElement/isLoaded/hasGestureFeatures
+    // and its own latch — never a while* prop, a callback or `viewportProp`.
     $effect(() => {
         if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
-        const node = visualElement
-        const target = element
-        // Gate each attacher on its own props, exactly as upstream's
-        // feature-enable lists do (`motion/features/definitions.ts`). Attaching
-        // unconditionally would, among other things, create an
-        // IntersectionObserver for every motion element on the page.
-        const cleanups: (() => void)[] = []
-        if (whileHoverProp || onHoverStartProp || onHoverEndProp) {
-            cleanups.push(
-                attachHoverGesture(target, node, {
-                    onHoverStart: onHoverStartProp,
-                    onHoverEnd: onHoverEndProp
-                })
-            )
-        }
-        if (whileFocusProp || onFocusStartProp || onFocusEndProp) {
-            cleanups.push(
-                attachFocusGesture(target, node, {
-                    onFocusStart: onFocusStartProp,
-                    onFocusEnd: onFocusEndProp
-                })
-            )
-        }
-        if (whileInViewProp || onInViewStartProp || onInViewEndProp) {
-            cleanups.push(
-                attachInViewGesture(target, node, viewportProp, {
-                    onInViewStart: onInViewStartProp,
-                    onInViewEnd: onInViewEndProp
-                })
-            )
-        }
-        return () => {
-            for (const cleanup of cleanups) cleanup()
-        }
+        if (!hoverEnabled) return
+        // Callbacks are getters read at event time (as in the press effect), so a
+        // new callback identity doesn't cancel an in-progress hover.
+        return attachHoverGesture(element, visualElement, {
+            get onHoverStart() {
+                return onHoverStartProp
+            },
+            get onHoverEnd() {
+                return onHoverEndProp
+            }
+        })
+    })
+
+    $effect(() => {
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        if (!focusEnabled) return
+        return attachFocusGesture(element, visualElement, {
+            get onFocusStart() {
+                return onFocusStartProp
+            },
+            get onFocusEnd() {
+                return onFocusEndProp
+            }
+        })
+    })
+
+    $effect(() => {
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        if (!inViewEnabled) return
+        const gesture = createInViewGesture(element, visualElement, () => viewportProp, {
+            get onInViewStart() {
+                return onInViewStartProp
+            },
+            get onInViewEnd() {
+                return onInViewEndProp
+            }
+        })
+        // Nested: re-runs only on an amount/margin/root change and restarts the
+        // observer while keeping hasEnteredView/isInView, like upstream's
+        // `startObserver()` from `update()`. It is torn down with the parent.
+        $effect(() => {
+            void viewportAmount
+            void viewportMargin
+            void viewportRoot
+            untrack(() => gesture.startObserver())
+        })
+        return () => gesture.unmount()
     })
 
     // ── Press (Motion 14.10 `tap` options) ───────────────────────────────────

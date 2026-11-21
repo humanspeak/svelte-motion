@@ -1299,3 +1299,238 @@ describe('layout mount vs update', () => {
         didUpdateSpy.mockRestore()
     })
 })
+
+describe('gesture props changing during the gesture (plan 006)', () => {
+    /** Enable a true-hover environment, as the existing whileHover test does. */
+    const stubHoverMedia = () => {
+        vi.stubGlobal('matchMedia', (query: string) => {
+            const matches = query.includes('(hover: hover)') || query.includes('(pointer: fine)')
+            return {
+                matches,
+                media: query,
+                onchange: null,
+                addEventListener() {},
+                removeEventListener() {},
+                addListener() {},
+                removeListener() {},
+                dispatchEvent() {
+                    return false
+                }
+            } as unknown as MediaQueryList
+        })
+    }
+
+    let observers: {
+        callback: IntersectionObserverCallback
+        disconnect: ReturnType<typeof vi.fn>
+        unobserve: ReturnType<typeof vi.fn>
+    }[]
+
+    /** Record every IntersectionObserver the component creates. */
+    const stubIntersectionObserver = () => {
+        observers = []
+        vi.stubGlobal(
+            'IntersectionObserver',
+            class {
+                constructor(callback: IntersectionObserverCallback) {
+                    const entry = {
+                        callback,
+                        disconnect: vi.fn(),
+                        unobserve: vi.fn()
+                    }
+                    observers.push(entry)
+                    Object.assign(this, {
+                        observe: vi.fn(),
+                        unobserve: entry.unobserve,
+                        disconnect: entry.disconnect,
+                        takeRecords: vi.fn(() => [])
+                    })
+                }
+            }
+        )
+    }
+
+    /** Drive the most recently created observer. */
+    const intersect = (el: Element, isIntersecting: boolean) => {
+        const observer = observers.at(-1)
+        observer?.callback(
+            [{ target: el, isIntersecting } as unknown as IntersectionObserverEntry],
+            {} as IntersectionObserver
+        )
+    }
+
+    it('hover: a new whileHover mid-hover still ends the hover on leave', async () => {
+        stubHoverMedia()
+        const onHoverStart = vi.fn()
+        const onHoverEnd = vi.fn()
+        const props = {
+            tag: 'div',
+            initial: { scale: 1 },
+            animate: { scale: 1.1 },
+            whileHover: { scale: 1.2 },
+            onHoverStart,
+            onHoverEnd
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        await result.rerender({ ...props, whileHover: { scale: 1.3 } })
+        await flushTimers()
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.3 })
+
+        await fireEvent.pointerLeave(el)
+        await flushTimers()
+        expect(onHoverStart).toHaveBeenCalledTimes(1)
+        expect(onHoverEnd).toHaveBeenCalledTimes(1)
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1.1 })
+    })
+
+    it('focus: a new whileFocus mid-focus still ends on blur', async () => {
+        const onFocusStart = vi.fn()
+        const onFocusEnd = vi.fn()
+        const props = {
+            tag: 'button',
+            initial: { scale: 1 },
+            animate: { scale: 1 },
+            whileFocus: { scale: 1.2 },
+            onFocusStart,
+            onFocusEnd
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        const realMatches = el.matches.bind(el)
+        vi.spyOn(el, 'matches').mockImplementation(
+            (selector: string) => selector === ':focus-visible' || realMatches(selector)
+        )
+
+        await fireEvent.focus(el)
+        await flushTimers()
+        await result.rerender({ ...props, whileFocus: { scale: 1.4 } })
+        await flushTimers()
+        await fireEvent.blur(el)
+        await flushTimers()
+
+        expect(onFocusEnd).toHaveBeenCalledTimes(1)
+        expect(await latestValuesOf(el)).toMatchObject({ scale: 1 })
+    })
+
+    it('in-view: a new whileInView neither restarts the observer nor re-fires', async () => {
+        stubIntersectionObserver()
+        const onInViewStart = vi.fn()
+        const props = {
+            tag: 'div',
+            initial: { opacity: 0 },
+            whileInView: { opacity: 1 },
+            viewport: { once: true },
+            onInViewStart
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        intersect(el, true)
+        await flushTimers()
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+
+        await result.rerender({ ...props, whileInView: { opacity: 0.9 } })
+        await flushTimers()
+        // A real browser reports any newly created observer's initial state.
+        intersect(el, true)
+        await flushTimers()
+
+        expect(observers.length).toBe(1)
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('in-view: an amount change restarts the observer without re-firing', async () => {
+        stubIntersectionObserver()
+        const onInViewStart = vi.fn()
+        const props = {
+            tag: 'div',
+            initial: { opacity: 0 },
+            whileInView: { opacity: 1 },
+            viewport: { amount: 'some' } as { amount: 'some' | number },
+            onInViewStart
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        intersect(el, true)
+        await flushTimers()
+
+        await result.rerender({ ...props, viewport: { amount: 0.5 } })
+        await flushTimers()
+        intersect(el, true)
+        await flushTimers()
+
+        expect(observers.length).toBe(2)
+        expect(observers[0].disconnect).toHaveBeenCalled()
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('in-view: a new callback identity is used without a new observer', async () => {
+        stubIntersectionObserver()
+        const first = vi.fn()
+        const second = vi.fn()
+        const props = {
+            tag: 'div',
+            initial: { opacity: 0 },
+            whileInView: { opacity: 1 },
+            viewport: { amount: 'some' as const },
+            onInViewStart: first
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        await result.rerender({ ...props, onInViewStart: second })
+        await flushTimers()
+        intersect(el, true)
+        await flushTimers()
+
+        expect(observers.length).toBe(1)
+        expect(first).not.toHaveBeenCalled()
+        expect(second).toHaveBeenCalledTimes(1)
+    })
+
+    it('hover: removing every hover prop mid-hover and adding them back keeps the listeners', async () => {
+        stubHoverMedia()
+        const props = {
+            tag: 'div',
+            initial: { scale: 1 },
+            animate: { scale: 1.1 },
+            whileHover: { scale: 1.2 },
+            onHoverStart: vi.fn(),
+            onHoverEnd: vi.fn()
+        }
+        const result = render(MotionContainer as unknown as any, { props })
+        await flushTimers()
+        const el = result.container.firstElementChild as HTMLElement
+
+        await fireEvent.pointerEnter(el)
+        await flushTimers()
+
+        await result.rerender({
+            ...props,
+            whileHover: undefined,
+            onHoverStart: undefined,
+            onHoverEnd: undefined
+        })
+        await flushTimers()
+
+        const onHoverEnd2 = vi.fn()
+        await result.rerender({ ...props, whileHover: { scale: 1.2 }, onHoverEnd: onHoverEnd2 })
+        await flushTimers()
+
+        await fireEvent.pointerLeave(el)
+        await flushTimers()
+        expect(onHoverEnd2).toHaveBeenCalledTimes(1)
+    })
+})
