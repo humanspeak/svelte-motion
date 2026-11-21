@@ -14,3 +14,9 @@
   - The first full unit run had 2 failures, in `_MotionContainer.transitionOut.spec.ts` and `motionDomProjection.spec.ts` (9c), while 11 lanes loaded the machine. Both specs passed 140/140 alone, and the second full run passed 1734/1734.
 - **Note:** open PR #518 also edits `package.json` (the `@playwright/test` pin). Whichever lands second rebases.
 - **Integrated:** `96a6a979` on `fix/2.14.1`.
+
+## 2026-11-21, integration correction
+
+- `96a6a979` was missing the lockfile half of this plan. The lane's `pnpm-lock.yaml` had been reverted before the guard committed it, and the guard didn't notice. As a result, `pnpm install --frozen-lockfile` failed on the batch tip with `ERR_PNPM_OUTDATED_LOCKFILE`; plan 003's executor reported it.
+- **Fixed in `3d748bf6`:** `pnpm install --lockfile-only` moved the `esm-env` 1.2.2 entry to the root importer's dependencies, the same 3-line change the executor made, and `--frozen-lockfile` passes again.
+- From now on, the guard's merge step leaves out a lane's lockfile unless the plan owns it.
