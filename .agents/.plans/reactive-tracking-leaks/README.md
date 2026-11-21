@@ -8,6 +8,8 @@ This was a codebase audit, not an upstream sync. The Motion 14.14.0 bump is
 being handled separately and nothing here plans it. Where a plan's files
 overlap with that bump, its Maintenance notes say so.
 
+**2026-11-20 extension for svelte-motion 2.14.1.** The branch was rebased onto `origin/main` `a33531a2` (v2.14.0, Motion 14.14.0). Plans 001–005 were pre-flighted against it: 001 and 003 got refreshed excerpts and line numbers (see their revision notes), and 002, 004 and 005 had no drift. The maintainer chose findings 6–15 plus housekeeping (findings 20–22). These became plans 006–016, written against `a33531a2`. Upstream citations in the new plans use `v14.14.0`, which is now our pin.
+
 **Selection**: the run was non-interactive, so nobody chose findings. Per the
 skill's default, plans were written for the top five findings by leverage
 (impact ÷ effort, weighted by confidence). The dominant theme gave the batch
@@ -21,9 +23,10 @@ starting, honor its STOP conditions, and update your row when done.
 
 ## Parallel waves
 
-- **Wave 1** (no dependencies): 001, 002, 003, 004, 005
+- **Wave 1** (no dependencies): 001, 002, 004, 005, 006, 008, 009, 010, 012, 013, 015, 016
+- **Wave 2**: 003 (after 012), 007 (after 006), 011 (after 005 and 010), 014 (after 006)
 
-There is no wave 2. No plan reads code another plan creates.
+Only 012 → 003 and 006 → 014 are real code dependencies. The other edges only order merges between plans that edit the same file in separate regions: `_MotionContainer.svelte` for 006/007, `presence.ts` for 005/010/011.
 
 ## Status
 
@@ -31,18 +34,35 @@ There is no wave 2. No plan reads code another plan creates.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [001](001-declare-esm-env-dependency.md) | Every bare import the published package makes is a declared dependency (`esm-env`) | 1 | P1 | S | none | `package.json`, `pnpm-lock.yaml`, `src/lib/__tests__/declaredImports.spec.ts` | TODO |
 | [002](002-motion-value-set-untracked.md) | Writing to a motion value inside `$effect` no longer subscribes the effect to it | 1 | P1 | S–M | none | `src/lib/utils/augmentMotionValue.svelte.ts` + spec | TODO |
-| [003](003-on-layout-measure-untracked.md) | `onLayoutMeasure` may read and write `$state` without looping | 1 | P1 | S | none | `src/lib/html/_MotionContainer.svelte` (one effect), `src/routes/tests/layout/measure-state`, `e2e/layout/measure-state.spec.ts`, `src/routes/+page.svelte` | TODO |
+| [003](003-on-layout-measure-untracked.md) | `onLayoutMeasure` may read and write `$state` without looping | 2 | P1 | S | 012 | `src/lib/html/_MotionContainer.svelte` (one effect), `src/routes/tests/layout/measure-state`, `e2e/layout/measure-state.spec.ts`, `src/routes/+page.svelte` | TODO |
 | [004](004-animation-controls-plain-set.md) | `controls.start()` in an `$effect` does not re-run on subscribe/unsubscribe | 1 | P2 | S | none | `src/lib/utils/animationControls.svelte.ts`, new `animationControls.svelte.spec.ts` | TODO |
 | [005](005-presence-child-reversed-exit.md) | A `PresenceChild` exit reversed by re-entry does not fire `onExitComplete` | 1 | P1 | S | none | `src/lib/components/PresenceChild.svelte` (one line), `src/lib/utils/presence.ts` (context type + object), `src/lib/utils/usePresence.spec.ts` | TODO |
+| [006](006-gesture-effects-split.md) | Hover, focus and in-view each get their own effect; a gesture prop change no longer re-attaches the others | 1 | P1 | M | none | `_MotionContainer.svelte` (gesture section, about 3611–3663, plus imports), `utils/gestures.ts` (hover/focus/in-view) + spec, `_MotionContainer.spec.ts`, new `tests/motion/gesture-prop-change` + e2e, `+page.svelte` link | TODO |
+| [007](007-key-transition-restart.md) | A second in-place `key` change during a key transition no longer strands the element | 2 | P1 | S–M | 006 (merge order) | `_MotionContainer.svelte` (key-tracker vars 848–852, key-change effect 3831–3955), new `tests/animate-presence/key-change-in-place` + e2e, `+page.svelte` link | TODO |
+| [008](008-parse-style-string.md) | Style strings split only on top-level `;`; data URIs and fallback pairs survive | 1 | P2 | S | none | `utils/style.ts` + spec, `utils/optimizedAppear.ts` (`readStyleProp`), `_MotionContainer.ssr.spec.ts`, new `tests/style-string-declarations` + e2e, `+page.svelte` link | TODO |
+| [009](009-vite-motion-import.md) | The Vite optimizer keeps the `motion` import while any `motion.<x>` reference survives | 1 | P2 | S | none | `src/lib/vite.ts`, `src/lib/vite.spec.ts` | TODO |
+| [010](010-clone-exit-restore-position.md) | A clone exit restores the parent's inline `position` when the last exit ends | 1 | P2 | S | none | `utils/presence.ts` (clone-exit containing block + four release sites), `utils/presence.spec.ts` | TODO |
+| [011](011-animate-presence-mode-reactive.md) | `AnimatePresence` `mode` is read live; in-flight exits keep their mode | 2 | P2 | S–M | 005, 010 (merge order) | `utils/presence.ts`, `components/AnimatePresence.svelte`, new mode specs + harnesses, new `tests/animate-presence/mode-switch` + e2e, boundary-teardown page, docs `animate-presence` | TODO |
+| [012](012-reorder-item-reregister.md) | `Reorder.Item` re-registers its element and layout slot when its value object changes | 1 | P1 | S | none | `Reorder/Item.svelte`, new `Reorder/objectValues.component.spec.ts` + harness, new `tests/reorder/immutable-values` + e2e, `+page.svelte` link | TODO |
+| [013](013-reduced-motion-instant-transforms.md) | Reduced motion applies transform and position targets instantly, as upstream does | 1 | P2 | M | none | `_MotionContainer.svelte` (reduced-motion call sites, about 19–1607, plus one effect), `reducedMotionConfig.svelte.ts` + spec, `types.ts` (JSDoc), new reduced-motion spec + harness, test page, flipped `e2e/utilities/motion-config-reduced-motion.spec.ts`, three docs pages | TODO |
+| [014](014-gesture-callback-args.md) | Hover, tap and viewport callbacks get upstream's arguments; `onViewportEnter`/`onViewportLeave` added | 2 | P2 | S–M | 006 | `utils/gestures.ts` + spec, `_MotionContainer.svelte`, `types.ts`, `index.ts` (type exports), new `tests/motion/gesture-callback-args` + e2e, `+page.svelte` link, three docs pages | TODO |
+| [015](015-motion-value-event-events.md) | `useMotionValueEvent` supports every motion-value event | 1 | P2 | S | none | `utils/motionValueEvent.ts`, new `motionValueEvent.svelte.spec.ts`, docs `use-motion-value-event` | TODO |
+| [016](016-repo-housekeeping.md) | Delete the always-failing Coveralls workflow, fix CONTRIBUTING, drop stale plan copies | 1 | P3 | S | none | `.github/workflows/coveralls.yml` (deleted), `CONTRIBUTING.md` (lines 13, 17, 45, 72, 85; not 52–68), `.agents/.plans/motion-14-{2,5,6}-0/` (deleted) | TODO |
 
 Every plan also adds its own `.changeset/<slug>.md` (unique file names, no
 overlap).
 
-`Touches` lists the files each plan edits; no two plans share one. Status
+`Touches` lists the files each plan edits. Shared files are limited to the ones named in the waves note above, plus one-link edits to `src/routes/+page.svelte` (003, 006, 007, 008, 011, 012, 014, each in its own section) and the JSDoc-only edit to `types.ts` (013 and 014). A rebase resolves those. Status
 values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED
 (with one-line rationale).
 
 ## Dependency notes
+
+- **012 before 003 (real).** A `Reorder.Item` that gets a new value object under a stable key is re-registered in the group's layout slots today only because of the leak 003 removes. 012 makes both the element and the slot registration explicit, so 003 can land without regressing Reorder. 003's Reorder gate runs 012's tests and STOPs if they are missing.
+- **006 before 014 (real).** 014 changes the callback signatures inside the gesture effects that 006 rewrites.
+- **011 changes one line of 005's context object.** It turns `mode,` into `get mode() { return readMode() }`, the only way to keep `context.mode` live without editing `PresenceChild.svelte` and `_MotionContainer.svelte`. The context type is unchanged. 011 has a done-criterion and a STOP condition guarding this, and the exception was accepted when the batch was assembled.
+- **Ports for the new plans:** 006 → 4216, 007 → 4217, 008 → 4218, 009 → 4219 (reserved), 010 → 4220, 011 → 4221, 012 → 4222, 013 → 4223, 014 → 4224, 015 → 4225 (reserved). 016 needs none.
+- **016 and PR #518** both edit `CONTRIBUTING.md`. 016 avoids lines 52–68, the verification table #518 changes. Whichever lands second rebases. 016's changeset can be dropped before merging, since nothing in the package changes.
 
 - None of the five depend on each other.
 - Playwright ports are assigned per plan so parallel lanes do not collide:
@@ -78,23 +98,23 @@ Confidence is about the finding being real, not about the fix.
 | 3 | `onLayoutMeasure` runs inside the library's layout effects | bug | A callback that reads and writes `$state` throws `effect_update_depth_exceeded`; the repo's own test page works around it | S | MED | HIGH | `_MotionContainer.svelte:3046-3054`, `:3132`; `motionDomProjection.ts:1551,1619`; `tests/layout-dependency/+page.svelte:51-57` | 003 |
 | 4 | Reversed `PresenceChild` exit still fires `onExitComplete` and `forceRender` | bug | Modal cleanup runs while the modal is back on screen; the clone path already does this correctly | S | LOW | HIGH | `PresenceChild.svelte:370-379`; `presence.ts:1937-1949, 2010-2017`; upstream `AnimatePresence/index.tsx:124-134` | 005 |
 | 5 | Animation controls keep subscribers in a `SvelteSet` | bug | `$effect(() => controls.start(...))` replays on every subscriber mount or unmount | S | LOW | HIGH (by reading) | `animationControls.svelte.ts:54,69,79,82`; upstream `animation-controls.ts:54` | 004 |
-| 6 | Hover, focus and in-view gestures share one effect and re-attach on any gesture prop change | bug | A reactive `whileHover` changed mid-hover drops the leave listener (hover sticks, `onHoverEnd` lost); focus state resets; `onInViewStart` re-fires, `viewport.once` can fire twice | M | MED | HIGH | `_MotionContainer.svelte:3589-3625`; `gestures.ts:102-110, 208, 277-278`; upstream `gestures/hover.ts:36-50`, `features/viewport/index.ts:77-88` | none |
-| 7 | A second in-place `key` change during a key transition strands the element at its exit target for good | bug | Direct `AnimatePresence` child with a changing `key` prop (no `{#key}`): two quick changes leave it at opacity 0 and all later key changes are ignored | S–M | MED | HIGH | `_MotionContainer.svelte:3795-3917` (cleanup sets `keyTransitionStopped`; `finally` then never clears `keyTrackerIsTransitioning`) | none |
-| 8 | `parseStyleString` splits on every `;` and keeps one value per property | bug | `style="background-image:url('data:image/png;base64,…')"` is truncated; fallback pairs (`height:100vh;height:100dvh`) collapse | S | LOW | HIGH | `utils/style.ts:443-457`, `:85-87`; same split in `optimizedAppear.ts:146-153` | none |
-| 9 | Vite optimizer can drop the `motion` import while `motion.<tag>` expressions remain | bug | `<W as={motion.span} />` next to a `<motion.div>` throws `motion is not defined` at runtime, only with the plugin on | S | LOW | HIGH (by reading) | `vite.ts:313-321, 337-339` | none |
-| 10 | The clone exit sets `position: relative` on a static parent and never restores it | bug | After the first exit the parent stays a containing block; the app's own absolutely positioned descendants move | S | LOW | HIGH | `presence.ts:2404-2409`; no restore in `completeExit` / `takeExitHandoff` / `dispose` | none |
-| 11 | `AnimatePresence` reads `mode` once at mount | bug (upstream divergence) | A runtime `mode` change is ignored; a test page works around it with a remount | S–M | LOW–MED | HIGH | `AnimatePresence.svelte:165-167`; `presence.ts:1504`; upstream `AnimatePresence/index.tsx:52,177` | none |
-| 12 | `Reorder.Item` registers its element once; a new value object under a stable key is never re-registered | bug | Immutable updates (`{...item, done: true}`) drop the item from arrow-key navigation and the tab stop | S | LOW | HIGH (elements), MED (drag) | `Reorder/Item.svelte:162-163`; `Reorder/Group.svelte:277-284`; upstream `Reorder/Item.tsx:141` | none |
-| 13 | Reduced motion strips transform targets; upstream applies them instantly | bug (upstream divergence) | Under `reducedMotion="always"`, `animate={{ x: 200 }}` leaves the element at 0 (upstream: at 200, no tween). Size and inset keys still tween | M | MED | HIGH (diverges) | `reducedMotionConfig.svelte.ts:69-79`; upstream `visual-element-target.ts:150-160`. Currently pinned as intended by `e2e/utilities/motion-config-reduced-motion.spec.ts:22-31` and the docs | none |
-| 14 | Hover, tap and in-view callbacks receive no arguments; `onViewportEnter` / `onViewportLeave` do not exist | bug (upstream divergence) | Ported code that reads `info.point` or `event.target` throws | S–M | LOW | HIGH | `gestures.ts:69-72`; `types.ts:466-480`; upstream `gestures/hover.ts:28-33` | none |
-| 15 | `useMotionValueEvent` only supports `'change'` and only Svelte readables | bug (upstream divergence) | `animationStart` / `animationComplete` / `animationCancel` are not observable; the docs description advertises them | S–M | LOW–MED | HIGH | `motionValueEvent.ts:30-44`; upstream `use-motion-value-event.ts:6-23`; `docs/.../use-motion-value-event/+page.svx:12` | none |
+| 6 | Hover, focus and in-view gestures share one effect and re-attach on any gesture prop change | bug | A reactive `whileHover` changed mid-hover drops the leave listener (hover sticks, `onHoverEnd` lost); focus state resets; `onInViewStart` re-fires, `viewport.once` can fire twice | M | MED | HIGH | `_MotionContainer.svelte:3589-3625`; `gestures.ts:102-110, 208, 277-278`; upstream `gestures/hover.ts:36-50`, `features/viewport/index.ts:77-88` | 006 |
+| 7 | A second in-place `key` change during a key transition strands the element at its exit target for good | bug | Direct `AnimatePresence` child with a changing `key` prop (no `{#key}`): two quick changes leave it at opacity 0 and all later key changes are ignored | S–M | MED | HIGH | `_MotionContainer.svelte:3795-3917` (cleanup sets `keyTransitionStopped`; `finally` then never clears `keyTrackerIsTransitioning`) | 007 |
+| 8 | `parseStyleString` splits on every `;` and keeps one value per property | bug | `style="background-image:url('data:image/png;base64,…')"` is truncated; fallback pairs (`height:100vh;height:100dvh`) collapse | S | LOW | HIGH | `utils/style.ts:443-457`, `:85-87`; same split in `optimizedAppear.ts:146-153` | 008 |
+| 9 | Vite optimizer can drop the `motion` import while `motion.<tag>` expressions remain | bug | `<W as={motion.span} />` next to a `<motion.div>` throws `motion is not defined` at runtime, only with the plugin on | S | LOW | HIGH (by reading) | `vite.ts:313-321, 337-339` | 009 |
+| 10 | The clone exit sets `position: relative` on a static parent and never restores it | bug | After the first exit the parent stays a containing block; the app's own absolutely positioned descendants move | S | LOW | HIGH | `presence.ts:2404-2409`; no restore in `completeExit` / `takeExitHandoff` / `dispose` | 010 |
+| 11 | `AnimatePresence` reads `mode` once at mount | bug (upstream divergence) | A runtime `mode` change is ignored; a test page works around it with a remount | S–M | LOW–MED | HIGH | `AnimatePresence.svelte:165-167`; `presence.ts:1504`; upstream `AnimatePresence/index.tsx:52,177` | 011 |
+| 12 | `Reorder.Item` registers its element once; a new value object under a stable key is never re-registered | bug | Immutable updates (`{...item, done: true}`) drop the item from arrow-key navigation and the tab stop | S | LOW | HIGH (elements), MED (drag) | `Reorder/Item.svelte:162-163`; `Reorder/Group.svelte:277-284`; upstream `Reorder/Item.tsx:141` | 012 |
+| 13 | Reduced motion strips transform targets; upstream applies them instantly | bug (upstream divergence) | Under `reducedMotion="always"`, `animate={{ x: 200 }}` leaves the element at 0 (upstream: at 200, no tween). Size and inset keys still tween | M | MED | HIGH (diverges) | `reducedMotionConfig.svelte.ts:69-79`; upstream `visual-element-target.ts:150-160`. Currently pinned as intended by `e2e/utilities/motion-config-reduced-motion.spec.ts:22-31` and the docs | 013 |
+| 14 | Hover, tap and in-view callbacks receive no arguments; `onViewportEnter` / `onViewportLeave` do not exist | bug (upstream divergence) | Ported code that reads `info.point` or `event.target` throws | S–M | LOW | HIGH | `gestures.ts:69-72`; `types.ts:466-480`; upstream `gestures/hover.ts:28-33` | 014 |
+| 15 | `useMotionValueEvent` only supports `'change'` and only Svelte readables | bug (upstream divergence) | `animationStart` / `animationComplete` / `animationCancel` are not observable; the docs description advertises them | S–M | LOW–MED | HIGH | `motionValueEvent.ts:30-44`; upstream `use-motion-value-event.ts:6-23`; `docs/.../use-motion-value-event/+page.svx:12` | 015 |
 | 16 | Presence style observer re-snapshots the full computed style on every descendant attribute write | perf | A presence child containing a per-frame-animated SVG re-serializes its root's computed style every frame | S | LOW | HIGH (mechanism), MED (size) | `presence.ts:338-355`, `:2084-2086` | none |
 | 17 | `classifyMutations` runs once per subscribed `layout` element for the same mutation batch | perf | Removing many rows under N `layout` children walks each removed subtree N times | S | LOW | HIGH | `layout.ts:626-628, 895-905, 1208-1210, 1274-1276` | none |
 | 18 | Many clone exits in one update each force a layout and scan sibling z-indexes | perf | "Clear completed" on a few-hundred-row list: k forced layouts plus O(k·N) `getComputedStyle` | M | MED | HIGH (complexity), MED (severity) | `presence.ts:2308-2320, 2516-2529, 1724-1741` | none |
 | 19 | The relative-keyframe memo is never invalidated | bug | `{x:'+=50'}` → `{x:200}` → `{x:'+=50'}` returns to 50, not 250 | S | LOW | HIGH (by reading) | `_MotionContainer.svelte:551-587` | none |
-| 20 | Weekly Coveralls workflow has failed on every run since at least 2026-09-20 | dx | A permanently red scheduled job; it runs `pnpm test` without a build, and coverage is already uploaded by the publish workflow | S | LOW | HIGH | `.github/workflows/coveralls.yml:34-38`; `gh run list --workflow Coveralls` | none |
-| 21 | CONTRIBUTING.md states four things that are false | docs/dx | The guide CLAUDE.md sends fresh sessions to: Trunk "1.25.0" (`trunk.yaml` says 1.29.0), Motion "pinned 14.0.0" (14.12.0), a two-project Vitest layout that does not exist, and a unit command with no build prerequisite | S | LOW | HIGH | `CONTRIBUTING.md:13,17,38,72,85`; `.trunk/trunk.yaml:5`; `vitest.config.ts` | none |
-| 22 | Three shipped plan batches sit in `.agents/.plans/` as older drafts | dx | `dispatch` looks there for work; #516 re-added `motion-14-2-0`, `motion-14-5-0`, `motion-14-6-0` after #512 closed them. The `.plans-closed` copies are supersets | S | LOW | HIGH | `git show --stat d3cea700 -- .agents/.plans` | none |
+| 20 | Weekly Coveralls workflow has failed on every run since at least 2026-09-20 | dx | A permanently red scheduled job; it runs `pnpm test` without a build, and coverage is already uploaded by the publish workflow | S | LOW | HIGH | `.github/workflows/coveralls.yml:34-38`; `gh run list --workflow Coveralls` | 016 |
+| 21 | CONTRIBUTING.md states four things that are false | docs/dx | The guide CLAUDE.md sends fresh sessions to: Trunk "1.25.0" (`trunk.yaml` says 1.29.0), Motion "pinned 14.0.0" (14.12.0), a two-project Vitest layout that does not exist, and a unit command with no build prerequisite | S | LOW | HIGH | `CONTRIBUTING.md:13,17,38,72,85`; `.trunk/trunk.yaml:5`; `vitest.config.ts` | 016 |
+| 22 | Three shipped plan batches sit in `.agents/.plans/` as older drafts | dx | `dispatch` looks there for work; #516 re-added `motion-14-2-0`, `motion-14-5-0`, `motion-14-6-0` after #512 closed them. The `.plans-closed` copies are supersets | S | LOW | HIGH | `git show --stat d3cea700 -- .agents/.plans` | 016 |
 | 23 | `svelte` peer range is `^5.0.0` but shipped code needs a later 5.x | deps | `$props.id()`, `createSubscriber` and `{@attach}` hooks fail on early 5.x with no peer warning | S | LOW | MED (exact minimums not checked against the Svelte changelog) | `package.json` peerDependencies; `_MotionContainer.svelte:182`; `presence.ts:27` | none |
 | 24 | Top-level `overrides` in `package.json` is not applied by pnpm | deps | Reads as a mitigation that is in force; the lockfile has no `cookie@0.7` | S | LOW | HIGH | `package.json:145-149`; `pnpm-lock.yaml` | none |
 | 25 | 9 test pages have no e2e spec and 26 are not linked from the home page | tests | Breaks the repo's own rules; `useSpring` has no root e2e | M | LOW | HIGH (lists matched by route path) | `src/routes/tests/**` vs `e2e/**` vs `src/routes/+page.svelte` | none |
@@ -107,10 +127,18 @@ Confidence is about the finding being real, not about the fix.
 | 32 | Docs Worker endpoints trust the slug and client headers | security (low) | Unknown or inherited-name slugs reach analytics and a KV write; `x-forwarded-for` used as identity; `/ingest` proxy forwards cookies. Targets are fixed, so no SSRF | S | LOW | HIGH (code), LOW–MED (impact) | `docs/src/routes/r/[slug].json/+server.ts:20-49`; `docs/src/hooks.server.ts:19-25` | none |
 | 33 | Docs tree carries high/critical advisories through `posthog-js` → `dompurify` | security (deps) | Docs site browser bundle only; nothing in the published package's runtime deps | S | LOW | MED | `pnpm audit --prod` (20 advisories, 1 critical, 4 high) | none |
 
-Suggested next picks if the maintainer wants a second batch: 6 and 7 (both
+Second batch (planned 2026-11-20 as 006–016): 6 and 7 (both
 real, user-visible, both in `_MotionContainer.svelte`, so they should be one
 plan each in separate waves or one combined plan), then 8, 9, 10, and a small
 housekeeping plan for 20–22.
+
+## Found while writing plans 006–016 (not planned)
+
+- **Finding 13's "size and inset keys still tween" is probably wrong.** Reading motion-dom, the node already has `shouldReduceMotion`, so `width`/`height`/inset are already instant. Only the transform keys our filter strips are affected. 013's red tests are written against the observable behavior either way.
+- **A third naive `;` split** is in `layout.ts:107-116` (`stripNonChildLayoutStyle`). It only builds a comparison key, so 008 leaves it alone; it's a one-line follow-up.
+- **008 side effect with `!important`.** After 008, a user's own `!important` declaration stays next to the library's appended hold (for example `display:none`) and now beats it. 008's Maintenance notes cover this.
+- **Upstream `viewport.once` divergence, kept on purpose.** By reading, upstream doesn't disconnect the observer on `once`, so `onViewportEnter` can fire again after the element leaves and returns. Ours disconnects, which matches what both projects document. Consider raising it upstream.
+- **Docs demo bug.** `docs/src/lib/examples/use-reduced-motion-config/demos/Default.svelte` calls `useReducedMotionConfig()` outside its own `<MotionConfig>`, so its readout never follows the radio buttons.
 
 ## Direction suggestions
 

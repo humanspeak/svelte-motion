@@ -8,7 +8,7 @@
 > dispatched you and told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat 4665b907..HEAD -- package.json pnpm-lock.yaml src/lib/__tests__`
+> `git diff --stat a33531a2..HEAD -- package.json pnpm-lock.yaml src/lib/__tests__`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -22,6 +22,10 @@
 - **Wave**: 1
 - **Category**: bug (packaging)
 - **Planned at**: commit `4665b907`, 2026-11-13
+
+## Revision notes
+
+- **2026-11-20, pre-flight against `a33531a2`** (Motion 14.14.0, v2.14.0): the `package.json` excerpt now shows the `14.14.0` pins, and the drift check is based on `a33531a2`. `esm-env` is still only a devDependency, so the finding stands and the steps are unchanged.
 
 ## Why this matters
 
@@ -43,8 +47,8 @@ spec fails whenever shipped code imports a package that is not declared.
   ```json
   "dependencies": {
       "acorn": "^8.18.0",
-      "motion": "14.12.0",
-      "motion-dom": "14.12.0"
+      "motion": "14.14.0",
+      "motion-dom": "14.14.0"
   },
   "devDependencies": {
       ...
