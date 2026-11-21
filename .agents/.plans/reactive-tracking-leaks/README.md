@@ -132,6 +132,15 @@ real, user-visible, both in `_MotionContainer.svelte`, so they should be one
 plan each in separate waves or one combined plan), then 8, 9, 10, and a small
 housekeeping plan for 20–22.
 
+## Batch full verification (2026-11-21)
+
+On `fix/2.14.1` at `95fb8899`, with all 16 plans merged:
+- **Exit 0:** install, build and publint, `pnpm check` (0 errors), package, unit tests with coverage, the vite6 consumer, the docs build/check/unit/geo-SEO, docs Playwright 12/12, Trunk (no new issues), and `git diff --check`.
+- **Root Chromium e2e:** 1010 passed, 2 skipped, 1 failed, 1 flaky.
+  - **Failed:** `e2e/utilities/use-presence.spec.ts`, which still counted a reversed exit as a completion. Plan 005 Step 5b fixed it in `a9d53031`, and `e2e/utilities` then passed 134/134.
+  - **Flaky:** `pop-layout-container-move.spec.ts:282`. It isn't from this batch: with `--repeat-each=4 --retries=0`, `fix/2.14.1` passed 140/140 and fresh `main` failed 1/140 on the same test.
+- **`transitionOut` unit flake:** it didn't reproduce on the idle machine.
+
 ## Seen during execution
 
 - **Possible load flake:** `_MotionContainer.transitionOut.spec.ts` › "initial's out transition is used for the mount animation only" failed once on a full `pnpm test:only` run in two lanes (001 and 006), while about ten lanes shared the machine. It passed alone each time. Check whether it reproduces in the batch's final full run on an idle machine.
