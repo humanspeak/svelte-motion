@@ -1202,6 +1202,14 @@
                         Wait exit completion (latest requested key remains)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/key-change-in-place') + searchParams}
+                    >
+                        In-place key change during a key transition
+                    </a>
+                </li>
             </ul>
         </div>
         <div>

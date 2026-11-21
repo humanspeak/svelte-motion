@@ -790,11 +790,22 @@
     // trunk-ignore(eslint/no-useless-assignment): false positive — presenceKey is used throughout the component
     const presenceKey = keyProp != null ? String(keyProp) : `motion-${++keyCounter}`
 
-    // Track previous key for key-change detection (simulates React's key-based remounting)
-    // Plain variables (not $state) to avoid self-triggering the key-change $effect
+    // In-place key transitions (simulates React's key-based remounting). Plain
+    // variables, not $state, so the key-change $effect never subscribes to its
+    // own bookkeeping.
+    // - keyTrackerPrev: the last key the effect has seen.
+    // - keyTransitionExiting: an exit started by a key change is in flight.
+    // - keyTransitionFromKey: the key that exit belongs to, so a change back
+    //   to it can reverse the exit instead of finishing it.
+    // - keyTransitionGeneration: bumped by every new transition, by a
+    //   reversal, and on unmount. An async continuation whose generation is
+    //   stale returns without touching anything. Interrupted animations never
+    //   resolve their promise (motion-dom JSAnimation.stop() only tears down),
+    //   so nothing may depend on an awaited exit resuming.
     let keyTrackerPrev = keyProp
-    let keyTrackerIsTransitioning = false
-    let keyTransitionStopped = false
+    let keyTransitionExiting = false
+    let keyTransitionFromKey: typeof keyProp = undefined
+    let keyTransitionGeneration = 0
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -3833,22 +3844,31 @@
     // back to idle controls now leaves each value wherever its last completed
     // animation put it, because that is simply where the MotionValue is.
 
-    // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
-    // When key changes, run exit → initial → animate sequence on the same element
+    // Handle key prop changes inside AnimatePresence (simulates React's
+    // key-based remounting). A key change runs exit -> rewind -> enter on the
+    // same element. A key change DURING that exit follows upstream
+    // AnimatePresence (v14.14.0):
+    // - to another key: keep exiting, then enter once with the latest props,
+    //   as wait mode renders only the exiting child and mounts the latest one
+    //   after it (AnimatePresence/index.tsx:155-179);
+    // - back to the exiting key: reverse the exit with no rewind, as
+    //   ExitAnimationFeature does when the child is present again
+    //   (exit.ts:55).
+    // A change after the exit has finished starts a fresh transition. This
+    // effect returns no cleanup on purpose: Svelte runs an effect's cleanup
+    // before every re-run, so a cleanup cannot tell "the key changed again"
+    // from "unmounted". The teardown effect below handles unmount.
     $effect(() => {
-        // Access keyProp to create reactive dependency
         const currentKey = keyProp
 
         // Only handle key changes when:
         // 1. We're inside AnimatePresence (context exists)
         // 2. Element is ready (not during initial mount)
         // 3. Key actually changed (not undefined → value on mount)
-        // 4. Not already transitioning
         if (
             !shouldRegisterPresenceExit ||
             !element ||
             isLoaded !== 'ready' ||
-            keyTrackerIsTransitioning ||
             currentKey === keyTrackerPrev ||
             keyTrackerPrev === undefined
         ) {
@@ -3858,7 +3878,7 @@
                 isLoaded,
                 hasElement: !!element,
                 hasContext: !!context,
-                keyTrackerIsTransitioning
+                keyTransitionExiting
             })
             // Update prev for next comparison
             if (currentKey !== keyTrackerPrev) {
@@ -3867,14 +3887,34 @@
             return
         }
 
+        if (keyTransitionExiting && currentKey === keyTransitionFromKey) {
+            pwLog('[motion] key changed back mid-exit, reversing', { currentKey })
+            keyTransitionGeneration++
+            keyTransitionExiting = false
+            keyTrackerPrev = currentKey
+            untrack(() => {
+                void visualElement?.animationState?.setActive('exit', false)
+            })
+            return
+        }
+
+        if (keyTransitionExiting) {
+            pwLog('[motion] key changed mid-exit, entering latest after exit', {
+                currentKey
+            })
+            keyTrackerPrev = currentKey
+            return
+        }
+
         pwLog('[motion] key changed, running exit→initial→animate', {
             prevKey: keyTrackerPrev,
             newKey: currentKey
         })
 
-        // Mark as transitioning to prevent re-entry
-        keyTrackerIsTransitioning = true
-        keyTransitionStopped = false
+        const generation = ++keyTransitionGeneration
+        const isCurrent = () => generation === keyTransitionGeneration && !!element
+        keyTransitionExiting = true
+        keyTransitionFromKey = keyTrackerPrev
         keyTrackerPrev = currentKey
 
         // Run the key transition sequence
@@ -3888,18 +3928,19 @@
                 const animationState = visualElement?.animationState
 
                 // 1. Exit, via setActive — not a bespoke `animate()` call.
-                if (animationState && exitProp !== undefined && !keyTransitionStopped) {
+                if (animationState && exitProp !== undefined) {
                     pwLog('[motion] key transition: setActive(exit, true)')
                     await animationState.setActive('exit', true)
                 }
 
                 pwLog('[motion] key transition: exit done', {
-                    keyTransitionStopped,
+                    current: isCurrent(),
                     hasElement: !!element
                 })
 
-                // Check if component was unmounted during the exit animation
-                if (keyTransitionStopped || !element) return
+                // Reversed, superseded or unmounted while exiting.
+                if (!isCurrent()) return
+                keyTransitionExiting = false
 
                 pwLog('[motion] key transition: rewinding to initial and re-entering')
                 if (visualElement && animationState) {
@@ -3927,6 +3968,9 @@
                     visualElement.blockInitialAnimation = false
                     // Release exit so it stops protecting those keys.
                     await animationState.setActive('exit', false)
+                    // A key change during the re-enter started a new
+                    // transition; it owns the element now.
+                    if (!isCurrent()) return
                     // Clear `prevResolvedValues` so the re-enter is not deduped
                     // away as "already at target".
                     animationState.reset()
@@ -3941,22 +3985,27 @@
 
                 runAnimation()
             } finally {
-                pwLog('[motion] key transition: finally', { keyTransitionStopped })
-                if (!keyTransitionStopped) {
-                    keyTrackerIsTransitioning = false
+                pwLog('[motion] key transition: finally', { current: isCurrent() })
+                if (generation === keyTransitionGeneration) {
+                    keyTransitionExiting = false
                 }
             }
         }
 
-        // Fire-and-forget: `$effect` bodies cannot be async, and the transition
-        // manages its own cancellation via the cleanup returned below.
-        void runKeyTransition()
+        // Fire-and-forget: `$effect` bodies cannot be async. `untrack` keeps
+        // the synchronous prefix (`visualElement`, `exitProp`) out of this
+        // effect's dependencies, so only `keyProp`, `element` and `isLoaded`
+        // re-run it.
+        untrack(() => {
+            void runKeyTransition()
+        })
+    })
 
-        // Cleanup on unmount
-        return () => {
-            pwLog('[motion] key effect: cleanup, stopping transition')
-            keyTransitionStopped = true
-        }
+    // Unmount teardown for the key transition. It reads nothing reactive, so
+    // it runs once and its cleanup fires only when the component is destroyed.
+    $effect(() => () => {
+        keyTransitionGeneration++
+        keyTransitionExiting = false
     })
 
     // The former JSON-dedup re-run effects lived here (`lastAnimatePropJson`,
