@@ -10,11 +10,11 @@ Work from the repository root.
 | ------- | ------------------------------------------ | ----------------- |
 | Node.js | 24 (Volta pin `24.18.0` in `package.json`) | `node --version`  |
 | pnpm    | 12.6.0                                     | `pnpm --version`  |
-| Trunk   | 1.25.0 (CLI pin in `.trunk/trunk.yaml`)    | `trunk --version` |
+| Trunk   | 1.29.0 (CLI pin in `.trunk/trunk.yaml`)    | `trunk --version` |
 
 Verify versions before installing. Do not install the latest tools globally or upgrade the lockfile as a way to repair setup; report a version mismatch instead.
 
-Install Trunk with its [official instructions](https://docs.trunk.io/cli); the repository configures CLI `1.25.0` in `.trunk/trunk.yaml`. Trunk owns formatting and linting (Prettier, ESLint, markdownlint and others in `.trunk/trunk.yaml`); the package `lint` and `format` scripts are not the comprehensive check. The pre-commit hook skips formatting and lint when `trunk` is missing, so a successful commit alone does not prove they ran. Run `trunk --version` and report a missing executable rather than counting it as a pass.
+Install Trunk with its [official instructions](https://docs.trunk.io/cli); the repository pins the CLI version in `.trunk/trunk.yaml` (`cli.version`). Trunk owns formatting and linting (Prettier, ESLint, markdownlint and others in `.trunk/trunk.yaml`); the package `lint` and `format` scripts are not the comprehensive check. The pre-commit hook skips formatting and lint when `trunk` is missing, so a successful commit alone does not prove they ran. Run `trunk --version` and report a missing executable rather than counting it as a pass.
 
 ## Setup
 
@@ -47,6 +47,8 @@ Run commands in this order. Each step prepares what the next one needs.
 | Root SSR/hydration         | `pnpm exec playwright test e2e/text/exact-text.spec.ts --project=chromium` |
 | e2e in a parallel worktree | `PW_PORT=4201 pnpm exec playwright test <path>`                            |
 
+Vitest needs `.svelte-kit/tsconfig.json`, which `svelte-kit sync` generates. On a fresh checkout run `pnpm check` (or `pnpm build`) once before `pnpm exec vitest run`; without it Vitest fails at startup with a tsconfig parse error. Run `pnpm build` first as well when a test or the docs import the built package from `dist/`.
+
 ### Full verification
 
 | Step | Purpose               | Command                                                        |
@@ -69,7 +71,7 @@ Ordering matters. The root build emits the package that `docs/` and the consumer
 
 ### Test layout
 
-- Root Vitest runs a `client` project in JSDOM and a `server` project in Node. Files under `src/testing` are tests and helpers, not public library exports.
+- Root Vitest runs one JSDOM test run configured in `vitest.config.ts` (setup file `vitest.setup.ts`), covering `src/**/*.{test,spec}.{js,ts}`. Files under `src/testing` are tests and helpers, not public library exports.
 - Docs Vitest runs unit tests for docs code in Node. It skips the docs mirror and full-reference generators; normal `dev` and `build` still produce them. Docs behavior is tested against the built site: `docs/scripts/geo-seo-output.test.ts` checks generated artifacts and `docs/e2e` drives the site in real browsers.
 - Failure screenshots are artifacts only. They do not imply platform screenshot baselines.
 
@@ -82,7 +84,7 @@ When a full e2e run fails, review failures one page at a time with the maintaine
 - Cloud network policy and credentials are separate prerequisites. Never copy local authentication, settings, or secrets into a clone.
 - The docs build fetches GitHub statistics. If the network blocks it, report that as environment evidence, not as a runtime regression, and do not disable the check.
 - Docs and CI do not replace each other: a local pass is not CI evidence. Record which commands actually ran and which prerequisites prevented others.
-- Motion dependencies (`motion`, `motion-dom`) stay on their pinned 14.0.0 versions; do not change them as part of setup.
+- Motion dependencies (`motion`, `motion-dom`) are pinned to the same exact version in `package.json`, and `src/lib/__tests__/motionDependencies.spec.ts` enforces it. Do not change them as part of setup.
 
 ## Claude project settings
 
