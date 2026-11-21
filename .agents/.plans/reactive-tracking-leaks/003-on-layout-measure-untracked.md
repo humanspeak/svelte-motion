@@ -25,6 +25,7 @@
 
 ## Revision notes
 
+- **2026-11-21, Step 2b (guard, maintainer chose to fix in this release).** The first executor stopped at Step 3. With Step 2, `e2e/reorder/keyboard-grid.spec.ts` failed 3/3: a grid keyboard move sent an item to the wrong slot. Without Step 2 it passed 2/2. `reorder.component.spec.ts` "projects each newly displaced sibling…" also failed 3/3, because its commits came from the MutationObserver path instead of the restart path. The removed leak was what restarted every Reorder item's layout observer on each reorder. Step 2b restores that restart explicitly, for Reorder only, with an internal `__layoutRemeasureKey` prop following the `__motionKind` pattern, so neither spec should need an edit.
 - **2026-11-20, depends on 012**: while writing plan 012, we found that a `Reorder.Item` that gets a new value object under a stable key is only re-registered in the group's layout slots today because of the leak this plan removes. The seed call runs tracked and re-runs whenever `value` or the group's `values` change. If this plan landed alone, dragging and keyboard-moving such items would silently break, and no existing Reorder spec would catch it. Plan 012 re-registers both the element and the slot explicitly, so land 012 first. Step 3 already covers 012's tests, because it runs `e2e/reorder`, where 012 adds `immutable-values.spec.ts`, and `src/lib/components/Reorder`, where 012 adds `objectValues.component.spec.ts`. Before starting, confirm both files exist on your branch. If they don't, 012 has not landed: STOP.
 - **2026-11-20, pre-flight against `a33531a2`** (Motion 14.14.0, v2.14.0): the code quoted here is unchanged, but the 14.14.0 work shifted the line numbers. `_MotionContainer.svelte` is now 4155 lines: the subscription effect is at 3078–3096 and `setLastRect(...)` is at 3170. The adapter calls its listeners at `motionDomProjection.ts:1651` and `:1719`, and `onMeasure` is at `:1740`. The drift check is now based on `a33531a2`. The 14.14.0 changes to `_MotionContainer.svelte` (the `layoutTransition` derived, the `fx` attribute) don't touch this effect.
 
@@ -184,7 +185,11 @@ Notes:
 
 **In scope** (the only files you should modify):
 
-- `src/lib/html/_MotionContainer.svelte` (only the effect at lines 3078–3096)
+- `src/lib/html/_MotionContainer.svelte` (only the effect at lines 3078–3096,
+  plus Step 2b's internal prop: its declaration, its destructure, and one read
+  at the top of the layout observer effect)
+- `src/lib/components/Reorder/Item.svelte` (Step 2b only: one `$derived` and
+  one prop on its `MotionContainer`)
 - `src/routes/tests/layout/measure-state/+page.svelte` (create)
 - `e2e/layout/measure-state.spec.ts` (create)
 - `src/routes/+page.svelte` (one new link)
@@ -194,8 +199,8 @@ Notes:
 
 - `src/lib/utils/motionDomProjection.ts`. The adapter's fan-out stays
   synchronous; the fix belongs at the subscription.
-- `src/lib/components/Reorder/*`. If Reorder breaks, that is a STOP condition,
-  not a reason to edit it.
+- `src/lib/components/Reorder/*` other than Step 2b's `Item.svelte` edit.
+  Don't touch `Group.svelte`, `context.ts` or any Reorder spec.
 - `src/routes/tests/layout-dependency/+page.svelte` and its spec.
 - Other user callbacks in `_MotionContainer.svelte` (`onProjectionUpdate`,
   `onLayoutAnimationStart`, gesture callbacks). They were not audited for this
@@ -320,6 +325,87 @@ tracked part as shown.
 `PW_PORT=4213 pnpm exec playwright test e2e/layout/measure-state.spec.ts --project=chromium`
 → both tests PASS.
 
+### Step 2b: Make Reorder's re-measure on reorder explicit (2026-11-21 amendment)
+
+**Why.** Before this plan, the observer effect's reads inside the
+`onMeasure` listener included `Reorder.Group`'s `values`, through
+`registerItem` → `updateDetectedAxis` → `getMeasuredOrder()`. So every
+`Reorder.Item`'s layout observer effect restarted on every reorder. That
+re-measured every slot synchronously: it called `refreshLayout()`, then the
+listener, then `registerItem`. The keyed-move code in that effect is written
+around this restart; see its comment "A keyed each update reassigns every
+child's props … restarts this effect".
+
+Upstream gets the same result explicitly. A reorder re-renders every item,
+and each item's projection re-measures in that commit. With Step 2 alone,
+slots only update on the later MutationObserver commit.
+`e2e/reorder/keyboard-grid.spec.ts` "arrows move the item the way they
+point" then fails 3/3, because a grid move reads a stale slot.
+
+Restore the restart explicitly, for Reorder only:
+
+1. **Declare the internal prop.** In `src/lib/html/_MotionContainer.svelte`,
+   in the props type, directly after the `__motionKind` member, add:
+
+   ```ts
+           /**
+            * @internal Set by `Reorder.Item`: a value that changes whenever its
+            * group's order changes. The layout observer effect reads it, so
+            * every item re-measures its slot in the same flush as a reorder, as
+            * upstream re-measures every re-rendered item in that commit.
+            */
+           __layoutRemeasureKey?: unknown
+   ```
+
+2. **Destructure it.** In the `let { … } = $props()` destructure, directly
+   after `__motionKind: motionKindProp = 'motion',`, add
+   `__layoutRemeasureKey: layoutRemeasureKeyProp,`.
+
+3. **Read it in the observer effect.** In the layout observer `$effect`
+   (the one whose body starts with `const observedElement = element`, about
+   line 3141), add this line immediately before `const observedElement = element`:
+
+   ```ts
+           // Reorder.Item's order key (Step 2b): a reorder restarts this effect
+           // so the slot is re-measured now, not on the next MutationObserver.
+           void layoutRemeasureKeyProp
+   ```
+
+4. **Pass the key from the item.** In `src/lib/components/Reorder/Item.svelte`,
+   add a derived near the other context-derived values:
+
+   ```ts
+       /**
+        * A fresh object whenever the group's order changes (`trackOrder` reads
+        * every entry of `values`), passed to `MotionContainer` so this item
+        * re-measures its slot in the same flush as the reorder.
+        */
+       const layoutRemeasureKey = $derived.by(() => {
+           context.trackOrder()
+           return {}
+       })
+   ```
+
+   Then add `__layoutRemeasureKey={layoutRemeasureKey}` to its
+   `<MotionContainer …>`, directly after `__motionKind={context.kind}`.
+
+Don't edit `Group.svelte` or `context.ts`; `trackOrder` already exists.
+
+**Verify**:
+
+- `PW_PORT=4213 pnpm exec playwright test e2e/reorder/keyboard-grid.spec.ts --project=chromium`
+  → all pass. It failed 3/3 with Step 2 alone.
+- `pnpm exec vitest run src/lib/components/Reorder` → all pass, including
+  `reorder.component.spec.ts` "projects each newly displaced sibling across
+  sequential keyed reorders", unchanged. With the restart back, its commits
+  come from the restart path again.
+- `PW_PORT=4213 pnpm exec playwright test e2e/layout/measure-state.spec.ts --project=chromium`
+  → still passes. The key is a prop, so the consumer's callback stays
+  untracked.
+
+If either Reorder spec still fails, STOP and report it. Don't edit the
+specs.
+
 ### Step 3: Prove Reorder and layout still work
 
 Reorder registers every item's slot through this callback, and until now each
@@ -351,7 +437,7 @@ Create `.changeset/on-layout-measure-untracked.md`:
 ### Step 5: Full gate
 
 `pnpm build`, `pnpm check`, `pnpm test:only`, the two e2e commands from Steps 2
-and 3 once more, then `trunk fmt` and `trunk check` on the five in-scope files,
+and 3 once more, then `trunk fmt` and `trunk check` on the six in-scope files,
 then `git diff --check`.
 
 **Verify**: every command exits 0; `trunk check` reports no issues.
@@ -376,7 +462,7 @@ then `git diff --check`.
 - [ ] `grep -c "measure-state" src/routes/+page.svelte` prints `1`
 - [ ] `grep -c "waitForTimeout" e2e/layout/measure-state.spec.ts` prints `0`
 - [ ] `trunk check` on the changed files reports no issues
-- [ ] `git status --short` lists only the five in-scope files
+- [ ] `git status --short` lists only the six in-scope files
 - [ ] The status row in `.agents/.plans/reactive-tracking-leaks/README.md` is updated
 
 ## STOP conditions
@@ -387,7 +473,8 @@ Stop and report back (do not improvise) if:
 - The effect at lines 3078–3096 does not match the excerpt.
 - Any Reorder, layout, layoutId or projection spec fails after Step 2 and
   passes without it.
-- The fix seems to need a change in `motionDomProjection.ts` or in Reorder.
+- The fix seems to need a change in `motionDomProjection.ts`, or in Reorder
+  beyond Step 2b.
 
 ## Maintenance notes
 
