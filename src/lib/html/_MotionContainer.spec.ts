@@ -947,15 +947,15 @@ describe('_MotionContainer', () => {
         await group.update({ present: false })
         await group.complete('owned-fast')
         await group.update({ present: true })
-        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        expect(group.onExitComplete).toHaveBeenCalledTimes(0)
         await group.update({ present: false })
         await group.complete('owned-slow', 0)
         await group.complete('owned-fast', 1)
         expect(group.result.queryByTestId('owned-group')).toBeTruthy()
-        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
+        expect(group.onExitComplete).toHaveBeenCalledTimes(0)
         await group.complete('owned-slow', 1)
         expect(group.result.queryByTestId('owned-group')).toBeNull()
-        expect(group.onExitComplete).toHaveBeenCalledTimes(2)
+        expect(group.onExitComplete).toHaveBeenCalledTimes(1)
     })
 
     it('a motion descendant mounted during owned descendant exits joins the current barrier', async () => {
@@ -1044,8 +1044,10 @@ describe('_MotionContainer', () => {
                 await result.rerender({ present: true, onExitComplete })
                 await flushTimers()
                 expect(result.getByTestId('owned-presence-child')).toBe(child)
-                // Cancelling A balances its parent's pending-exit count.
-                expect(onExitComplete).toHaveBeenCalledTimes(1)
+                // A reversed exit fires nothing (upstream deletes the key); cancelling
+                // it still balances the parent's pending-exit count, which the final
+                // removal below proves.
+                expect(onExitComplete).toHaveBeenCalledTimes(0)
 
                 await result.rerender({ present: false, onExitComplete })
                 await flushTimers()
@@ -1055,16 +1057,16 @@ describe('_MotionContainer', () => {
                 await flushTimers()
                 await flushTimers()
                 expect(result.getByTestId('owned-presence-child')).toBe(child)
-                expect(onExitComplete).toHaveBeenCalledTimes(1)
+                expect(onExitComplete).toHaveBeenCalledTimes(0)
 
                 second.resolve()
                 await flushTimers()
                 await flushTimers()
                 expect(result.queryByTestId('owned-presence-child')).toBeNull()
-                expect(onExitComplete).toHaveBeenCalledTimes(2)
+                expect(onExitComplete).toHaveBeenCalledTimes(1)
                 oldComplete(0)
                 await flushTimers()
-                expect(onExitComplete).toHaveBeenCalledTimes(2)
+                expect(onExitComplete).toHaveBeenCalledTimes(1)
             } finally {
                 setActive.mockRestore()
                 first.resolve()

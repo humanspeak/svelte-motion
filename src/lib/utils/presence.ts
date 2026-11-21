@@ -1452,6 +1452,14 @@ export type AnimatePresenceContext = {
      * pending enters in mode='wait'. Not intended for direct consumer use.
      */
     notifyExitComplete: () => void
+    /**
+     * @internal Pairs with `notifyExitStart` for an exit that was reversed by
+     * a re-entry. Decrements the in-flight exit counter and unblocks pending
+     * enters in mode='wait', but fires neither `onExitComplete` nor the
+     * LayoutGroup re-render: the exit never completed. Not intended for
+     * direct consumer use.
+     */
+    notifyExitCancel: () => void
 }
 
 /**
@@ -2885,7 +2893,11 @@ export const createAnimatePresenceContext = (context: {
         dispose,
         takeExitHandoff,
         notifyExitStart: startExit,
-        notifyExitComplete: finishExit
+        notifyExitComplete: finishExit,
+        notifyExitCancel: () => {
+            // `startExit` is a no-op once disposed, so its cancel must be too.
+            if (!disposed) cancelExit()
+        }
     }
 }
 
