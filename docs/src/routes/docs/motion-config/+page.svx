@@ -80,12 +80,12 @@ Explicit `transition` on a `motion.<tag>` always wins:
 
 ## `reducedMotion` policy
 
-`reducedMotion` controls how transform animations behave for descendants. Three values:
+`reducedMotion` controls whether transform and layout animations run for descendants. Three values:
 
 | Value | Behavior |
 | --- | --- |
 | `'never'` (default) | Animations run as authored, regardless of OS preference |
-| `'always'` | Strip transform keys (`x`, `y`, `scale`, `rotate`, `skew`, …). Other props (opacity, color, etc.) still animate |
+| `'always'` | Transform and layout values (`x`, `y`, `scale`, `rotate`, `skew`, `width`, `height`, `top`, `left`, …) jump straight to their target with no animation. Other values (opacity, colour, etc.) still animate |
 | `'user'` | Honor the OS-level `prefers-reduced-motion: reduce` — acts like `'always'` for users who opted in, `'never'` otherwise |
 
 ```svelte
@@ -95,8 +95,8 @@ Explicit `transition` on a `motion.<tag>` always wins:
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
     >
-        Always fades in. Translation only runs for users who haven't requested
-        reduced motion.
+        Always fades in. It slides in only for users who haven't asked for
+        reduced motion; otherwise it appears in place and fades.
     </motion.div>
 </MotionConfig>
 ```
@@ -105,7 +105,7 @@ Explicit `transition` on a `motion.<tag>` always wins:
 
 ## `skipAnimations`
 
-Set `skipAnimations` to make every animation in the subtree jump directly to its final value instead of tweening. Unlike `reducedMotion="always"`, which strips only transform keys while opacity, color, and other properties continue to animate, `skipAnimations` disables the tween for every animated property.
+Set `skipAnimations` to make every animation in the subtree jump directly to its final value instead of tweening. Unlike `reducedMotion="always"`, which only makes transform and layout values instant while opacity, colour and other values keep animating, `skipAnimations` disables the tween for every animated property.
 
 ```svelte
 <MotionConfig skipAnimations>
@@ -179,7 +179,7 @@ Because configs inherit from their nearest ancestor, a bare `<MotionConfig>` doe
 
 ## Programmatic reads
 
-For per-component decisions that go beyond stripping transforms (e.g. swapping a parallax effect for a static background), read the resolved policy via [`useReducedMotionConfig`](/docs/use-reduced-motion-config):
+For per-component decisions that go beyond making transforms instant (e.g. swapping a parallax effect for a static background), read the resolved policy via [`useReducedMotionConfig`](/docs/use-reduced-motion-config):
 
 ```svelte
 <script lang="ts">

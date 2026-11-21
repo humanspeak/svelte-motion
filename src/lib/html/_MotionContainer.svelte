@@ -15,10 +15,7 @@
         type MotionKind
     } from '$lib/utils/motionKind'
     import { BROWSER, DEV } from 'esm-env'
-    import {
-        filterReducedMotionKeyframes,
-        useReducedMotionConfig
-    } from '$lib/utils/reducedMotionConfig.svelte'
+    import { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig.svelte'
     import type {
         MotionProps,
         AnimationControlsDefinition,
@@ -587,53 +584,6 @@
     }
 
     /**
-     * Strip transform channels from a definition under a reducing policy.
-     *
-     * `filterReducedMotionKeyframes` used to be applied by the deleted
-     * `executeAnimation`, so the animationState was seeing unfiltered targets and
-     * animating transforms that the policy forbids (`initialKeyframes` keeps its
-     * own filtering, which is why only the animate half regressed). Re-homed here
-     * so the animationState never sees a transform channel it must not touch.
-     *
-     * Handles both shapes the animationState resolves: a target object, and a
-     * variant MAP (a bare variant LABEL cannot be filtered, so the map behind it
-     * is filtered instead). Lists of labels resolve through the same map.
-     *
-     * @param definition A target object, variant label, or list of labels.
-     * @returns The definition with transform channels removed where applicable.
-     */
-    const filterReducedMotionDefinition = (definition: unknown): unknown => {
-        if (!reducedMotion) return definition
-        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
-            // A label (or list of labels) resolves via `variants`, filtered below.
-            return definition
-        }
-        return filterReducedMotionKeyframes(definition as Record<string, unknown>, reducedMotion)
-    }
-
-    /** The `variants` map with transform channels stripped under a reducing policy. */
-    const reducedMotionVariants = $derived.by(() => {
-        if (!reducedMotion || !variantsProp) return variantsProp
-        const out: Record<string, unknown> = {}
-        for (const [name, variant] of Object.entries(variantsProp)) {
-            // Function-form variants resolve per `custom` inside the
-            // animationState, so wrap rather than filter eagerly.
-            out[name] =
-                typeof variant === 'function'
-                    ? (...args: unknown[]) =>
-                          filterReducedMotionKeyframes(
-                              (variant as (...a: unknown[]) => Record<string, unknown>)(...args),
-                              reducedMotion
-                          )
-                    : filterReducedMotionKeyframes(
-                          variant as Record<string, unknown>,
-                          reducedMotion
-                      )
-        }
-        return out as typeof variantsProp
-    })
-
-    /**
      * The props motion-dom reads off this node.
      *
      * `style` is carried through because the projection adapter has always
@@ -655,12 +605,9 @@
             // variants off `visualElement.props`, so it must see the same
             // presence/parent-resolved `initial`, the same inherited variant
             // label and the same `custom` the legacy writer used. (plan 002)
-            // Filtered too: under a reducing policy the node must not even be
-            // SEEDED with a transform channel, or `makeLatestValues` puts it in
-            // `latestValues` and the VE renders it (the container's own
-            // `initialKeyframes` was already filtered, which is why only the
-            // animate half of the regression was visible).
-            initial: filterReducedMotionDefinition(effectiveInitialProp),
+            // Reduced motion is applied by motion-dom per value, not by filtering
+            // targets (visual-element-target.ts:150-164 @ v14.14.0).
+            initial: effectiveInitialProp,
             // motion-dom's optimized-appear handoff reads this id from the
             // VisualElement props (not from the DOM attribute). Keeping both in
             // sync lets animateTarget adopt the SSR compositor animation.
@@ -672,10 +619,8 @@
             // — killing parent-driven propagation and `staggerChildren`.
             // `animateChanges` reads the inherited label itself, from
             // `getVariantContext(visualElement.parent)`.
-            animate: animateControls
-                ? undefined
-                : filterReducedMotionDefinition(resolveRelativeAnimate(declarativeAnimateProp)),
-            variants: reducedMotionVariants,
+            animate: animateControls ? undefined : resolveRelativeAnimate(declarativeAnimateProp),
+            variants: variantsProp,
             // motion-dom 13.5.1's VisualElement mount/animateChanges and
             // `makeLatestValues` read `props.inherit`; forward it so the
             // VisualElement tree honours `inherit={false}` too (motion b63833cb0).
@@ -690,12 +635,12 @@
                 motionConfig?.transition === undefined && transitionProp === undefined
                     ? undefined
                     : mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
-            whileHover: filterReducedMotionDefinition(whileHoverProp),
-            whileTap: filterReducedMotionDefinition(whileTapProp),
-            whileFocus: filterReducedMotionDefinition(whileFocusProp),
-            whileInView: filterReducedMotionDefinition(whileInViewProp),
-            whileDrag: filterReducedMotionDefinition(whileDragProp),
-            whilePinch: filterReducedMotionDefinition(whilePinchProp),
+            whileHover: whileHoverProp,
+            whileTap: whileTapProp,
+            whileFocus: whileFocusProp,
+            whileInView: whileInViewProp,
+            whileDrag: whileDragProp,
+            whilePinch: whilePinchProp,
             // Gesture callbacks are public VisualElement props upstream. Carry
             // them here even though the Svelte drag adapter invokes them: a
             // callback-reference replacement is still a real props commit and
@@ -1072,10 +1017,7 @@
                     custom !== undefined ? custom : effectiveCustom
                 )
                 if (!resolved) return undefined
-                return filterReducedMotionKeyframes(
-                    resolved as Record<string, unknown>,
-                    reducedMotion
-                ) as DOMKeyframesDefinition
+                return resolved as DOMKeyframesDefinition
             }
             const filteredExit = resolvePresenceExit(resolvePresenceCustom())
             context.registerChild(
@@ -1091,8 +1033,15 @@
                 // makes exits instant under `<MotionConfig skipAnimations>`.
                 // Deliberately NOT folded into the shared `mergedTransition`
                 // derived: that value also feeds the projection adapter, and
-                // upstream does not skip layout/FLIP animations.
-                skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
+                // upstream does not skip layout/FLIP animations. `reduceMotion`
+                // rides the same way: vanilla `animate()` makes positional
+                // values of an unheld clone instant only when the transition
+                // asks (effects.ts:73 @ v14.14.0).
+                {
+                    ...mergedTransition,
+                    ...(skipAnimations ? { skipAnimations: true } : {}),
+                    ...(reducedMotion ? { reduceMotion: true } : {})
+                },
                 resolvePresenceExit,
                 // Plan 015b (R6): the clone's completion re-renders this group.
                 layoutGroupContext?.group,
@@ -1578,12 +1527,10 @@
      * the element stranded on its exit target. (plan 004 Step 4)
      */
     const keyChangeInitialKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            getInitialKeyframes(
-                resolveInitial(initialProp, variantsProp, effectiveCustom)
-            ) as Record<string, unknown>,
-            reducedMotion
-        )
+        getInitialKeyframes(resolveInitial(initialProp, variantsProp, effectiveCustom)) as Record<
+            string,
+            unknown
+        >
     )
 
     // No `resolvedWhile*` here: the animationState resolves variant LABELS
@@ -1593,22 +1540,14 @@
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            getInitialKeyframes(resolvedInitial) as Record<string, unknown>,
-            reducedMotion
-        )
+        getInitialKeyframes(resolvedInitial) as Record<string, unknown>
     )
 
-    // Reduced-motion-filtered animate values used as the inline-style
-    // baseline so an animated value (transforms included) persists after
-    // the WAAPI animation completes (#377). Filtered exactly like
-    // `initialKeyframes` so transforms are stripped under reduced motion.
-    const animateKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            resolvedAnimate as Record<string, unknown> | undefined,
-            reducedMotion
-        )
-    )
+    // Animate values used as the inline-style baseline so an animated value
+    // (transforms included) persists after the WAAPI animation completes
+    // (#377). Not filtered under reduced motion: motion-dom makes positional
+    // values instant instead of dropping them.
+    const animateKeyframes = $derived(resolvedAnimate as Record<string, unknown> | undefined)
     // Re-entry while this key's exit clone is still animating out (plan 010
     // Step 5). Upstream never unmounts an exiting child: AnimatePresence keeps
     // rendering it and flips its `isPresent` back to true
@@ -1695,10 +1634,15 @@
             isNotEmpty(animateKeyframes) &&
             !optimizedAppearSuppressedByTransformTemplate &&
             // The appear bootstrap drives WAAPI directly (`startWaapiAnimation`),
-            // bypassing the VisualElement — so `shouldSkipAnimations` cannot
-            // reach it. Suppress the handoff entirely and let the (instant)
-            // main-thread enter animation write the final values.
-            !skipAnimations
+            // bypassing the VisualElement — so neither `shouldSkipAnimations`
+            // nor `shouldReduceMotion` can reach it. Under `skipAnimations` or
+            // reduced motion, suppress the handoff entirely and let the
+            // main-thread enter animation, which goes through the VisualElement,
+            // apply the instant rule.
+            !skipAnimations &&
+            // Same reason as skipAnimations: the bootstrap would tween
+            // transforms that reduced motion makes instant.
+            !reducedMotion
             ? `svelte-motion-${componentHydrationId}`
             : undefined
     )
@@ -2143,15 +2087,9 @@
         return context.onEnterUnblocked(() => revealWaitHiddenElement())
     })
 
-    // A post-mount "strip transforms the reducing policy forbids" pass used to
-    // live here. It is GONE: `useReducedMotionConfig` already resolves
-    // `'always'`/`'never'` SYNCHRONOUSLY from the MotionConfig context (only
-    // `'user'` consults matchMedia), so `buildMotionNodeProps` filters `initial`
-    // before the node is ever seeded and there is nothing left to strip. The pass
-    // also ran only under a reducing policy and disturbed the node after its
-    // enter had completed, which showed up as a double-fade flash under
-    // `policy='always'` (guard-measured: opacity settled >0.99, then re-ran from
-    // ~0.02). plan 002 Step 3h(a).
+    // There is no post-mount pass that strips transforms under a reducing
+    // policy: targets are never filtered. Reduced motion is the node's
+    // `shouldReduceMotion`, which motion-dom reads per value (plan 013).
 
     /**
      * True once the mount/enter effect has run the first `animateChanges()`
@@ -2421,6 +2359,18 @@
     $effect(() => {
         if (!visualElement || !element) return
         visualElement.shouldSkipAnimations = skipAnimations
+    })
+
+    // `VisualElement.mount()` latches `shouldReduceMotion` from the
+    // `reducedMotionConfig` given at creation (VisualElement.ts:498-507 @
+    // v14.14.0). This library's MotionConfig and the OS preference are
+    // reactive, so re-assert the resolved policy, as for skipAnimations
+    // above. motion-dom then makes positional values (transforms, width,
+    // height, top/left/right/bottom) and layout animations instant, and
+    // leaves the rest animating.
+    $effect(() => {
+        if (!visualElement || !element) return
+        visualElement.shouldReduceMotion = reducedMotion
     })
 
     // Keep the node's props in sync, then let the animationState diff them.

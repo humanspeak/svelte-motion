@@ -48,13 +48,13 @@ description: 'Resolve the active reduced-motion policy from <MotionConfig> and t
 
 ## `<MotionConfig reducedMotion>`
 
-The `reducedMotion` prop on `<MotionConfig>` controls how transform animations
-are handled for descendant `motion` elements:
+The `reducedMotion` prop on `<MotionConfig>` controls whether transform and
+layout animations run for descendant `motion` elements:
 
 | Value      | Behavior                                                                                  |
 | ---------- | ----------------------------------------------------------------------------------------- |
 | `'never'`  | Default. Animations run as authored.                                                      |
-| `'always'` | Strip transform keys (`x`, `y`, `scale`, `rotate`, `skew`, …). Other props still animate. |
+| `'always'` | Transform and layout values (`x`, `y`, `scale`, `rotate`, `skew`, `width`, `height`, `top`, `left`, …) jump straight to their target with no animation. Other values (opacity, colour, etc.) still animate. |
 | `'user'`   | Honor the OS-level `prefers-reduced-motion`. Acts like `'always'` when the user opted in. |
 
 ```svelte
@@ -68,7 +68,8 @@ are handled for descendant `motion` elements:
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
     >
-        Fades in always; only translates when the user hasn't opted into reduced motion.
+        Always fades in. It slides in only for users who haven't asked for reduced motion;
+        otherwise it appears in place and fades.
     </motion.div>
 </MotionConfig>
 ```
@@ -76,7 +77,7 @@ are handled for descendant `motion` elements:
 ## Custom decisions
 
 Use the hook directly when you want to make per-component decisions that go
-beyond stripping transforms &mdash; for example, swapping a parallax effect for
+beyond making transforms instant &mdash; for example, swapping a parallax effect for
 a static background:
 
 ```svelte

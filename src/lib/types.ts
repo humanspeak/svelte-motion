@@ -1056,8 +1056,9 @@ export type MotionProps = {
  * Reduced-motion policy for {@link MotionConfigProps.reducedMotion}.
  *
  * - `'never'` (default): Animations run as authored, regardless of OS preference.
- * - `'always'`: Transform animations (x, y, scale, rotate, skew, translate) are
- *   skipped. Other properties such as `opacity` and `color` still animate.
+ * - `'always'`: Transform and layout values (x, y, scale, rotate, skew, width,
+ *   height, top, left, …) are applied instantly instead of animating. Other
+ *   properties such as `opacity` and `color` still animate.
  * - `'user'`: Honors the OS-level `prefers-reduced-motion: reduce` setting —
  *   behaves like `'always'` when the user has opted in, otherwise `'never'`.
  *
@@ -1107,7 +1108,7 @@ export type MotionConfigProps = {
      * for E2E tests and visual-regression screenshots, where a deterministic
      * settled frame matters more than the transition.
      *
-     * Unlike {@link ReducedMotionConfig}, which only strips transform keys,
+     * Unlike {@link ReducedMotionConfig}, which only makes transform and layout values instant,
      * this disables the tween for every animated property.
      *
      * Defaults to `false`. Layout/FLIP projection animations and drag momentum

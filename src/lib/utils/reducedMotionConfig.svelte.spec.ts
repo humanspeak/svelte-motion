@@ -6,10 +6,7 @@ vi.mock('$lib/components/motionConfig.context', () => ({
 }))
 
 import { getMotionConfig } from '$lib/components/motionConfig.context'
-import {
-    filterReducedMotionKeyframes,
-    useReducedMotionConfig
-} from './reducedMotionConfig.svelte.js'
+import { useReducedMotionConfig } from './reducedMotionConfig.svelte.js'
 
 const mockedGetMotionConfig = vi.mocked(getMotionConfig)
 
@@ -38,41 +35,6 @@ const createMediaQueryList = (initialMatches: boolean) => {
         listenerCount: () => listeners.size
     }
 }
-
-describe('filterReducedMotionKeyframes', () => {
-    it('returns input unchanged when reduced is false', () => {
-        const input = { x: 100, y: 50, opacity: 1 }
-        const out = filterReducedMotionKeyframes(input, false)
-        expect(out).toBe(input)
-    })
-
-    it('strips transform keys when reduced is true', () => {
-        const input = {
-            x: 100,
-            y: 50,
-            translateX: 10,
-            scale: 1.5,
-            scaleX: 1,
-            rotate: 45,
-            skewY: 5,
-            opacity: 1,
-            backgroundColor: '#fff'
-        }
-        const out = filterReducedMotionKeyframes(input, true)
-        expect(out).toEqual({ opacity: 1, backgroundColor: '#fff' })
-    })
-
-    it('preserves non-transform keys including transition', () => {
-        const input = { x: 1, opacity: 0.5, transition: { duration: 0.3 } }
-        const out = filterReducedMotionKeyframes(input, true)
-        expect(out).toEqual({ opacity: 0.5, transition: { duration: 0.3 } })
-    })
-
-    it('handles undefined input', () => {
-        expect(filterReducedMotionKeyframes(undefined, true)).toBeUndefined()
-        expect(filterReducedMotionKeyframes(undefined, false)).toBeUndefined()
-    })
-})
 
 describe('useReducedMotionConfig', () => {
     let cleanups: VoidFunction[]
