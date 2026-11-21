@@ -13,6 +13,10 @@
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 
+> **Revision (2026-11-21, guard, batch full run):** Step 5b updates
+> `e2e/utilities/use-presence.spec.ts` and its page, which also counted a
+> reversed exit as a completion. Step 5 hadn't run `e2e/utilities`.
+>
 > **Revision (2026-11-20, guard):** the first executor stopped in Step 5.
 > Three specs in `_MotionContainer.spec.ts` pinned the old behaviour, a
 > reversed exit firing `onExitComplete` once. Putting line 381 back made the
@@ -377,6 +381,30 @@ nothing. Change only the expected counts. Don't change the steps, the
 pass. If any of these specs fails for any other reason (for example the child
 is never removed after `second.resolve()`, meaning the pending count is
 unbalanced), STOP and report.
+
+### Step 5b: The usePresence e2e and page that pinned the old count (2026-11-21, batch full run)
+
+The batch's full Chromium run failed `e2e/utilities/use-presence.spec.ts`
+"owned motion child survives a rapid hide/show/hide until the current exit
+completes", on both the run and its retry, with `Expected: "completion
+notifications: 2"`, `Received: "completion notifications: 1"`. That spec
+counts the reversed exit as a completion, which is the behaviour this plan
+removed; Step 5 only ran `e2e/animate-presence`. In that test, change only
+the expected counts:
+
+- right after `phase` reads `exit B`: `'completion notifications: 1'` →
+  `'completion notifications: 0'`;
+- after the card is removed (`phase` reads `removed`): `2` → `1`;
+- after the second replay's removal: `4` → `2`.
+
+In `src/routes/tests/use-presence/+page.svelte`, the tester text "Completion
+notifications include cancelled exits." (about line 207) is now false.
+Replace it with "A reversed exit fires no completion notification; only an
+exit that finishes does." Change nothing else in either file.
+
+**Verify**: `PW_PORT=4215 pnpm exec playwright test e2e/utilities/use-presence.spec.ts --project=chromium --repeat-each=3`
+→ all pass. Also run `e2e/utilities` once and confirm it all passes. On any
+other failure, STOP.
 
 ### Step 5: Full gate
 
