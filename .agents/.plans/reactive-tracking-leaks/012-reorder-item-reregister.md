@@ -25,6 +25,10 @@
 - **Category**: bug
 - **Planned at**: commit `a33531a2`, 2026-11-20
 
+## Revision notes
+
+- **2026-11-20, guard amendment after the first executor run.** In jsdom, unit test 2 (a replaced first item keeps the tab stop) passed on unmodified code: `tabIndexes()` stayed `[0, -1, -1]` after the rerender, after `flushSync()` and after 1000 ms of timers. A probe confirmed the arrow-key half of the bug is real: after the replacement, ArrowDown from `a` left focus on `a`, because the replaced `a` is missing from the group's `elements`. So the element registration is still lost, as the finding says, but jsdom shows no tab-stop symptom. Why isn't known; the likely suspect is `checkTabStop` not re-running, or the `tabindex` attribute not re-rendering, when only `values[0]`'s identity changes. The fix (Step 2) is unchanged, and it matches upstream's per-render `elements.set`. Unit test 2 is now a guard, not red evidence. The tab-stop red evidence moves to e2e test 2 in Chromium. If Chromium doesn't show the tab-stop symptom either, the tab-stop claim is dropped from the changeset and the tester panel (Step 4).
+
 ## Why this matters
 
 `Reorder.Group` keys its per-item registries by the item's `value`. A
@@ -328,8 +332,8 @@ Tests, inside `describe('Reorder with replaced value objects', ...)`:
    `expect(next[2]).toBe(b2)`, `expect(moved).toBe(b2)`.
 
 **Verify**: `pnpm exec vitest run src/lib/components/Reorder/objectValues.component.spec.ts`
-→ test 1 FAILS with `expected 'c' to be 'b'`, and test 2 FAILS with
-`[-1, 0, -1]` received where `[0, -1, -1]` was expected.
+→ test 1 FAILS with `expected 'c' to be 'b'`. Test 2 passes on unmodified code
+in jsdom (see the 2026-11-20 revision note); it is kept as a regression guard.
 
 Test 3 is a guard for plan 003, not a reproduction. On a base without 003 it
 may pass, because the accidental re-seed in `_MotionContainer.svelte`
@@ -337,8 +341,8 @@ re-registers the slot. On a base that already contains 003, it fails (no
 `onReorder` call, so `mock.lastCall` is `undefined`). Either result is
 acceptable here; record which you saw.
 
-If test 1 or test 2 passes on the unmodified code, STOP and report what
-`focused()` and `tabIndexes()` returned.
+If test 1 passes on the unmodified code, STOP and report what `focused()`
+returned. Test 2 may pass here.
 
 ### Step 2: Re-register the item whenever its value changes
 
@@ -489,13 +493,17 @@ with Step 2's change temporarily reverted in your working tree
 `git checkout src/lib/components/Reorder/Item.svelte`, run, then
 `git apply "$TMPDIR/012.patch"`; do not use `git stash`):
 `PW_PORT=4222 pnpm exec playwright test e2e/reorder/immutable-values.spec.ts --project=chromium`
-→ test 1 FAILS (`focused` is `c`, expected `b`) and test 2 FAILS (`focused` is
-`b`, expected `a`).
+→ test 1 FAILS (`focused` is `c`, expected `b`). Test 2 is expected to FAIL
+(`focused` is `b`, expected `a`). Record whether it does.
 
 **Verify (green, with Step 2 applied)**: the same command → all 4 tests PASS.
 
-If tests 1 and 2 pass without Step 2's change, STOP and report: the browser
-path differs from jsdom and the page needs a closer look.
+If test 1 passes without Step 2's change, STOP and report: the browser path
+differs from jsdom and the page needs a closer look. If only test 2 passes
+without Step 2's change, don't stop. Keep it as a guard, and remove the
+tab-stop claim from the changeset ("keeps the group's tab stop") and from the
+test page's tester-panel text. Report that the tab-stop symptom didn't
+reproduce in Chromium either.
 
 ### Step 5: Reorder e2e regression gate
 
@@ -529,9 +537,11 @@ more, then `trunk fmt` and `trunk check` on the seven in-scope files, then
 
 ## Test plan
 
-- Red first: `objectValues.component.spec.ts` tests 1 and 2 fail on current
-  code (`expected 'c' to be 'b'`; tab indexes `[-1, 0, -1]`) and pass after
-  Step 2. The matching e2e tests 1 and 2 fail the same way in Chromium.
+- Red first: `objectValues.component.spec.ts` test 1 fails on current code
+  (`expected 'c' to be 'b'`) and passes after Step 2. Unit test 2 (tab stop) is a
+  guard; it passes on current code in jsdom. e2e test 1 is red in Chromium;
+  e2e test 2 is the tab-stop reproduction if Chromium shows it. Otherwise
+  it's a guard too, and the tab-stop claim is dropped (Step 4).
 - Guards for plan 003: unit test 3 and e2e tests 3 and 4. They cover the
   layout-slot registration, which today only works through the accidental
   re-seed in `_MotionContainer.svelte`. They must pass with this plan's fix
