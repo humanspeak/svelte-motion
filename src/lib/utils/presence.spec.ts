@@ -1,4 +1,4 @@
-import type { MotionExit, MotionTransition } from '$lib/types'
+import type { AnimatePresenceMode, MotionExit, MotionTransition } from '$lib/types'
 import { animate } from 'motion'
 import { nodeGroup, visualElementStore } from 'motion-dom'
 import { getContext, setContext, tick } from 'svelte'
@@ -2827,5 +2827,169 @@ describe('clone exit containing block (plan 010)', () => {
         d.resolve()
         await flush()
         expect(parent.style.position).toBe('')
+    })
+})
+
+describe('reactive mode (plan 011)', () => {
+    let parent: HTMLElement
+    let el: HTMLElement
+    let el2: HTMLElement
+    const deferred = () => {
+        let resolve!: () => void
+        const promise = new Promise<void>((r) => (resolve = r))
+        return { promise, resolve }
+    }
+    const flush = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+    }
+    const deferExit = () => {
+        const d = deferred()
+        vi.mocked(animate).mockReturnValueOnce({ finished: d.promise, stop: vi.fn() } as never)
+        return d
+    }
+    /**
+     * Create a context whose mode is driven through `getMode` /
+     * `subscribeMode`, like `AnimatePresence` drives it.
+     */
+    const createModeContext = (initialMode: AnimatePresenceMode = 'sync') => {
+        let current: AnimatePresenceMode = initialMode
+        let notify: (() => void) | undefined
+        const ctx = createAnimatePresenceContext({
+            getMode: () => current,
+            subscribeMode: (listener) => {
+                notify = listener
+                return () => (notify = undefined)
+            }
+        })
+        const setMode = (next: AnimatePresenceMode) => {
+            current = next
+            notify?.()
+        }
+        return { ctx, setMode }
+    }
+    const clones = () => Array.from(document.querySelectorAll<HTMLElement>('[data-clone="true"]'))
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        parent = document.createElement('div')
+        document.body.appendChild(parent)
+        el = document.createElement('div')
+        el2 = document.createElement('div')
+        parent.append(el, el2)
+        for (const node of [el, el2]) {
+            vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(makeRect(10, 20))
+        }
+        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 200, 200))
+        // Computed position follows the inline value, as in a browser.
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            mockComputedStyle({
+                position: (target as HTMLElement).style?.position || 'static',
+                display: 'block',
+                boxSizing: 'border-box'
+            })
+        )
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+            cb(0)
+            return 1
+        })
+    })
+
+    it('ctx.mode follows getMode', () => {
+        const { ctx, setMode } = createModeContext()
+        expect(ctx.mode).toBe('sync')
+        setMode('wait')
+        expect(ctx.mode).toBe('wait')
+    })
+
+    it('an exit keeps the mode it started with', () => {
+        const { ctx, setMode } = createModeContext()
+        ctx.registerChild('a', el, { opacity: 0 })
+        ctx.registerChild('b', el2, { opacity: 0 })
+        deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        setMode('wait')
+        expect(clones()[0].getAttribute('data-mode')).toBe('sync')
+        deferExit()
+        el2.remove()
+        ctx.unregisterChild('b')
+        expect(clones()).toHaveLength(2)
+        expect(clones()[1].getAttribute('data-mode')).toBe('wait')
+    })
+
+    it('switching to wait mid-exit gates new enters until the exit ends', async () => {
+        const { ctx, setMode } = createModeContext()
+        ctx.registerChild('a', el, { opacity: 0 })
+        const d = deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        setMode('wait')
+        expect(ctx.isEnterBlocked('new')).toBe(true)
+        const cb = vi.fn()
+        ctx.onEnterUnblocked(cb)
+        d.resolve()
+        await flush()
+        expect(cb).toHaveBeenCalledTimes(1)
+        expect(ctx.isEnterBlocked()).toBe(false)
+    })
+
+    it('switching away from wait mid-exit still releases held enters', async () => {
+        const { ctx, setMode } = createModeContext('wait')
+        ctx.registerChild('a', el, { opacity: 0 })
+        const d = deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        const cb = vi.fn()
+        ctx.onEnterUnblocked(cb)
+        setMode('sync')
+        expect(cb).not.toHaveBeenCalled()
+        d.resolve()
+        await flush()
+        expect(cb).toHaveBeenCalledTimes(1)
+    })
+
+    it('a reversed exit after switching away from wait still releases', () => {
+        const { ctx, setMode } = createModeContext('wait')
+        ctx.registerChild('a', el, { opacity: 0 })
+        deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        const cb = vi.fn()
+        ctx.onEnterUnblocked(cb)
+        setMode('sync')
+        expect(cb).not.toHaveBeenCalled()
+        ctx.takeExitHandoff('a')
+        expect(cb).toHaveBeenCalledTimes(1)
+    })
+
+    it('switching to popLayout seeds pop data for resting children', () => {
+        const { ctx, setMode } = createModeContext()
+        ctx.registerChild('a', el, { opacity: 0 })
+        setMode('popLayout')
+        deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(clones()[0].getAttribute('data-mode')).toBe('popLayout')
+        expect(document.querySelector('[data-presence-placeholder="true"]')).toBeNull()
+        // A popLayout snapshot exists, so the non-pop placement and its
+        // containing-block hold are not used.
+        expect(parent.style.position).toBe('')
+    })
+
+    it('leaving popLayout drops the pop data', () => {
+        const { ctx, setMode } = createModeContext('popLayout')
+        ctx.registerChild('a', el, { opacity: 0 })
+        setMode('sync')
+        deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(clones()[0].getAttribute('data-mode')).toBe('sync')
+        expect(document.querySelector('[data-presence-placeholder="true"]')).not.toBeNull()
+    })
+
+    it('a static mode option still works', () => {
+        expect(createAnimatePresenceContext({ mode: 'wait' }).mode).toBe('wait')
     })
 })

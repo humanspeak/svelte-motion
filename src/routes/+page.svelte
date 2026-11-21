@@ -1180,6 +1180,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/mode-switch') + searchParams}
+                    >
+                        Runtime mode switch
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/clone-typography') + searchParams}
                     >
                         Exit typography and inheritance

@@ -2132,8 +2132,10 @@
             return false
         }
 
-        // For mode='wait': check immediately if enters are blocked
-        if (context?.mode === 'wait') {
+        // For mode='wait', or a child still held by a wait block from before
+        // mount (the mode may have changed since; plan 011 Step 3b): check
+        // whether enters are blocked and release through the same path.
+        if (context && (context.mode === 'wait' || untrack(() => waitEnterBlockedBeforeMount))) {
             // Skip if we already have a wait callback registered
             if (waitCallbackRegistered) {
                 pwLog('[motion] runAnimation: wait callback already registered, skipping')

@@ -59,27 +59,21 @@
                         >{mounted ? 'AnimatePresence boundary' : 'Boundary removed'}</span
                     >
                     {#if mounted}
-                        {#key mode}
-                            <AnimatePresence
-                                {mode}
-                                initial={false}
-                                onExitComplete={() => completed++}
-                            >
-                                {#if visible}
-                                    <motion.div
-                                        key="card"
-                                        data-testid="teardown-card"
-                                        class="teardown-card"
-                                        exit={{ opacity: 0, x: 100 }}
-                                        transition={{ duration: 2, ease: 'linear' }}
-                                    >
-                                        <span class="card-icon" aria-hidden="true">✦</span>
-                                        <strong>A little goodbye.</strong>
-                                        <p>This card takes two seconds to fade and slide away.</p>
-                                    </motion.div>
-                                {/if}
-                            </AnimatePresence>
-                        {/key}
+                        <AnimatePresence {mode} initial={false} onExitComplete={() => completed++}>
+                            {#if visible}
+                                <motion.div
+                                    key="card"
+                                    data-testid="teardown-card"
+                                    class="teardown-card"
+                                    exit={{ opacity: 0, x: 100 }}
+                                    transition={{ duration: 2, ease: 'linear' }}
+                                >
+                                    <span class="card-icon" aria-hidden="true">✦</span>
+                                    <strong>A little goodbye.</strong>
+                                    <p>This card takes two seconds to fade and slide away.</p>
+                                </motion.div>
+                            {/if}
+                        </AnimatePresence>
                     {/if}
                     {#if !mounted || (!visible && completed > 0)}
                         <div class="empty-stage">
@@ -112,7 +106,7 @@
             <div class="demo-readout">
                 <label
                     >Presence mode
-                    <select bind:value={mode} onchange={resetDemo}>
+                    <select bind:value={mode}>
                         <option value="sync">sync</option><option value="wait">wait</option><option
                             value="popLayout">popLayout</option
                         >
