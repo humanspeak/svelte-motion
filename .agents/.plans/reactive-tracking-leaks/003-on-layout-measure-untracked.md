@@ -25,6 +25,7 @@
 
 ## Revision notes
 
+- **2026-11-21, Step 2b item 5 (guard, round 3).** With items 1–4, `keyboard-grid` and the sequential-reorder unit spec passed, but `e2e/reorder/basic.spec.ts` "keeps a held item pinned during upward swaps after earlier reversals" failed 3/3 with about 19px of drift. With Step 2 alone it passed 3/3. The old leak only restarted items in groups without an `axis` prop, because `updateDetectedAxis` reads `values` only then. Item 5 sends the key only in those groups.
 - **2026-11-21, Step 2b (guard, maintainer chose to fix in this release).** The first executor stopped at Step 3. With Step 2, `e2e/reorder/keyboard-grid.spec.ts` failed 3/3: a grid keyboard move sent an item to the wrong slot. Without Step 2 it passed 2/2. `reorder.component.spec.ts` "projects each newly displaced sibling…" also failed 3/3, because its commits came from the MutationObserver path instead of the restart path. The removed leak was what restarted every Reorder item's layout observer on each reorder. Step 2b restores that restart explicitly, for Reorder only, with an internal `__layoutRemeasureKey` prop following the `__motionKind` pattern, so neither spec should need an edit.
 - **2026-11-20, depends on 012**: while writing plan 012, we found that a `Reorder.Item` that gets a new value object under a stable key is only re-registered in the group's layout slots today because of the leak this plan removes. The seed call runs tracked and re-runs whenever `value` or the group's `values` change. If this plan landed alone, dragging and keyboard-moving such items would silently break, and no existing Reorder spec would catch it. Plan 012 re-registers both the element and the slot explicitly, so land 012 first. Step 3 already covers 012's tests, because it runs `e2e/reorder`, where 012 adds `immutable-values.spec.ts`, and `src/lib/components/Reorder`, where 012 adds `objectValues.component.spec.ts`. Before starting, confirm both files exist on your branch. If they don't, 012 has not landed: STOP.
 - **2026-11-20, pre-flight against `a33531a2`** (Motion 14.14.0, v2.14.0): the code quoted here is unchanged, but the 14.14.0 work shifted the line numbers. `_MotionContainer.svelte` is now 4155 lines: the subscription effect is at 3078–3096 and `setLastRect(...)` is at 3170. The adapter calls its listeners at `motionDomProjection.ts:1651` and `:1719`, and `onMeasure` is at `:1740`. The drift check is now based on `a33531a2`. The 14.14.0 changes to `_MotionContainer.svelte` (the `layoutTransition` derived, the `fx` attribute) don't touch this effect.
@@ -190,6 +191,9 @@ Notes:
   at the top of the layout observer effect)
 - `src/lib/components/Reorder/Item.svelte` (Step 2b only: one `$derived` and
   one prop on its `MotionContainer`)
+- `src/lib/components/Reorder/Group.svelte` and
+  `src/lib/components/Reorder/context.ts` (Step 2b item 5 only: one getter
+  and its type member)
 - `src/routes/tests/layout/measure-state/+page.svelte` (create)
 - `e2e/layout/measure-state.spec.ts` (create)
 - `src/routes/+page.svelte` (one new link)
@@ -200,7 +204,8 @@ Notes:
 - `src/lib/utils/motionDomProjection.ts`. The adapter's fan-out stays
   synchronous; the fix belongs at the subscription.
 - `src/lib/components/Reorder/*` other than Step 2b's `Item.svelte` edit.
-  Don't touch `Group.svelte`, `context.ts` or any Reorder spec.
+  Outside Step 2b item 5, don't touch `Group.svelte` or `context.ts`, and
+  don't touch any Reorder spec.
 - `src/routes/tests/layout-dependency/+page.svelte` and its spec.
 - Other user callbacks in `_MotionContainer.svelte` (`onProjectionUpdate`,
   `onLayoutAnimationStart`, gesture callbacks). They were not audited for this
@@ -389,10 +394,58 @@ Restore the restart explicitly, for Reorder only:
    Then add `__layoutRemeasureKey={layoutRemeasureKey}` to its
    `<MotionContainer …>`, directly after `__motionKind={context.kind}`.
 
-Don't edit `Group.svelte` or `context.ts`; `trackOrder` already exists.
+5. **(Round 3, 2026-11-21) Key only groups that auto-detect their axis.**
+   The leak only ever restarted items in a group without an `axis` prop:
+   `updateDetectedAxis()` reads `values` only `if (axisOverride === undefined)`
+   (`Group.svelte` about line 114). Restarting items in an `axis`-locked group
+   is new, and it makes a held item drift about 19px on each swap in
+   `e2e/reorder/basic.spec.ts` "keeps a held item pinned during upward swaps
+   after earlier reversals" (`axis="y"`). Restore the exact old condition:
+   - In `src/lib/components/Reorder/context.ts`, in `ReorderContextProps`,
+     after `readonly axis: ReorderAxis`, add:
+
+     ```ts
+         /**
+          * Whether the group detects its axis from its items' layouts (no
+          * `axis` prop). Items only re-measure on a reorder then (plan 003).
+          */
+         readonly detectsAxis: boolean
+     ```
+
+   - In `src/lib/components/Reorder/Group.svelte`, in the `context` object,
+     after the `get axis()` getter, add:
+
+     ```ts
+             get detectsAxis() {
+                 return axisOverride === undefined
+             },
+     ```
+
+   - In `Item.svelte`, change the derived to:
+
+     ```ts
+         const layoutRemeasureKey = $derived.by(() => {
+             if (!context.detectsAxis) return undefined
+             context.trackOrder()
+             return {}
+         })
+     ```
+
+     and update its JSDoc: it changes on every order change only in a group
+     that detects its axis, matching which items the old accidental
+     dependency restarted.
+
+   - Fake contexts in specs that build a `ReorderContextProps` with a cast
+     (`as unknown as ReorderContextProps`) need no change. If `pnpm check`
+     reports a typed fake context missing `detectsAxis`, STOP and report it.
+     Don't edit specs.
+
+`trackOrder` already exists.
 
 **Verify**:
 
+- `PW_PORT=4213 pnpm exec playwright test e2e/reorder/basic.spec.ts --project=chromium --repeat-each=3`
+  → all pass. It failed 3/3 with items 1–4 alone.
 - `PW_PORT=4213 pnpm exec playwright test e2e/reorder/keyboard-grid.spec.ts --project=chromium`
   → all pass. It failed 3/3 with Step 2 alone.
 - `pnpm exec vitest run src/lib/components/Reorder` → all pass, including
