@@ -17,3 +17,13 @@
 - **Executor-reported, not re-run:** `pnpm check` 0 errors, `pnpm test:only` 1735 passed, `e2e/animate-presence` 210/210 on port 4215, Trunk clean.
 - **Next:** plan 011 depends on this plan and 010, and changes one line of this context object (the `mode` getter).
 - **Integrated:** `358b1f86` on `fix/2.14.1`.
+
+## 2026-11-21, Step 5b (found by the batch full run): PASS
+
+- The batch's full Chromium run failed `e2e/utilities/use-presence.spec.ts` "owned motion child survives a rapid hide/show/hide…", on the run and its retry (`Expected 2, Received 1`). The spec counted the reversed exit as a completion, and Step 5 had only run `e2e/animate-presence`.
+- **Fix executor, lane `lane/2141-005b`:**
+  - red confirmed: 1 failed with `--retries=0`;
+  - only the three expected counts changed (1/2/4 → 0/1/2), plus the page sentence;
+  - `use-presence.spec.ts --repeat-each=3` → 33 passed, `e2e/utilities` → 134 passed, Trunk clean.
+- **Diff read by the guard.**
+- **Integrated:** `a9d53031` on `fix/2.14.1`.
