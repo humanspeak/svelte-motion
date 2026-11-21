@@ -13,5 +13,5 @@
   - The new `esm-env` import is covered by plan 001, which makes it a runtime dependency.
 - **Executor-reported, not re-run:** `pnpm check` 0 errors (both `@ts-expect-error` lines are used), `pnpm test:only` 1740/1740 on the final run, `pnpm build` ok, Trunk clean.
   - The first full run had 1 failure, in `chromiumLaunchOptions.spec.ts`, under load from the other lanes. It passed alone.
-- **Follow-up:** `docs/src/routes/docs/use-motion-value-event/+page.ts` still lists `'Auto Cleanup'` in `seo.ogFeatures`. It's out of the plan's scope and is recorded in the batch README for the docs pass.
+- **Follow-up:** `docs/src/routes/docs/use-motion-value-event/+page.svx:15` still lists `'Auto Cleanup'` in `seo.ogFeatures`. It's out of the plan's scope and is recorded in the batch README for the docs pass.
 - **Integrated:** `f2cf4603` on `fix/2.14.1`.

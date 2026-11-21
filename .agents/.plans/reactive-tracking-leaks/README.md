@@ -138,6 +138,7 @@ housekeeping plan for 20–22.
 - **A third naive `;` split** is in `layout.ts:107-116` (`stripNonChildLayoutStyle`). It only builds a comparison key, so 008 leaves it alone; it's a one-line follow-up.
 - **008 side effect with `!important`.** After 008, a user's own `!important` declaration stays next to the library's appended hold (for example `display:none`) and now beats it. 008's Maintenance notes cover this.
 - **Upstream `viewport.once` divergence, kept on purpose.** By reading, upstream doesn't disconnect the observer on `once`, so `onViewportEnter` can fire again after the element leaves and returns. Ours disconnects, which matches what both projects document. Consider raising it upstream.
+- **Stale SEO tag (from 015).** `docs/src/routes/docs/use-motion-value-event/+page.svx:15` still lists `'Auto Cleanup'` in `seo.ogFeatures`; the hook returns an unsubscribe for the caller to register. It's a one-word docs fix.
 - **Docs demo bug.** `docs/src/lib/examples/use-reduced-motion-config/demos/Default.svelte` calls `useReducedMotionConfig()` outside its own `<MotionConfig>`, so its readout never follows the radio buttons.
 
 ## Direction suggestions
