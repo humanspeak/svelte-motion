@@ -541,6 +541,69 @@ export const suppressScrollAnchoring = (element: HTMLElement): void => {
     }
 }
 
+/** Containing blocks {@link holdContainingBlock} holds, with their own inline value. */
+const containingBlockHolds = new WeakMap<
+    HTMLElement,
+    { count: number; inline: string; priority: string }
+>()
+
+/**
+ * Make `element` the containing block of an absolutely positioned exit
+ * clone for as long as the clone is on screen. A `static` element gets
+ * `position: relative`; an element another clone already holds joins
+ * that hold (it reads `relative` now, because of it). Overlapping holds
+ * share one write, and the element's own inline value and priority come
+ * back when the last one is released, unless the app wrote its own value
+ * in the meantime. Any other element is left alone.
+ *
+ * Upstream never writes an ancestor's style: its `sync` and `wait` exits
+ * keep the element in its slot, and `popLayout` pins the element itself
+ * with a removable `<style>` rule (`PopChild.tsx:159-180,238-243` @
+ * v14.14.0). Only svelte-motion's clone exit needs a containing block, so
+ * the write must not outlive the clone.
+ *
+ * @param element The clone's positioning parent (it generates a box).
+ * @param computedPosition `getComputedStyle(element).position`, read now.
+ * @returns An idempotent release; a no-op when nothing was held.
+ *
+ * @example
+ * ```ts
+ * const release = holdContainingBlock(parent, getComputedStyle(parent).position)
+ * // ... the clone animates out ...
+ * clone.remove()
+ * release()
+ * ```
+ */
+export const holdContainingBlock = (
+    element: HTMLElement,
+    computedPosition: string
+): (() => void) => {
+    const held = containingBlockHolds.get(element)
+    if (held) {
+        held.count += 1
+    } else if (computedPosition === 'static') {
+        containingBlockHolds.set(element, {
+            count: 1,
+            inline: element.style.position,
+            priority: element.style.getPropertyPriority('position')
+        })
+        element.style.position = 'relative'
+    } else {
+        return () => {}
+    }
+    let released = false
+    return () => {
+        if (released) return
+        released = true
+        const hold = containingBlockHolds.get(element)
+        if (!hold || --hold.count > 0) return
+        containingBlockHolds.delete(element)
+        // A value the app wrote during the hold is its own; keep it.
+        if (element.style.position !== 'relative') return
+        element.style.setProperty('position', hold.inline, hold.priority)
+    }
+}
+
 /**
  * Remove what a nested `AnimatePresence` had in flight from a fresh exit
  * clone (plan 012, N3): copies of its own exit clones and placeholders, which
@@ -1828,6 +1891,8 @@ export const createAnimatePresenceContext = (context: {
         started?: boolean
         /** The completion tail ran. */
         completed?: boolean
+        /** Gives the positioning parent back its own `position` (plan 010). */
+        releaseContainingBlock?: () => void
     }
     const activeExits = new Map<string, ActiveExit>()
 
@@ -2409,12 +2474,14 @@ export const createAnimatePresenceContext = (context: {
         const parentRect =
             popLayoutSnapshot || held ? undefined : positioningParent.getBoundingClientRect()
 
-        if (!popLayoutSnapshot && !held) {
-            const parentPosition = getComputedStyle(positioningParent).position
-            if (parentPosition === 'static') {
-                positioningParent.style.position = 'relative'
-            }
-        }
+        // Released wherever the clone leaves the DOM (plan 010).
+        const releaseContainingBlock =
+            !popLayoutSnapshot && !held
+                ? holdContainingBlock(
+                      positioningParent,
+                      getComputedStyle(positioningParent).position
+                  )
+                : undefined
 
         // Preserve the original display property (especially flex for centered content)
         const originalDisplay = frozenStyle.display ?? ''
@@ -2577,7 +2644,14 @@ export const createAnimatePresenceContext = (context: {
         // No scroll-anchoring adjustment from the swap, as upstream keeps
         // the element (plan 012 A6).
         if (followParent instanceof HTMLElement) suppressScrollAnchoring(followParent)
-        const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false, holds: [] }
+        const activeExit: ActiveExit = {
+            clone,
+            child,
+            placeholder,
+            cancelled: false,
+            holds: [],
+            releaseContainingBlock
+        }
         activeExits.set(key, activeExit)
         if (popLayoutSnapshot) {
             // The "before" point is the element's; the "after" one is the
@@ -2620,6 +2694,7 @@ export const createAnimatePresenceContext = (context: {
                 // ignore
             }
             clone.remove()
+            activeExit.releaseContainingBlock?.()
 
             // Log clone removal and element counts for debugging rapid toggle
             pwLog('[presence] clone REMOVED from DOM', {
@@ -2693,6 +2768,7 @@ export const createAnimatePresenceContext = (context: {
                 }
                 releaseActiveExit()
                 clone.remove()
+                activeExit.releaseContainingBlock?.()
                 removeExitPlaceholder(key, placeholder)
                 const currentChild = children.get(key)
                 if (currentChild && currentChild.element === exitingElement) {
@@ -2821,6 +2897,7 @@ export const createAnimatePresenceContext = (context: {
         // the clone's values (plan 012).
         for (const hold of active.holds) hold.cancel()
         active.clone.remove()
+        active.releaseContainingBlock?.()
         removeExitPlaceholder(key, active.placeholder)
         if (children.get(key) === active.child) {
             children.delete(key)
@@ -2856,6 +2933,7 @@ export const createAnimatePresenceContext = (context: {
             active.animation?.stop?.()
             for (const hold of active.holds) hold.cancel()
             active.clone.remove()
+            active.releaseContainingBlock?.()
         }
         for (const placeholder of exitPlaceholders.values()) placeholder.remove()
         children.clear()

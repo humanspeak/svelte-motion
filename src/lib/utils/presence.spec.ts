@@ -10,6 +10,7 @@ import {
     createAnimatePresenceContext,
     createPopLayoutPointCache,
     getPresenceDepth,
+    holdContainingBlock,
     measurePopLayoutSnapshot,
     observeStyleChanges,
     popLayoutPointFollowsScroll,
@@ -363,7 +364,8 @@ describe('presence context', () => {
         expect(onExitComplete).toHaveBeenCalled()
     })
 
-    it('forces parent position to relative when static', async () => {
+    it('forces a static parent to relative while the exit runs, then restores it', async () => {
+        parent.style.position = ''
         // Simulate computed style returning 'static' even if inline style is ''
         vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
             mockComputedStyle({ position: 'static', borderRadius: '8px', boxSizing: 'border-box' })
@@ -372,9 +374,11 @@ describe('presence context', () => {
         const ctx = createAnimatePresenceContext({ onExitComplete })
         ctx.registerChild('k', el, { opacity: 0 })
         ctx.unregisterChild('k')
-        await Promise.resolve()
-        await Promise.resolve()
         expect(parent.style.position).toBe('relative')
+        await Promise.resolve()
+        await Promise.resolve()
+        await tick()
+        expect(parent.style.position).toBe('')
     })
 
     it('removes the clone after finished resolves', async () => {
@@ -2627,5 +2631,201 @@ describe('createPopLayoutPointCache and window resizes (plan 012 A2)', () => {
         await settle()
         expect(cache.read(element)?.[1]).toBe(-80)
         cache.dispose()
+    })
+})
+
+describe('clone exit containing block (plan 010)', () => {
+    let parent: HTMLElement
+    let el: HTMLElement
+    let el2: HTMLElement
+    const deferred = () => {
+        let resolve!: () => void
+        const promise = new Promise<void>((r) => (resolve = r))
+        return { promise, resolve }
+    }
+    const flush = async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve()
+    }
+    const deferExit = () => {
+        const d = deferred()
+        vi.mocked(animate).mockReturnValueOnce({ finished: d.promise, stop: vi.fn() } as never)
+        return d
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.restoreAllMocks()
+        document.body.innerHTML = ''
+        parent = document.createElement('div')
+        document.body.appendChild(parent)
+        el = document.createElement('div')
+        el2 = document.createElement('div')
+        parent.append(el, el2)
+        for (const node of [el, el2]) {
+            vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(makeRect(10, 20))
+        }
+        vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(makeRect(0, 0, 200, 200))
+        // Computed position follows the inline value, so the second exit sees
+        // the first one's write, as in a browser.
+        vi.spyOn(window, 'getComputedStyle').mockImplementation((target) =>
+            mockComputedStyle({
+                position: (target as HTMLElement).style?.position || 'static',
+                display: 'block',
+                boxSizing: 'border-box'
+            })
+        )
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+            cb(0)
+            return 1
+        })
+    })
+
+    it('restores an empty inline value after the exit completes', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        const d = deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('relative')
+        d.resolve()
+        await flush()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('restores an explicit inline static', async () => {
+        parent.style.position = 'static'
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        const d = deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('relative')
+        d.resolve()
+        await flush()
+        expect(parent.style.position).toBe('static')
+    })
+
+    it('overlapping exits share one hold', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('a', el, { opacity: 0 })
+        ctx.registerChild('b', el2, { opacity: 0 })
+        const da = deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        const db = deferExit()
+        el2.remove()
+        ctx.unregisterChild('b')
+        expect(parent.style.position).toBe('relative')
+        da.resolve()
+        await flush()
+        expect(parent.style.position).toBe('relative')
+        db.resolve()
+        await flush()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('the second exit holds even though the parent already reads relative', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('a', el, { opacity: 0 })
+        ctx.registerChild('b', el2, { opacity: 0 })
+        const da = deferExit()
+        el.remove()
+        ctx.unregisterChild('a')
+        const db = deferExit()
+        el2.remove()
+        ctx.unregisterChild('b')
+        db.resolve()
+        await flush()
+        expect(parent.style.position).toBe('relative')
+        da.resolve()
+        await flush()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('a reversed exit restores', () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('relative')
+        ctx.takeExitHandoff('a')
+        expect(parent.style.position).toBe('')
+    })
+
+    it('boundary disposal restores', () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('relative')
+        ctx.dispose()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('an exit with nothing to animate restores', () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        ctx.registerChild('a', el, undefined, undefined, () => undefined)
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(document.querySelector('[data-clone="true"]')).toBeNull()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('keeps a value the app wrote during the exit', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        const d = deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        parent.style.position = 'sticky'
+        d.resolve()
+        await flush()
+        expect(parent.style.position).toBe('sticky')
+    })
+
+    it('never touches an already positioned parent', async () => {
+        parent.style.position = 'absolute'
+        const ctx = createAnimatePresenceContext({ mode: 'sync' })
+        const d = deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('absolute')
+        d.resolve()
+        await flush()
+        expect(parent.style.position).toBe('absolute')
+    })
+
+    it('restores the inline priority', () => {
+        parent.style.setProperty('position', 'static', 'important')
+        const release = holdContainingBlock(parent, 'static')
+        expect(parent.style.position).toBe('relative')
+        release()
+        expect(parent.style.position).toBe('static')
+        expect(parent.style.getPropertyPriority('position')).toBe('important')
+    })
+
+    it('release is idempotent', () => {
+        const first = holdContainingBlock(parent, 'static')
+        const second = holdContainingBlock(parent, 'relative')
+        first()
+        first()
+        expect(parent.style.position).toBe('relative')
+        second()
+        expect(parent.style.position).toBe('')
+    })
+
+    it('a popLayout exit leaves the parent alone', async () => {
+        const ctx = createAnimatePresenceContext({ mode: 'popLayout' })
+        const d = deferExit()
+        ctx.registerChild('a', el, { opacity: 0 })
+        el.remove()
+        ctx.unregisterChild('a')
+        expect(parent.style.position).toBe('')
+        d.resolve()
+        await flush()
+        expect(parent.style.position).toBe('')
     })
 })
