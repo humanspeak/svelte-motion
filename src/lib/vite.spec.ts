@@ -141,6 +141,103 @@ describe('svelteMotionOptimize', () => {
         )
     })
 
+    it('keeps the motion import for a template-expression reference', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+    import W from './W.svelte'
+</script>
+
+<motion.div>hi</motion.div>
+<W as={motion.span} />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain("import { motion } from '@humanspeak/svelte-motion'")
+        expect(result).toContain(
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+        )
+        expect(result).toContain('<SvelteMotionDiv>hi</SvelteMotionDiv>')
+        expect(result).toContain('as={motion.span}')
+    })
+
+    it('keeps the original import, other names included, for a template-expression reference', () => {
+        const code = `<script>
+    import { motion, animate } from '@humanspeak/svelte-motion'
+    import W from './W.svelte'
+</script>
+
+<motion.div>hi</motion.div>
+<W as={motion.span} />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain("import { motion, animate } from '@humanspeak/svelte-motion'")
+    })
+
+    it('keeps the motion import for svelte:component and @const references', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<motion.div>a</motion.div>
+<svelte:component this={motion.span} />
+{#if true}{@const C = motion.p}<C />{/if}`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain("import { motion } from '@humanspeak/svelte-motion'")
+    })
+
+    it('keeps the motion import for a non-tag script member', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+    const C = motion.notatag
+</script>
+
+<motion.div>a</motion.div>`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).toContain("import { motion } from '@humanspeak/svelte-motion'")
+        expect(result).toContain('const C = motion.notatag')
+    })
+
+    it('does not keep the motion import for an HTML or CSS comment mentioning motion', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+</script>
+
+<!-- motion components below -->
+<motion.div>hi</motion.div>
+
+<style>
+    /* styles for the motion box */
+</style>`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).not.toContain('import { motion }')
+        expect(result).toContain(
+            "import SvelteMotionDiv from '@humanspeak/svelte-motion/html/Div.svelte'"
+        )
+    })
+
+    it('does not keep the motion import for motion.div in a script string or comment', () => {
+        const code = `<script>
+    import { motion } from '@humanspeak/svelte-motion'
+    const C = motion.div
+    const label = "motion.div"
+    // motion.div is the box
+    /* motion.div */
+</script>
+
+<C />`
+
+        const result = transform(code)
+        expect(result).not.toBeNull()
+        expect(result).not.toContain('import { motion }')
+    })
+
     it('handles SVG elements', () => {
         const code = `<script>
     import { motion } from '@humanspeak/svelte-motion'
