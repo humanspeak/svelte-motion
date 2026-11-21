@@ -8,7 +8,7 @@ This was a codebase audit, not an upstream sync. The Motion 14.14.0 bump is
 being handled separately and nothing here plans it. Where a plan's files
 overlap with that bump, its Maintenance notes say so.
 
-**2026-11-20 extension for svelte-motion 2.14.1.** The branch was rebased onto `origin/main` `a33531a2` (v2.14.0, Motion 14.14.0). Plans 001–005 were pre-flighted against it: 001 and 003 got refreshed excerpts and line numbers (see their revision notes), and 002, 004 and 005 had no drift. The maintainer chose findings 6–15 plus housekeeping (findings 20–22). These became plans 006–016, written against `a33531a2`. Upstream citations in the new plans use `v14.14.0`, which is now our pin.
+**2026-11-20 extension for svelte-motion 2.14.1.** The branch was rebased onto `origin/main` `a33531a2` (v2.14.0, Motion 14.14.0). Plans 001–005 were pre-flighted against it: 001 and 003 got refreshed excerpts and line numbers (see their revision notes), and 002, 004 and 005 had no drift. The maintainer chose findings 6–15 plus housekeeping (findings 20–22). These became plans 006–016, written against `a33531a2`. The batch now lives on `fix/2.14.1`, branched from that commit, and the 2.14.1 work lands there. `improve/post-2.12-audit` is superseded. Upstream citations in the new plans use `v14.14.0`, which is now our pin.
 
 **Selection**: the run was non-interactive, so nobody chose findings. Per the
 skill's default, plans were written for the top five findings by leverage
