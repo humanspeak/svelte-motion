@@ -16,6 +16,12 @@
 > treat it as a STOP condition. Line numbers below are at `a33531a2`; after
 > 005 and 010 they are shifted, so find each site by the quoted code.
 
+> **Revision (2026-11-21, guard, round 3):** Step 3b alone turned case 5 from
+> "never shown" (6/12) into "shown too early" (7/12), because `isEnterBlocked`
+> returned `false` once the mode was `sync`. Step 3c keeps a held child
+> blocked while an exit that started under `wait` is in flight, matching
+> upstream, where a mode change doesn't re-diff the rendered children.
+>
 > **Revision (2026-11-21, guard):** the first executor stopped in Step 4.
 > e2e case 5 raced: if the mode left `wait` before `runAnimation()` ran,
 > the card held before mount was never released. Step 3b lets that child
@@ -638,6 +644,50 @@ the branch, `context.isEnterBlocked(presenceKey)` decides what happens:
 
 If case 5 still fails, STOP and report the run count and the card's
 `data-presence-wait-hidden` value.
+
+### Step 3c: A held enter stays blocked by a wait exit after the switch (2026-11-21, second amendment)
+
+**Why.** After Step 3b, case 5 still failed 7 of 12 runs, the other way
+round: card B showed while A's clone was still exiting. Step 2's
+`isEnterBlocked` returns `false` as soon as the mode isn't `wait`, so the
+held child took the "not blocked" path. Upstream keeps it hidden. A mode
+change alone doesn't re-run `AnimatePresence`'s diff (it only runs when
+`presentChildren !== diffedChildren`, `AnimatePresence/index.tsx` @
+v14.14.0). So `renderedChildren` stays the exiting children until their
+exits complete, and only then does the new child render. A child added
+*after* the switch is unaffected: it is never held before mount, so it never
+reaches `isEnterBlocked` through Step 3b's branch.
+
+**Edit.** In `src/lib/utils/presence.ts` `isEnterBlocked`, replace
+
+```ts
+        const mode = readMode()
+        if (mode !== 'wait') {
+            pwLog('[presence] isEnterBlocked', { blocked: false, mode, inFlightExits, key })
+            return false
+        }
+```
+
+with
+
+```ts
+        const mode = readMode()
+        if (mode !== 'wait') {
+            // An exit that started under `wait` (it raised `enterBlocked`) still
+            // holds the children that were waiting on it, as upstream keeps
+            // rendering only the exiting children until they finish; a mode
+            // change alone does not re-diff (plan 011 Step 3c).
+            const blocked = enterBlocked && inFlightExits > 0
+            pwLog('[presence] isEnterBlocked', { blocked, mode, inFlightExits, key })
+            return blocked
+        }
+```
+
+Leave the rest of the function unchanged. `hasBlockingSibling` must stay
+wait-only: in `sync` mode, other present children are normal.
+
+**Verify**: the same commands as Step 3b. Case 5 must pass all 12 repeats.
+If it doesn't, STOP and report.
 
 ### Step 4: A test page and e2e for mode switching
 
