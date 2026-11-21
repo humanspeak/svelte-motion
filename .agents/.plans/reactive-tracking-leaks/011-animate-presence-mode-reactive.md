@@ -16,6 +16,12 @@
 > treat it as a STOP condition. Line numbers below are at `a33531a2`; after
 > 005 and 010 they are shifted, so find each site by the quoted code.
 
+> **Revision (2026-11-21, guard):** the first executor stopped in Step 4.
+> e2e case 5 raced: if the mode left `wait` before `runAnimation()` ran,
+> the card held before mount was never released. Step 3b lets that child
+> take the wait-release path, which is the one `_MotionContainer.svelte`
+> edit this plan now allows.
+
 ## Status
 
 - **Priority**: P2
@@ -254,6 +260,8 @@ Notes:
 - `src/routes/tests/animate-presence/boundary-teardown/+page.svelte`
 - `docs/src/routes/docs/animate-presence/+page.svx` (one table row)
 - `.changeset/animate-presence-mode-reactive.md` (create)
+- `src/lib/html/_MotionContainer.svelte`: **only** the condition of
+  `runAnimation()`'s wait branch, as Step 3b says (2026-11-21 amendment)
 
 **The one exception to plan 005's ownership.** Plan 005 owns the
 `AnimatePresenceContext` type and the object returned by
@@ -266,9 +274,9 @@ must NOT change. Make no other edit to the type or the object.
 
 **Out of scope** (do NOT touch, even though they look related):
 
-- `src/lib/components/PresenceChild.svelte` and
-  `src/lib/html/_MotionContainer.svelte`: they read `context.mode` at
-  decision time and pick up the new value with no edit.
+- `src/lib/components/PresenceChild.svelte`, and every part of
+  `src/lib/html/_MotionContainer.svelte` except Step 3b's one condition: they
+  read `context.mode` at decision time and pick up the new value with no edit.
 - The `AnimatePresenceContext` type, and every other line of the returned
   object (plan 005 adds `notifyExitCancel` there).
 - `holdContainingBlock` and its release sites (plan 010).
@@ -586,6 +594,51 @@ In `src/lib/components/AnimatePresence.svelte`:
 `pnpm exec vitest run src/lib/components src/lib/utils/usePresence.spec.ts src/lib/utils/presence.spec.ts`
 → all pass.
 
+### Step 3b: Release a before-mount wait hold even if the mode changed (2026-11-21 amendment)
+
+**Why.** A child that mounts while a `wait` exit is pending is hidden by the
+`waitEnterBlockedBeforeMount` derived in `_MotionContainer.svelte` (about
+line 1775; it reads `context.mode` at mount). Only `runAnimation()`'s
+`if (context?.mode === 'wait')` branch (about line 2185) can release that
+hold, by registering the enter-unblocked callback or revealing the element.
+`runAnimation()` runs after a rAF, plus a 10 ms sleep under Playwright. If
+the mode switches away from `wait` inside that window, the branch is skipped
+and the child stays `display:none` forever. The first executor saw e2e
+case 5 fail this way in 5 of 12 runs. Adding a 300 ms wait before the
+switch made it pass.
+
+**Edit.** In `runAnimation()`, change the wait branch's condition so a child
+that was held before mount still takes the release path, whatever the mode
+is now:
+
+```ts
+        // For mode='wait': check immediately if enters are blocked
+        if (context?.mode === 'wait') {
+```
+
+becomes
+
+```ts
+        // For mode='wait', or a child still held by a wait block from before
+        // mount (the mode may have changed since; plan 011 Step 3b): check
+        // whether enters are blocked and release through the same path.
+        if (context?.mode === 'wait' || untrack(() => waitEnterBlockedBeforeMount)) {
+```
+
+Change nothing else in `runAnimation()` or elsewhere in the file. Inside
+the branch, `context.isEnterBlocked(presenceKey)` decides what happens:
+- **Still blocked:** register the callback. Step 2's state-based release in
+  `finishExit`/`cancelExit` fires it when the exits end.
+- **Not blocked:** the existing unblocked path reveals the element now.
+
+**Verify**:
+- `PW_PORT=4221 pnpm exec playwright test e2e/animate-presence/mode-switch.spec.ts --project=chromium --repeat-each=12`
+  → all pass. Case 5 failed 5/12 without this step.
+- `pnpm exec vitest run src/lib/components src/lib/utils/presence.spec.ts` → all pass.
+
+If case 5 still fails, STOP and report the run count and the card's
+`data-presence-wait-hidden` value.
+
 ### Step 4: A test page and e2e for mode switching
 
 Create `src/routes/tests/animate-presence/mode-switch/+page.svelte`. Keep it
@@ -782,8 +835,8 @@ Stop and report back (do not improvise) if:
   change): the getter is leaking a dependency. Do not "fix" it in
   `PresenceChild.svelte` or `_MotionContainer.svelte`.
 - The change seems to need an edit to the `AnimatePresenceContext` type, to
-  another line of the returned object, to `PresenceChild.svelte` or to
-  `_MotionContainer.svelte`.
+  another line of the returned object, to `PresenceChild.svelte`, or to
+  `_MotionContainer.svelte` beyond Step 3b.
 - `boundary-teardown.spec.ts` fails without the remount even after putting
   back `onchange={resetDemo}`.
 
