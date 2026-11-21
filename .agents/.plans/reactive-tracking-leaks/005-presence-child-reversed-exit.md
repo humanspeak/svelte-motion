@@ -13,6 +13,13 @@
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
 
+> **Revision (2026-11-20, guard):** the first executor stopped in Step 5.
+> Three specs in `_MotionContainer.spec.ts` pinned the old behaviour, a
+> reversed exit firing `onExitComplete` once. Putting line 381 back made the
+> file pass 45/45, so this plan's change is the only cause. Those counts
+> contradict upstream, so Step 5a now updates them, and the STOP condition
+> allows exactly that edit.
+
 ## Status
 
 - **Priority**: P1
@@ -223,6 +230,8 @@ Notes:
   object only)
 - `src/lib/components/PresenceChild.svelte` (line 379 only)
 - `src/lib/utils/usePresence.spec.ts` (new cases)
+- `src/lib/html/_MotionContainer.spec.ts`: only the `onExitComplete` call
+  counts in the three specs named in Step 5a (2026-11-20 amendment)
 - `.changeset/presence-child-reversed-exit.md` (create)
 
 **Out of scope** (do NOT touch, even though they look related):
@@ -338,6 +347,37 @@ Create `.changeset/presence-child-reversed-exit.md`:
 `onExitComplete` no longer fires when an exit held by `PresenceChild` (or the owned `<AnimatePresence present>` form) is reversed by setting `present` back to `true` before it finishes, matching Motion.
 ```
 
+### Step 5a: Update the three specs that pinned the old count
+
+Three specs in `src/lib/html/_MotionContainer.spec.ts` assert the behaviour
+this plan fixes: a reversed exit firing `onExitComplete` once. Upstream
+(`AnimatePresence/index.tsx` @ v14.14.0) deletes a re-entered key from
+`exitComplete`, and `onExitComplete` only fires through
+`pendingExitComplete` once every exit has completed. So a reversal fires
+nothing. Change only the expected counts. Don't change the steps, the
+`complete(...)` calls or the presence assertions:
+
+1. `'cancelled owned descendant exits cannot finish a later cycle'` (about
+   line 945):
+   - right after `await group.update({ present: true })`: `toHaveBeenCalledTimes(1)` → `toHaveBeenCalledTimes(0)`;
+   - after `complete('owned-fast', 1)`, with `owned-group` still truthy: `1` → `0`;
+   - after `complete('owned-slow', 1)`, with `owned-group` null: `2` → `1`.
+2. and 3. `it.each(['promise', 'callback'])('retains the owned child when a
+   superseded exit %s completes')` (about line 1003):
+   - after the re-entry rerender: `1` → `0`, and replace the comment
+     "Cancelling A balances its parent's pending-exit count." with
+     "A reversed exit fires nothing (upstream deletes the key); cancelling
+     it still balances the parent's pending-exit count, which the final
+     removal below proves.";
+   - after `first.resolve()`: `1` → `0`;
+   - after `second.resolve()`, with the child removed: `2` → `1`;
+   - after the late `oldComplete(0)`: `2` → `1`.
+
+**Verify**: `pnpm exec vitest run src/lib/html/_MotionContainer.spec.ts` → all
+pass. If any of these specs fails for any other reason (for example the child
+is never removed after `second.resolve()`, meaning the pending count is
+unbalanced), STOP and report.
+
 ### Step 5: Full gate
 
 `pnpm build`, `pnpm check`, `pnpm test:only`, then
@@ -386,7 +426,8 @@ Stop and report back (do not improvise) if:
 - After Step 3, a `mode="wait"` spec fails (an enter stays blocked after a
   reversed exit). `cancelExit` is meant to release it; if it does not, report
   the spec instead of adding a second release.
-- Any spec outside `usePresence.spec.ts` needs an edit to pass.
+- Any spec outside `usePresence.spec.ts` needs an edit to pass, other than the
+  count changes in Step 5a.
 
 ## Maintenance notes
 
