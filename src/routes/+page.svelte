@@ -1660,6 +1660,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/style-string-declarations') + searchParams}
+                    >
+                        styleString declarations (data URIs, fallbacks)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/use-spring') + searchParams}
                     >
                         useSpring

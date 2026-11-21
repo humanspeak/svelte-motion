@@ -1,4 +1,4 @@
-import { mergeInlineStyles } from '$lib/utils/style'
+import { mergeInlineStyles, parseStyleString } from '$lib/utils/style'
 import { resolveRestingValues } from '$lib/utils/variants'
 import { startWaapiAnimation, type AnimationOptions } from 'motion'
 import {
@@ -144,12 +144,7 @@ export const completeOptimizedAppearHandoff = (elementId: string | undefined): v
 }
 
 const readStyleProp = (style: string, prop: string): string | undefined => {
-    return style
-        .split(';')
-        .map((part) => part.trim())
-        .find((part) => part.startsWith(`${prop}:`))
-        ?.slice(prop.length + 1)
-        .trim()
+    return parseStyleString(style)[prop]
 }
 
 const toNativeOptions = (transition: AnimationOptions | undefined): KeyframeAnimationOptions => {

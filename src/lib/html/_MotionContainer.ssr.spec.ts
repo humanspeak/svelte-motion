@@ -28,6 +28,20 @@ describe('_MotionContainer SSR styles', () => {
         expect(style).toMatch(/border-radius: 12px/)
     })
 
+    it('keeps a data URI containing `;` from a string style in SSR output', () => {
+        const { container } = render(MotionContainer as unknown as any, {
+            props: {
+                tag: 'div',
+                initial: { opacity: 0.5 },
+                style: "width: 10px; background-image: url('data:image/png;base64,iVBORw0KGgo='); height: 5px; height: 6px"
+            }
+        })
+        const el = container.firstElementChild as HTMLElement
+        const style = el.getAttribute('style') ?? ''
+        expect(style).toContain('base64,iVBORw0KGgo=')
+        expect(style).toContain('opacity: 0.5')
+    })
+
     // Upstream parity: framer-motion `makeLatestValues` (use-visual-state.ts) seeds only
     // from `initial`, or from `animate` when the initial animation is blocked
     // (`initial={false}`). An empty `initial` therefore renders nothing for animate keys.
