@@ -28,7 +28,8 @@
     const steps: TesterStep[] = [
         {
             text: 'Load the page.',
-            expected: 'The first box is 50px tall, the second shows a pixel image at half opacity.'
+            expected:
+                'The first (blue) box is 50px tall. The second box is pale green: its background is a one-pixel green PNG data URI stretched to fill the box, shown at half opacity. An empty box would mean the URL was cut at its ";".'
         }
     ]
 
@@ -40,6 +41,10 @@
             backgroundImageOk = getComputedStyle(dataUri).backgroundImage.includes('base64')
     })
 </script>
+
+<svelte:head>
+    <title>Style strings keep data URIs and fallbacks</title>
+</svelte:head>
 
 <div class="page">
     <motion.div data-testid="fallback" bind:ref={fallback} style={FALLBACK_STYLE} />

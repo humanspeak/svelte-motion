@@ -28,6 +28,10 @@
     ]
 </script>
 
+<svelte:head>
+    <title>MotionConfig reduced motion</title>
+</svelte:head>
+
 <div class="flex min-h-screen w-full flex-col items-center justify-center gap-8 p-8">
     <div class="space-y-2 text-center">
         <h1 class="text-3xl font-bold">MotionConfig.reducedMotion</h1>

@@ -68,6 +68,10 @@
     ]
 </script>
 
+<svelte:head>
+    <title>Reorder: replaced value objects</title>
+</svelte:head>
+
 <!-- The Replace buttons come first so Tab from "before" reaches the group. -->
 <button id="replace-a" onclick={() => replace('a')}>Replace a</button>
 <button id="replace-b" onclick={() => replace('b')}>Replace b</button>

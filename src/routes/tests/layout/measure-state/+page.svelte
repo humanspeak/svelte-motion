@@ -25,7 +25,11 @@
     })
 
     const steps: TesterStep[] = [
-        { text: 'Load the page.', expected: 'The count reads a small number, 1 or 2.' },
+        {
+            text: 'Load the page.',
+            expected:
+                'The count settles at a small number (4 today: the mount reports the same box a few times) and stays there.'
+        },
         {
             text: 'Press Toggle a few times.',
             expected:
