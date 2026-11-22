@@ -15,10 +15,7 @@
         type MotionKind
     } from '$lib/utils/motionKind'
     import { BROWSER, DEV } from 'esm-env'
-    import {
-        filterReducedMotionKeyframes,
-        useReducedMotionConfig
-    } from '$lib/utils/reducedMotionConfig.svelte'
+    import { useReducedMotionConfig } from '$lib/utils/reducedMotionConfig.svelte'
     import type {
         MotionProps,
         AnimationControlsDefinition,
@@ -62,8 +59,8 @@
     import {
         attachFocusGesture,
         attachHoverGesture,
-        attachInViewGesture,
-        attachPressGesture
+        attachPressGesture,
+        createInViewGesture
     } from '$lib/utils/gestures'
     import { readTransformChannels } from '$lib/utils/hover'
     import { observeMove } from '$lib/utils/observeMove'
@@ -172,6 +169,13 @@
         /** @internal Injected by the `m` namespace; `motion` components omit it. */
         __motionKind?: MotionKind
         /**
+         * @internal Set by `Reorder.Item`: a value that changes whenever its
+         * group's order changes. The layout observer effect reads it, so
+         * every item re-measures its slot in the same flush as a reorder, as
+         * upstream re-measures every re-rendered item in that commit.
+         */
+        __layoutRemeasureKey?: unknown
+        /**
          * @internal Upstream's name: set by the main `Reorder`, so strict mode
          * warns once instead of throwing.
          */
@@ -185,6 +189,7 @@
         children,
         motionValueChild,
         __motionKind: motionKindProp = 'motion',
+        __layoutRemeasureKey: layoutRemeasureKeyProp,
         ignoreStrict: ignoreStrictProp = false,
         tag = 'div',
         key: keyProp,
@@ -217,6 +222,8 @@
         onHoverEnd: onHoverEndProp,
         onFocusStart: onFocusStartProp,
         onFocusEnd: onFocusEndProp,
+        onViewportEnter: onViewportEnterProp,
+        onViewportLeave: onViewportLeaveProp,
         onInViewStart: onInViewStartProp,
         onInViewEnd: onInViewEndProp,
         onTapStart: onTapStartProp,
@@ -587,53 +594,6 @@
     }
 
     /**
-     * Strip transform channels from a definition under a reducing policy.
-     *
-     * `filterReducedMotionKeyframes` used to be applied by the deleted
-     * `executeAnimation`, so the animationState was seeing unfiltered targets and
-     * animating transforms that the policy forbids (`initialKeyframes` keeps its
-     * own filtering, which is why only the animate half regressed). Re-homed here
-     * so the animationState never sees a transform channel it must not touch.
-     *
-     * Handles both shapes the animationState resolves: a target object, and a
-     * variant MAP (a bare variant LABEL cannot be filtered, so the map behind it
-     * is filtered instead). Lists of labels resolve through the same map.
-     *
-     * @param definition A target object, variant label, or list of labels.
-     * @returns The definition with transform channels removed where applicable.
-     */
-    const filterReducedMotionDefinition = (definition: unknown): unknown => {
-        if (!reducedMotion) return definition
-        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
-            // A label (or list of labels) resolves via `variants`, filtered below.
-            return definition
-        }
-        return filterReducedMotionKeyframes(definition as Record<string, unknown>, reducedMotion)
-    }
-
-    /** The `variants` map with transform channels stripped under a reducing policy. */
-    const reducedMotionVariants = $derived.by(() => {
-        if (!reducedMotion || !variantsProp) return variantsProp
-        const out: Record<string, unknown> = {}
-        for (const [name, variant] of Object.entries(variantsProp)) {
-            // Function-form variants resolve per `custom` inside the
-            // animationState, so wrap rather than filter eagerly.
-            out[name] =
-                typeof variant === 'function'
-                    ? (...args: unknown[]) =>
-                          filterReducedMotionKeyframes(
-                              (variant as (...a: unknown[]) => Record<string, unknown>)(...args),
-                              reducedMotion
-                          )
-                    : filterReducedMotionKeyframes(
-                          variant as Record<string, unknown>,
-                          reducedMotion
-                      )
-        }
-        return out as typeof variantsProp
-    })
-
-    /**
      * The props motion-dom reads off this node.
      *
      * `style` is carried through because the projection adapter has always
@@ -655,12 +615,9 @@
             // variants off `visualElement.props`, so it must see the same
             // presence/parent-resolved `initial`, the same inherited variant
             // label and the same `custom` the legacy writer used. (plan 002)
-            // Filtered too: under a reducing policy the node must not even be
-            // SEEDED with a transform channel, or `makeLatestValues` puts it in
-            // `latestValues` and the VE renders it (the container's own
-            // `initialKeyframes` was already filtered, which is why only the
-            // animate half of the regression was visible).
-            initial: filterReducedMotionDefinition(effectiveInitialProp),
+            // Reduced motion is applied by motion-dom per value, not by filtering
+            // targets (visual-element-target.ts:150-164 @ v14.14.0).
+            initial: effectiveInitialProp,
             // motion-dom's optimized-appear handoff reads this id from the
             // VisualElement props (not from the DOM attribute). Keeping both in
             // sync lets animateTarget adopt the SSR compositor animation.
@@ -672,10 +629,8 @@
             // — killing parent-driven propagation and `staggerChildren`.
             // `animateChanges` reads the inherited label itself, from
             // `getVariantContext(visualElement.parent)`.
-            animate: animateControls
-                ? undefined
-                : filterReducedMotionDefinition(resolveRelativeAnimate(declarativeAnimateProp)),
-            variants: reducedMotionVariants,
+            animate: animateControls ? undefined : resolveRelativeAnimate(declarativeAnimateProp),
+            variants: variantsProp,
             // motion-dom 13.5.1's VisualElement mount/animateChanges and
             // `makeLatestValues` read `props.inherit`; forward it so the
             // VisualElement tree honours `inherit={false}` too (motion b63833cb0).
@@ -690,12 +645,12 @@
                 motionConfig?.transition === undefined && transitionProp === undefined
                     ? undefined
                     : mergeTransitions(motionConfig?.transition ?? {}, transitionProp ?? {}),
-            whileHover: filterReducedMotionDefinition(whileHoverProp),
-            whileTap: filterReducedMotionDefinition(whileTapProp),
-            whileFocus: filterReducedMotionDefinition(whileFocusProp),
-            whileInView: filterReducedMotionDefinition(whileInViewProp),
-            whileDrag: filterReducedMotionDefinition(whileDragProp),
-            whilePinch: filterReducedMotionDefinition(whilePinchProp),
+            whileHover: whileHoverProp,
+            whileTap: whileTapProp,
+            whileFocus: whileFocusProp,
+            whileInView: whileInViewProp,
+            whileDrag: whileDragProp,
+            whilePinch: whilePinchProp,
             // Gesture callbacks are public VisualElement props upstream. Carry
             // them here even though the Svelte drag adapter invokes them: a
             // callback-reference replacement is still a real props commit and
@@ -845,11 +800,22 @@
     // trunk-ignore(eslint/no-useless-assignment): false positive — presenceKey is used throughout the component
     const presenceKey = keyProp != null ? String(keyProp) : `motion-${++keyCounter}`
 
-    // Track previous key for key-change detection (simulates React's key-based remounting)
-    // Plain variables (not $state) to avoid self-triggering the key-change $effect
+    // In-place key transitions (simulates React's key-based remounting). Plain
+    // variables, not $state, so the key-change $effect never subscribes to its
+    // own bookkeeping.
+    // - keyTrackerPrev: the last key the effect has seen.
+    // - keyTransitionExiting: an exit started by a key change is in flight.
+    // - keyTransitionFromKey: the key that exit belongs to, so a change back
+    //   to it can reverse the exit instead of finishing it.
+    // - keyTransitionGeneration: bumped by every new transition, by a
+    //   reversal, and on unmount. An async continuation whose generation is
+    //   stale returns without touching anything. Interrupted animations never
+    //   resolve their promise (motion-dom JSAnimation.stop() only tears down),
+    //   so nothing may depend on an awaited exit resuming.
     let keyTrackerPrev = keyProp
-    let keyTrackerIsTransitioning = false
-    let keyTransitionStopped = false
+    let keyTransitionExiting = false
+    let keyTransitionFromKey: typeof keyProp = undefined
+    let keyTransitionGeneration = 0
 
     // Compute merged transition without mutating props to avoid effect write loops
     const mergedTransition = $derived<AnimationOptions>(
@@ -1072,10 +1038,7 @@
                     custom !== undefined ? custom : effectiveCustom
                 )
                 if (!resolved) return undefined
-                return filterReducedMotionKeyframes(
-                    resolved as Record<string, unknown>,
-                    reducedMotion
-                ) as DOMKeyframesDefinition
+                return resolved as DOMKeyframesDefinition
             }
             const filteredExit = resolvePresenceExit(resolvePresenceCustom())
             context.registerChild(
@@ -1091,8 +1054,15 @@
                 // makes exits instant under `<MotionConfig skipAnimations>`.
                 // Deliberately NOT folded into the shared `mergedTransition`
                 // derived: that value also feeds the projection adapter, and
-                // upstream does not skip layout/FLIP animations.
-                skipAnimations ? { ...mergedTransition, skipAnimations: true } : mergedTransition,
+                // upstream does not skip layout/FLIP animations. `reduceMotion`
+                // rides the same way: vanilla `animate()` makes positional
+                // values of an unheld clone instant only when the transition
+                // asks (effects.ts:73 @ v14.14.0).
+                {
+                    ...mergedTransition,
+                    ...(skipAnimations ? { skipAnimations: true } : {}),
+                    ...(reducedMotion ? { reduceMotion: true } : {})
+                },
                 resolvePresenceExit,
                 // Plan 015b (R6): the clone's completion re-renders this group.
                 layoutGroupContext?.group,
@@ -1578,12 +1548,10 @@
      * the element stranded on its exit target. (plan 004 Step 4)
      */
     const keyChangeInitialKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            getInitialKeyframes(
-                resolveInitial(initialProp, variantsProp, effectiveCustom)
-            ) as Record<string, unknown>,
-            reducedMotion
-        )
+        getInitialKeyframes(resolveInitial(initialProp, variantsProp, effectiveCustom)) as Record<
+            string,
+            unknown
+        >
     )
 
     // No `resolvedWhile*` here: the animationState resolves variant LABELS
@@ -1593,22 +1561,14 @@
 
     // Extract keyframes from resolved initial, handling initial={false}
     const initialKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            getInitialKeyframes(resolvedInitial) as Record<string, unknown>,
-            reducedMotion
-        )
+        getInitialKeyframes(resolvedInitial) as Record<string, unknown>
     )
 
-    // Reduced-motion-filtered animate values used as the inline-style
-    // baseline so an animated value (transforms included) persists after
-    // the WAAPI animation completes (#377). Filtered exactly like
-    // `initialKeyframes` so transforms are stripped under reduced motion.
-    const animateKeyframes = $derived(
-        filterReducedMotionKeyframes(
-            resolvedAnimate as Record<string, unknown> | undefined,
-            reducedMotion
-        )
-    )
+    // Animate values used as the inline-style baseline so an animated value
+    // (transforms included) persists after the WAAPI animation completes
+    // (#377). Not filtered under reduced motion: motion-dom makes positional
+    // values instant instead of dropping them.
+    const animateKeyframes = $derived(resolvedAnimate as Record<string, unknown> | undefined)
     // Re-entry while this key's exit clone is still animating out (plan 010
     // Step 5). Upstream never unmounts an exiting child: AnimatePresence keeps
     // rendering it and flips its `isPresent` back to true
@@ -1695,10 +1655,15 @@
             isNotEmpty(animateKeyframes) &&
             !optimizedAppearSuppressedByTransformTemplate &&
             // The appear bootstrap drives WAAPI directly (`startWaapiAnimation`),
-            // bypassing the VisualElement — so `shouldSkipAnimations` cannot
-            // reach it. Suppress the handoff entirely and let the (instant)
-            // main-thread enter animation write the final values.
-            !skipAnimations
+            // bypassing the VisualElement — so neither `shouldSkipAnimations`
+            // nor `shouldReduceMotion` can reach it. Under `skipAnimations` or
+            // reduced motion, suppress the handoff entirely and let the
+            // main-thread enter animation, which goes through the VisualElement,
+            // apply the instant rule.
+            !skipAnimations &&
+            // Same reason as skipAnimations: the bootstrap would tween
+            // transforms that reduced motion makes instant.
+            !reducedMotion
             ? `svelte-motion-${componentHydrationId}`
             : undefined
     )
@@ -2143,15 +2108,9 @@
         return context.onEnterUnblocked(() => revealWaitHiddenElement())
     })
 
-    // A post-mount "strip transforms the reducing policy forbids" pass used to
-    // live here. It is GONE: `useReducedMotionConfig` already resolves
-    // `'always'`/`'never'` SYNCHRONOUSLY from the MotionConfig context (only
-    // `'user'` consults matchMedia), so `buildMotionNodeProps` filters `initial`
-    // before the node is ever seeded and there is nothing left to strip. The pass
-    // also ran only under a reducing policy and disturbed the node after its
-    // enter had completed, which showed up as a double-fade flash under
-    // `policy='always'` (guard-measured: opacity settled >0.99, then re-ran from
-    // ~0.02). plan 002 Step 3h(a).
+    // There is no post-mount pass that strips transforms under a reducing
+    // policy: targets are never filtered. Reduced motion is the node's
+    // `shouldReduceMotion`, which motion-dom reads per value (plan 013).
 
     /**
      * True once the mount/enter effect has run the first `animateChanges()`
@@ -2181,8 +2140,10 @@
             return false
         }
 
-        // For mode='wait': check immediately if enters are blocked
-        if (context?.mode === 'wait') {
+        // For mode='wait', or a child still held by a wait block from before
+        // mount (the mode may have changed since; plan 011 Step 3b): check
+        // whether enters are blocked and release through the same path.
+        if (context && (context.mode === 'wait' || untrack(() => waitEnterBlockedBeforeMount))) {
             // Skip if we already have a wait callback registered
             if (waitCallbackRegistered) {
                 pwLog('[motion] runAnimation: wait callback already registered, skipping')
@@ -2421,6 +2382,18 @@
     $effect(() => {
         if (!visualElement || !element) return
         visualElement.shouldSkipAnimations = skipAnimations
+    })
+
+    // `VisualElement.mount()` latches `shouldReduceMotion` from the
+    // `reducedMotionConfig` given at creation (VisualElement.ts:498-507 @
+    // v14.14.0). This library's MotionConfig and the OS preference are
+    // reactive, so re-assert the resolved policy, as for skipAnimations
+    // above. motion-dom then makes positional values (transforms, width,
+    // height, top/left/right/bottom) and layout animations instant, and
+    // leaves the rest animating.
+    $effect(() => {
+        if (!visualElement || !element) return
+        visualElement.shouldReduceMotion = reducedMotion
     })
 
     // Keep the node's props in sync, then let the animationState diff them.
@@ -3083,12 +3056,20 @@
     // before the first layout change.
     $effect(() => {
         if (!(element && onLayoutMeasureProp && motionDomProjection)) return
+        const notify = onLayoutMeasureProp
         // Seed from the adapter's cache (mount() already ran seedLayout());
         // fall back to a fresh read only when no cached rect exists yet.
         const seed = motionDomProjection.lastMeasuredRect ?? measureLayoutRect()
-        const off = motionDomProjection.onMeasure((rect) => onLayoutMeasureProp(boxFromRect(rect)))
+        // Untracked on both paths: the adapter calls listeners synchronously from
+        // whichever effect measured, and a consumer that reads and writes `$state`
+        // here would otherwise re-run that effect. Upstream notifies from the
+        // projection update, outside any render
+        // (create-projection-node.ts:1085-1092 @ v14.12.0).
+        const off = motionDomProjection.onMeasure((rect) =>
+            untrack(() => notify(boxFromRect(rect)))
+        )
         if (seed) {
-            onLayoutMeasureProp(boxFromRect(seed))
+            untrack(() => notify(boxFromRect(seed)))
         }
         return () => {
             off()
@@ -3138,6 +3119,9 @@
     // observers, and real layout changes now diff scroll-clean rects —
     // including offscreen, which animates like upstream instead of snapping.
     $effect(() => {
+        // Reorder.Item's order key (Step 2b): a reorder restarts this effect
+        // so the slot is re-measured now, not on the next MutationObserver.
+        void layoutRemeasureKeyProp
         const observedElement = element
         const layoutMode =
             layoutProp && isLoaded === 'ready' && hasLayoutFeatures ? layoutProp : false
@@ -3608,9 +3592,50 @@
         untrack(() => consumeLayoutIdHandoff(id))
     })
 
-    // ── Gestures (#449 plan 003) ─────────────────────────────────────────────
+    /**
+     * Upstream creates a gesture Feature the first time one of its props is
+     * truthy and never unmounts it while the component lives
+     * (`VisualElement.updateFeatures`, motion-dom/src/render/VisualElement.ts:657-688
+     * @ v14.14.0). The latch keeps the same rule: once enabled, the gesture's
+     * effect never re-runs for prop changes, so removing every hover prop
+     * mid-hover can't drop the pointerleave listener.
+     */
+    const createFeatureLatch = () => {
+        let enabled = false
+        return (wanted: boolean) => (enabled ||= wanted)
+    }
+    const latchHover = createFeatureLatch()
+    const latchFocus = createFeatureLatch()
+    const latchInView = createFeatureLatch()
+    // Enable lists as upstream `motion/features/definitions.ts`, plus our
+    // `onFocusStart`/`onFocusEnd` and `onInViewStart`/`onInViewEnd`.
+    const hoverEnabled = $derived(
+        latchHover(!!(whileHoverProp || onHoverStartProp || onHoverEndProp))
+    )
+    const focusEnabled = $derived(
+        latchFocus(!!(whileFocusProp || onFocusStartProp || onFocusEndProp))
+    )
+    const inViewEnabled = $derived(
+        latchInView(
+            !!(
+                whileInViewProp ||
+                onViewportEnterProp ||
+                onViewportLeaveProp ||
+                onInViewStartProp ||
+                onInViewEndProp
+            )
+        )
+    )
+    // Upstream restarts the in-view observer only when one of these changes
+    // (viewport/index.ts:77-88 @ v14.14.0). Deriveds compare by value, so a
+    // parent that re-creates an equal `viewport` object doesn't restart it.
+    const viewportAmount = $derived(viewportProp?.amount)
+    const viewportMargin = $derived(viewportProp?.margin)
+    const viewportRoot = $derived(viewportProp?.root)
+
+    // ── Gestures (#449 plan 003, split per gesture in 2.14.1) ────────────────
     //
-    // Four thin attachers, each of which only flips
+    // Thin attachers, each of which only flips
     // `animationState.setActive('whileX', …)`. The animationState owns priority
     // ordering (`variantPriorityOrder`) and protected keys, so the
     // `gestureCoordinator` that hand-approximated both — plus the per-gesture
@@ -3620,46 +3645,74 @@
     // MotionValue and `animateMotionValue` seeds each new generation with
     // `value.getVelocity()`.
     //
-    // The while* DEFINITIONS are not passed here — the attachers read them from
-    // `ve.props`, which `buildMotionNodeProps` supplies raw (variant labels
-    // included, resolved by the animationState). Only `element`, the node and the
-    // callback props are needed.
+    // One effect per gesture, as upstream keeps one Feature per gesture
+    // (`framer-motion/src/gestures/hover.ts:36-50`, `gestures/focus.ts:4-42`,
+    // `motion/features/viewport/index.ts` @ v14.14.0). Nothing a gesture reads
+    // at event time is a dependency of its effect: the while* DEFINITIONS come
+    // from `ve.getProps()` (which `buildMotionNodeProps` supplies raw, variant
+    // labels included), and the callbacks through getters. That matters
+    // because a re-attach is not harmless: cancelling motion-dom's `hover()`
+    // aborts its pointerleave listener without running the hover-end half
+    // (motion-dom/src/gestures/hover.ts:112-145), a fresh focus attacher has
+    // forgotten it was active and ignores the next blur, and a fresh
+    // IntersectionObserver re-fires `onInViewStart` on its initial report.
+    // Each effect reads only element/visualElement/isLoaded/hasGestureFeatures
+    // and its own latch — never a while* prop, a callback or `viewportProp`.
     $effect(() => {
         if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
-        const node = visualElement
-        const target = element
-        // Gate each attacher on its own props, exactly as upstream's
-        // feature-enable lists do (`motion/features/definitions.ts`). Attaching
-        // unconditionally would, among other things, create an
-        // IntersectionObserver for every motion element on the page.
-        const cleanups: (() => void)[] = []
-        if (whileHoverProp || onHoverStartProp || onHoverEndProp) {
-            cleanups.push(
-                attachHoverGesture(target, node, {
-                    onHoverStart: onHoverStartProp,
-                    onHoverEnd: onHoverEndProp
-                })
-            )
-        }
-        if (whileFocusProp || onFocusStartProp || onFocusEndProp) {
-            cleanups.push(
-                attachFocusGesture(target, node, {
-                    onFocusStart: onFocusStartProp,
-                    onFocusEnd: onFocusEndProp
-                })
-            )
-        }
-        if (whileInViewProp || onInViewStartProp || onInViewEndProp) {
-            cleanups.push(
-                attachInViewGesture(target, node, viewportProp, {
-                    onInViewStart: onInViewStartProp,
-                    onInViewEnd: onInViewEndProp
-                })
-            )
-        }
-        return () => {
-            for (const cleanup of cleanups) cleanup()
-        }
+        if (!hoverEnabled) return
+        // Callbacks are getters read at event time (as in the press effect), so a
+        // new callback identity doesn't cancel an in-progress hover.
+        return attachHoverGesture(element, visualElement, {
+            get onHoverStart() {
+                return onHoverStartProp
+            },
+            get onHoverEnd() {
+                return onHoverEndProp
+            }
+        })
+    })
+
+    $effect(() => {
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        if (!focusEnabled) return
+        return attachFocusGesture(element, visualElement, {
+            get onFocusStart() {
+                return onFocusStartProp
+            },
+            get onFocusEnd() {
+                return onFocusEndProp
+            }
+        })
+    })
+
+    $effect(() => {
+        if (!(element && visualElement && isLoaded === 'ready' && hasGestureFeatures)) return
+        if (!inViewEnabled) return
+        const gesture = createInViewGesture(element, visualElement, () => viewportProp, {
+            get onViewportEnter() {
+                return onViewportEnterProp
+            },
+            get onViewportLeave() {
+                return onViewportLeaveProp
+            },
+            get onInViewStart() {
+                return onInViewStartProp
+            },
+            get onInViewEnd() {
+                return onInViewEndProp
+            }
+        })
+        // Nested: re-runs only on an amount/margin/root change and restarts the
+        // observer while keeping hasEnteredView/isInView, like upstream's
+        // `startObserver()` from `update()`. It is torn down with the parent.
+        $effect(() => {
+            void viewportAmount
+            void viewportMargin
+            void viewportRoot
+            untrack(() => gesture.startObserver())
+        })
+        return () => gesture.unmount()
     })
 
     // ── Press (Motion 14.10 `tap` options) ───────────────────────────────────
@@ -3828,22 +3881,31 @@
     // back to idle controls now leaves each value wherever its last completed
     // animation put it, because that is simply where the MotionValue is.
 
-    // Handle key prop changes inside AnimatePresence (simulates React's key-based remounting)
-    // When key changes, run exit → initial → animate sequence on the same element
+    // Handle key prop changes inside AnimatePresence (simulates React's
+    // key-based remounting). A key change runs exit -> rewind -> enter on the
+    // same element. A key change DURING that exit follows upstream
+    // AnimatePresence (v14.14.0):
+    // - to another key: keep exiting, then enter once with the latest props,
+    //   as wait mode renders only the exiting child and mounts the latest one
+    //   after it (AnimatePresence/index.tsx:155-179);
+    // - back to the exiting key: reverse the exit with no rewind, as
+    //   ExitAnimationFeature does when the child is present again
+    //   (exit.ts:55).
+    // A change after the exit has finished starts a fresh transition. This
+    // effect returns no cleanup on purpose: Svelte runs an effect's cleanup
+    // before every re-run, so a cleanup cannot tell "the key changed again"
+    // from "unmounted". The teardown effect below handles unmount.
     $effect(() => {
-        // Access keyProp to create reactive dependency
         const currentKey = keyProp
 
         // Only handle key changes when:
         // 1. We're inside AnimatePresence (context exists)
         // 2. Element is ready (not during initial mount)
         // 3. Key actually changed (not undefined → value on mount)
-        // 4. Not already transitioning
         if (
             !shouldRegisterPresenceExit ||
             !element ||
             isLoaded !== 'ready' ||
-            keyTrackerIsTransitioning ||
             currentKey === keyTrackerPrev ||
             keyTrackerPrev === undefined
         ) {
@@ -3853,7 +3915,7 @@
                 isLoaded,
                 hasElement: !!element,
                 hasContext: !!context,
-                keyTrackerIsTransitioning
+                keyTransitionExiting
             })
             // Update prev for next comparison
             if (currentKey !== keyTrackerPrev) {
@@ -3862,14 +3924,34 @@
             return
         }
 
+        if (keyTransitionExiting && currentKey === keyTransitionFromKey) {
+            pwLog('[motion] key changed back mid-exit, reversing', { currentKey })
+            keyTransitionGeneration++
+            keyTransitionExiting = false
+            keyTrackerPrev = currentKey
+            untrack(() => {
+                void visualElement?.animationState?.setActive('exit', false)
+            })
+            return
+        }
+
+        if (keyTransitionExiting) {
+            pwLog('[motion] key changed mid-exit, entering latest after exit', {
+                currentKey
+            })
+            keyTrackerPrev = currentKey
+            return
+        }
+
         pwLog('[motion] key changed, running exit→initial→animate', {
             prevKey: keyTrackerPrev,
             newKey: currentKey
         })
 
-        // Mark as transitioning to prevent re-entry
-        keyTrackerIsTransitioning = true
-        keyTransitionStopped = false
+        const generation = ++keyTransitionGeneration
+        const isCurrent = () => generation === keyTransitionGeneration && !!element
+        keyTransitionExiting = true
+        keyTransitionFromKey = keyTrackerPrev
         keyTrackerPrev = currentKey
 
         // Run the key transition sequence
@@ -3883,18 +3965,19 @@
                 const animationState = visualElement?.animationState
 
                 // 1. Exit, via setActive — not a bespoke `animate()` call.
-                if (animationState && exitProp !== undefined && !keyTransitionStopped) {
+                if (animationState && exitProp !== undefined) {
                     pwLog('[motion] key transition: setActive(exit, true)')
                     await animationState.setActive('exit', true)
                 }
 
                 pwLog('[motion] key transition: exit done', {
-                    keyTransitionStopped,
+                    current: isCurrent(),
                     hasElement: !!element
                 })
 
-                // Check if component was unmounted during the exit animation
-                if (keyTransitionStopped || !element) return
+                // Reversed, superseded or unmounted while exiting.
+                if (!isCurrent()) return
+                keyTransitionExiting = false
 
                 pwLog('[motion] key transition: rewinding to initial and re-entering')
                 if (visualElement && animationState) {
@@ -3922,6 +4005,9 @@
                     visualElement.blockInitialAnimation = false
                     // Release exit so it stops protecting those keys.
                     await animationState.setActive('exit', false)
+                    // A key change during the re-enter started a new
+                    // transition; it owns the element now.
+                    if (!isCurrent()) return
                     // Clear `prevResolvedValues` so the re-enter is not deduped
                     // away as "already at target".
                     animationState.reset()
@@ -3936,22 +4022,27 @@
 
                 runAnimation()
             } finally {
-                pwLog('[motion] key transition: finally', { keyTransitionStopped })
-                if (!keyTransitionStopped) {
-                    keyTrackerIsTransitioning = false
+                pwLog('[motion] key transition: finally', { current: isCurrent() })
+                if (generation === keyTransitionGeneration) {
+                    keyTransitionExiting = false
                 }
             }
         }
 
-        // Fire-and-forget: `$effect` bodies cannot be async, and the transition
-        // manages its own cancellation via the cleanup returned below.
-        void runKeyTransition()
+        // Fire-and-forget: `$effect` bodies cannot be async. `untrack` keeps
+        // the synchronous prefix (`visualElement`, `exitProp`) out of this
+        // effect's dependencies, so only `keyProp`, `element` and `isLoaded`
+        // re-run it.
+        untrack(() => {
+            void runKeyTransition()
+        })
+    })
 
-        // Cleanup on unmount
-        return () => {
-            pwLog('[motion] key effect: cleanup, stopping transition')
-            keyTransitionStopped = true
-        }
+    // Unmount teardown for the key transition. It reads nothing reactive, so
+    // it runs once and its cleanup fires only when the component is destroyed.
+    $effect(() => () => {
+        keyTransitionGeneration++
+        keyTransitionExiting = false
     })
 
     // The former JSON-dedup re-run effects lived here (`lastAnimatePropJson`,

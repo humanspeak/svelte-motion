@@ -34,7 +34,7 @@
      * @prop present Whether the owned `child` snippet is present. Requires `child`.
      * @prop initial When false, children skip their enter animation on initial mount.
      * @prop custom Data forwarded to exiting dynamic variants.
-     * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'.
+     * @prop mode Controls enter/exit coordination: 'sync' (default), 'wait', or 'popLayout'. May change at runtime; exits already running keep the mode they started with.
      * @prop onExitComplete Optional callback invoked once all exits complete.
      * @prop anchorX Set whether to anchor the x position of the exiting element
      *     to the left or right when using `mode="popLayout"`. Use `'right'` for
@@ -157,6 +157,8 @@
         })
     }
 
+    // trunk-ignore(eslint/svelte/prefer-svelte-reactivity): a plain listener registry; tracking it would subscribe effects to mode changes
+    const modeListeners = new Set<() => void>()
     pwLog('[AnimatePresence] mounting', {
         initial,
         mode,
@@ -164,7 +166,13 @@
     })
     const context = createAnimatePresenceContext({
         initial,
-        mode,
+        // Read late, like the pop options: upstream reads `mode` on every
+        // render (AnimatePresence/index.tsx:263 @ v14.14.0).
+        getMode: () => mode,
+        subscribeMode: (listener) => {
+            modeListeners.add(listener)
+            return () => modeListeners.delete(listener)
+        },
         onExitComplete: () => {
             onExitComplete?.()
             // Owned form: the held child finished exiting with the parent.
@@ -187,6 +195,12 @@
 
     $effect.pre(() => {
         context.setCustom(custom)
+    })
+
+    // Seed pop data before the next exit when `mode` changes.
+    $effect.pre(() => {
+        void mode
+        untrack(() => modeListeners.forEach((listener) => listener()))
     })
 
     // Owned form whose child was already gone when the parent started

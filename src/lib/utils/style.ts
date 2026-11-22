@@ -82,9 +82,7 @@ export const mergeInlineStyles = (
     animateFallback?: Record<string, unknown> | null,
     transformTemplate?: TransformTemplate
 ): string => {
-    const base: Record<string, string> = parseStyleString(
-        typeof existingStyle === 'string' ? existingStyle : ''
-    )
+    const base = parseStyleDeclarations(typeof existingStyle === 'string' ? existingStyle : '')
 
     const source =
         initial && Object.keys(initial).length > 0
@@ -93,19 +91,19 @@ export const mergeInlineStyles = (
               ? animateFallback
               : null
     if (!source) {
-        if (transformTemplate && !base.transform) {
+        if (transformTemplate && !getDeclaration(base, 'transform')) {
             const templatedTransform = transformTemplate({}, '')
             if (templatedTransform) {
-                base.transform = templatedTransform
+                setDeclaration(base, 'transform', templatedTransform)
             }
         }
 
-        return stringifyStyleObject(base)
+        return stringifyDeclarations(base)
     }
 
     mergeRenderStateIntoStyle(base, buildMotionHTMLRenderState(source, transformTemplate))
 
-    return stringifyStyleObject(base)
+    return stringifyDeclarations(base)
 }
 
 /**
@@ -416,49 +414,135 @@ const shouldSkipInlineStyleKey = (key: string): boolean =>
     key === 'strokeDashoffset' ||
     key === 'stroke-dashoffset'
 
-const mergeRenderStateIntoStyle = (base: Record<string, string>, state: HTMLRenderState) => {
+const mergeRenderStateIntoStyle = (base: Array<[string, string]>, state: HTMLRenderState) => {
     for (const [key, value] of Object.entries(state.style)) {
         if (value == null) continue
         const cssKey = toKebabCase(key)
         const cssValue = String(value)
         if (cssKey === 'transform' && !cssValue) {
-            delete base.transform
+            removeDeclaration(base, 'transform')
             continue
         }
-        base[cssKey] = cssValue
+        setDeclaration(base, cssKey, cssValue)
     }
 
     for (const [key, value] of Object.entries(state.vars)) {
         if (value == null) continue
-        base[key] = String(value)
+        setDeclaration(base, key, String(value))
     }
 }
 
 /**
- * Parse an inline CSS string into a property → value record. Property
- * names are kept verbatim (kebab-case stays kebab-case), which is a
- * valid object-form style — `Reorder.Item` uses this to merge its
- * `x`/`y`/`zIndex` MotionValues into a consumer's string `style`.
+ * Split an inline CSS declaration list into ordered `[property, value]`
+ * pairs, the way the browser's CSS parser does: a `;` ends a declaration
+ * only outside quoted strings, outside `()`/`[]`/`{}` and outside
+ * comments. Comments are dropped. Duplicate properties are all kept, in
+ * source order. Declarations without a `:` or with an empty property name
+ * are skipped. Property names and values are trimmed; names keep their
+ * case (custom properties are case-sensitive).
+ *
+ * @param style Inline CSS such as the value of a `style` attribute.
+ * @returns The declarations in source order.
+ * @example
+ * ```ts
+ * parseStyleDeclarations("background: url(data:a;b); height: 1px; height: 1dvh")
+ * // => [['background', 'url(data:a;b)'], ['height', '1px'], ['height', '1dvh']]
+ * ```
  */
-export const parseStyleString = (style: string): Record<string, string> => {
-    const out: Record<string, string> = {}
-    style
-        .split(';')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .forEach((decl) => {
-            const idx = decl.indexOf(':')
-            if (idx === -1) return
-            const prop = decl.slice(0, idx).trim()
-            const value = decl.slice(idx + 1).trim()
-            if (prop) out[prop] = value
-        })
-    return out
+export const parseStyleDeclarations = (style: string): Array<[string, string]> => {
+    const declarations: Array<[string, string]> = []
+    let current = ''
+    let quote: string | null = null
+    let depth = 0
+    const flush = () => {
+        const colon = current.indexOf(':')
+        if (colon !== -1) {
+            const property = current.slice(0, colon).trim()
+            if (property) declarations.push([property, current.slice(colon + 1).trim()])
+        }
+        current = ''
+    }
+    for (let i = 0; i < style.length; i++) {
+        const ch = style[i]
+        if (ch === '\\') {
+            current += ch + (style[i + 1] ?? '')
+            i++
+            continue
+        }
+        if (quote) {
+            current += ch
+            if (ch === quote) quote = null
+            continue
+        }
+        if (ch === '/' && style[i + 1] === '*') {
+            const end = style.indexOf('*/', i + 2)
+            i = end === -1 ? style.length : end + 1
+            continue
+        }
+        if (ch === '"' || ch === "'") quote = ch
+        else if (ch === '(' || ch === '[' || ch === '{') depth++
+        else if ((ch === ')' || ch === ']' || ch === '}') && depth > 0) depth--
+        else if (ch === ';' && depth === 0) {
+            flush()
+            continue
+        }
+        current += ch
+    }
+    flush()
+    return declarations
 }
 
-const stringifyStyleObject = (obj: Record<string, string>): string =>
-    Object.entries(obj)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join('; ')
+/**
+ * Parse an inline CSS string into a property → value record, holding one
+ * value per property. When a property is declared more than once, the last
+ * declaration wins (what the browser resolves for a property whose values
+ * are all valid), so an object-form consumer such as `Reorder.Item`, which
+ * merges its `x`/`y`/`zIndex` MotionValues into a consumer's string
+ * `style`, sees the final value. Property names are kept verbatim
+ * (kebab-case stays kebab-case), which is a valid object-form style. Use
+ * {@link parseStyleDeclarations} when every declaration matters, such as a
+ * CSS fallback pair.
+ *
+ * @param style Inline CSS such as the value of a `style` attribute.
+ * @returns A record of property names to their last declared value.
+ * @example
+ * ```ts
+ * parseStyleString("background-image: url('data:image/png;base64,AAAA'); color: red")
+ * // => { 'background-image': "url('data:image/png;base64,AAAA')", color: 'red' }
+ * parseStyleString('height: 1px; height: 2px') // => { height: '2px' }
+ * ```
+ */
+export const parseStyleString = (style: string): Record<string, string> =>
+    Object.fromEntries(parseStyleDeclarations(style))
+
+const getDeclaration = (list: Array<[string, string]>, property: string): string | undefined =>
+    list.findLast(([name]) => name === property)?.[1]
+
+/**
+ * Write `property` once: overwrite its first declaration in place and drop
+ * every later one, or append it when absent. Keeps today's output order for
+ * strings without duplicates, since a JS object also keeps a key at its
+ * first insertion position.
+ */
+const setDeclaration = (list: Array<[string, string]>, property: string, value: string) => {
+    const first = list.findIndex(([name]) => name === property)
+    if (first === -1) {
+        list.push([property, value])
+        return
+    }
+    list[first] = [property, value]
+    for (let i = list.length - 1; i > first; i--) {
+        if (list[i][0] === property) list.splice(i, 1)
+    }
+}
+
+const removeDeclaration = (list: Array<[string, string]>, property: string) => {
+    for (let i = list.length - 1; i >= 0; i--) {
+        if (list[i][0] === property) list.splice(i, 1)
+    }
+}
+
+const stringifyDeclarations = (list: Array<[string, string]>): string =>
+    list.map(([k, v]) => `${k}: ${v}`).join('; ')
 
 const toKebabCase = (s: string): string => s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)

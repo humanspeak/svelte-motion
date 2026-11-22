@@ -203,6 +203,59 @@ describe('utils/usePresence', () => {
             await vi.advanceTimersByTimeAsync(100)
             expect(onExitComplete).toHaveBeenCalledTimes(1)
         })
+
+        // Upstream deletes a re-entered key from `exitComplete`
+        // (AnimatePresence/index.tsx:131-133 @ v14.12.0), so a reversed exit
+        // never fires `onExitComplete`.
+        it('a reversed exit does not fire onExitComplete', async () => {
+            const onExitComplete = vi.fn()
+            const { rerender } = render(MidHoldDestroyHarness, {
+                props: { outer: true, inner: true, onExitComplete }
+            })
+            // The probe holds the exit open.
+            await rerender({ outer: true, inner: false, onExitComplete })
+            await tick()
+            await rerender({ outer: true, inner: true, onExitComplete })
+            await tick()
+            await vi.advanceTimersByTimeAsync(1000)
+            expect(screen.queryByTestId('held-child')).not.toBeNull()
+            expect(onExitComplete).not.toHaveBeenCalled()
+        })
+
+        it('a later real exit after a reversed exit completes exactly once', async () => {
+            const onExitComplete = vi.fn()
+            const { rerender } = render(MidHoldDestroyHarness, {
+                props: { outer: true, inner: true, onExitComplete }
+            })
+            // Reversed exit.
+            await rerender({ outer: true, inner: false, onExitComplete })
+            await tick()
+            await rerender({ outer: true, inner: true, onExitComplete })
+            await tick()
+            await vi.advanceTimersByTimeAsync(1000)
+
+            // Real exit: hold it, then destroy the wrapper mid-hold.
+            await rerender({ outer: true, inner: false, onExitComplete })
+            await tick()
+            await rerender({ outer: false, inner: false, onExitComplete })
+            await vi.advanceTimersByTimeAsync(100)
+            expect(onExitComplete).toHaveBeenCalledTimes(1)
+        })
+
+        it('a reversed exit before the hold microtask also stays silent', async () => {
+            const onExitComplete = vi.fn()
+            const { rerender } = render(MidHoldDestroyHarness, {
+                props: { outer: true, inner: true, probe: false, onExitComplete }
+            })
+            // `rerender` flushes synchronously, so two calls without an await
+            // start the exit and re-enter before the exit-start microtask.
+            void rerender({ outer: true, inner: false, probe: false, onExitComplete })
+            void rerender({ outer: true, inner: true, probe: false, onExitComplete })
+            await tick()
+            await vi.advanceTimersByTimeAsync(1000)
+            expect(screen.queryByTestId('held-child')).not.toBeNull()
+            expect(onExitComplete).not.toHaveBeenCalled()
+        })
     })
 
     // Plan 017. Upstream `usePresence` registers one participant per component

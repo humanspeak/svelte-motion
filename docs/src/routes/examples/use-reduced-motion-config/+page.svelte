@@ -75,8 +75,9 @@
             <Settings />
             <span>
                 Useful for kiosk / preview / embed scenarios where the app needs to override the OS
-                setting in either direction. Pair with <code>filterReducedMotionKeyframes</code>
-                if you're hand-rolling animation paths.
+                setting in either direction. For hand-rolled animations, pass it to
+                <code>useAnimate</code> or
+                <code>createScopedAnimate({'{'} reduceMotion })</code>.
             </span>
         </li>
     </ul>

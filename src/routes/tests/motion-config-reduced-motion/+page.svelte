@@ -1,8 +1,36 @@
 <script lang="ts">
-    import { motion, MotionConfig, type ReducedMotionConfig } from '$lib'
+    import { AnimatePresence, motion, MotionConfig, type ReducedMotionConfig } from '$lib'
+    import TesterPanel, { type TesterStep } from '../layout/_parity/TesterPanel.svelte'
 
     let policy = $state<ReducedMotionConfig>('always')
+    let showExitBox = $state(true)
+
+    const steps: TesterStep[] = [
+        {
+            text: 'Load the page (policy `always`).',
+            expected:
+                'The box appears on the right at once, with no slide, and fades in over about a second.'
+        },
+        {
+            text: 'Click Hide exit box.',
+            expected:
+                'The lower box jumps 200 px right at once and fades out there. It never slides.'
+        },
+        {
+            text: 'Choose `never`.',
+            expected:
+                'The box slides in from the left while fading in; Hide exit box slides it right while fading.'
+        },
+        {
+            text: 'Choose `user`, then toggle DevTools > Rendering > Emulate prefers-reduced-motion, and choose `user` again.',
+            expected: 'With `reduce` it behaves like `always`; with `no-preference`, like `never`.'
+        }
+    ]
 </script>
+
+<svelte:head>
+    <title>MotionConfig reduced motion</title>
+</svelte:head>
 
 <div class="flex min-h-screen w-full flex-col items-center justify-center gap-8 p-8">
     <div class="space-y-2 text-center">
@@ -11,9 +39,9 @@
             <code class="rounded bg-gray-100 px-2 py-1"
                 >&lt;MotionConfig reducedMotion="..."&gt;</code
             >
-            strips transform animations from descendants while leaving
-            <code class="rounded bg-gray-100 px-2 py-1">opacity</code> and other non-transform properties
-            animating normally.
+            makes transform and layout values of descendants jump straight to their target, while
+            <code class="rounded bg-gray-100 px-2 py-1">opacity</code> and other values keep animating
+            normally.
         </p>
     </div>
 
@@ -26,7 +54,10 @@
                     value={option}
                     data-testid={`policy-${option}`}
                     checked={policy === option}
-                    onchange={() => (policy = option)}
+                    onchange={() => {
+                        policy = option
+                        showExitBox = true
+                    }}
                 />
                 {option}
             </label>
@@ -37,6 +68,15 @@
         Active policy: <strong>{policy}</strong>
     </p>
 
+    <button
+        type="button"
+        data-testid="toggle-exit"
+        class="rounded bg-gray-800 px-3 py-1 text-sm text-white"
+        onclick={() => (showExitBox = !showExitBox)}
+    >
+        {showExitBox ? 'Hide exit box' : 'Show exit box'}
+    </button>
+
     <MotionConfig reducedMotion={policy}>
         {#key policy}
             <motion.div
@@ -46,24 +86,52 @@
                 transition={{ duration: 1.2, ease: 'easeOut' }}
                 class="box"
             />
+            <AnimatePresence>
+                {#if showExitBox}
+                    <motion.div
+                        key="exit-box"
+                        data-testid="exit-box"
+                        initial={false}
+                        exit={{ x: 200, opacity: 0 }}
+                        transition={{ duration: 1.2, ease: 'linear' }}
+                        class="box"
+                    />
+                {/if}
+            </AnimatePresence>
         {/key}
     </MotionConfig>
 
     <div class="max-w-xl space-y-2 text-sm text-gray-600">
         <p>
-            With <code class="rounded bg-gray-100 px-1">reducedMotion="always"</code> the box stays at
-            its natural position (transform animations stripped) but still fades in.
+            With <code class="rounded bg-gray-100 px-1">reducedMotion="always"</code> the box appears
+            at its final position at once (no slide) and fades in. Hiding the exit box makes it jump to
+            its exit position at once and fade out there.
         </p>
         <p>
             With <code class="rounded bg-gray-100 px-1">reducedMotion="user"</code> the OS preference
             decides; in DevTools toggle "Emulate prefers-reduced-motion: reduce" to see the effect.
         </p>
         <p>
-            With <code class="rounded bg-gray-100 px-1">reducedMotion="never"</code> the box translates
-            and fades as authored.
+            With <code class="rounded bg-gray-100 px-1">reducedMotion="never"</code> the box slides and
+            fades as authored.
         </p>
     </div>
 </div>
+
+<TesterPanel
+    eyebrow="Motion 14.14.0 · visual-element-target.ts"
+    title="MotionConfig reducedMotion"
+    {steps}
+    status="Covered by e2e/utilities/motion-config-reduced-motion.spec.ts."
+>
+    {#snippet checks()}
+        <p>
+            Under a reducing policy Motion keeps every target and drops only the tween for
+            positional keys (transforms, width, height, top, left, …), which jump to their target.
+            Opacity, colour and other values still animate. Exit animations follow the same rule.
+        </p>
+    {/snippet}
+</TesterPanel>
 
 <style>
     :global(.box) {

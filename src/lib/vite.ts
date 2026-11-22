@@ -204,11 +204,6 @@ const MOTION_IMPORT_RE =
 const MOTION_TEMPLATE_OPEN_RE = /<motion\.([a-z][a-z0-9-]*)/g
 
 /**
- * Regex to find closing tags: `</motion.TAG>`
- */
-const MOTION_TEMPLATE_CLOSE_RE = /<\/motion\.([a-z][a-z0-9-]*)\s*>/g
-
-/**
  * Regex to find `motion.TAG` usage in script blocks (JS expressions).
  *
  * Matches property access like `motion.div` but NOT inside strings or comments.
@@ -303,42 +298,6 @@ export const svelteMotionOptimize = (): Plugin => ({
             )
         }
 
-        // Check if motion is used for anything other than .TAG access
-        // (e.g., passed as a variable, used in a function call)
-        const otherImports = importMatch[1]
-            .split(',')
-            .map((s) => s.trim())
-            .filter((s) => s && s !== 'motion')
-
-        // Check if motion itself is used beyond .TAG access
-        // Remove all motion.TAG patterns and see if bare `motion` remains
-        const codeWithoutTags = transformed
-            .replace(MOTION_TEMPLATE_OPEN_RE, '')
-            .replace(MOTION_TEMPLATE_CLOSE_RE, '')
-            .replace(MOTION_SCRIPT_RE, '')
-        const motionStillUsed = /\bmotion\b/.test(
-            codeWithoutTags.replace(MOTION_IMPORT_RE, '').replace(/['"].*?['"]/g, '')
-        )
-
-        // Replace the import statement
-        if (motionStillUsed) {
-            // motion is still used as a value (e.g., passed to a function), keep the original import
-            // Just add the individual imports alongside
-            transformed = transformed.replace(
-                MOTION_IMPORT_RE,
-                (original) => `${original}\n${componentImports.join('\n')}`
-            )
-        } else if (otherImports.length > 0) {
-            // Other named imports exist, keep those but remove motion
-            transformed = transformed.replace(
-                MOTION_IMPORT_RE,
-                `import { ${otherImports.join(', ')} } from '@humanspeak/svelte-motion'\n${componentImports.join('\n')}`
-            )
-        } else {
-            // Only motion was imported, replace entirely
-            transformed = transformed.replace(MOTION_IMPORT_RE, componentImports.join('\n'))
-        }
-
         // Replace template usage: <motion.TAG → <SvelteMotionTag, </motion.TAG> → </SvelteMotionTag>
         for (const [tag, localName] of tagToLocal) {
             const openRe = new RegExp(`<motion\\.${escapeRegExp(tag)}(?=[\\s/>])`, 'g')
@@ -362,6 +321,36 @@ export const svelteMotionOptimize = (): Plugin => ({
                 open + rewriteMotionRefsInScript(content, tagToLocal) + close
         )
 
+        // Check if motion is used for anything other than .TAG access
+        // (e.g., passed as a variable, used in a function call)
+        const otherImports = importMatch[1]
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s && s !== 'motion')
+
+        // Decide from what survives the rewrites above: any `motion` reference
+        // left in a script or template expression still needs the binding.
+        const motionStillUsed = hasMotionReference(transformed)
+
+        // Replace the import statement
+        if (motionStillUsed) {
+            // motion is still used as a value (e.g., passed to a function), keep the original import
+            // Just add the individual imports alongside
+            transformed = transformed.replace(
+                MOTION_IMPORT_RE,
+                (original) => `${original}\n${componentImports.join('\n')}`
+            )
+        } else if (otherImports.length > 0) {
+            // Other named imports exist, keep those but remove motion
+            transformed = transformed.replace(
+                MOTION_IMPORT_RE,
+                `import { ${otherImports.join(', ')} } from '@humanspeak/svelte-motion'\n${componentImports.join('\n')}`
+            )
+        } else {
+            // Only motion was imported, replace entirely
+            transformed = transformed.replace(MOTION_IMPORT_RE, componentImports.join('\n'))
+        }
+
         return {
             code: transformed,
             map: null
@@ -376,6 +365,56 @@ export const svelteMotionOptimize = (): Plugin => ({
  * @returns The escaped string safe for use in a RegExp.
  */
 const escapeRegExp = (str: string): string => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Whether a `.svelte` source still references the `motion` binding after the
+ * tag and script rewrites.
+ *
+ * Script bodies are checked with the import statement, string literals and
+ * comments removed. Markup is checked with `<style>` blocks, HTML comments and
+ * plain quoted attribute values removed, so template expressions such as
+ * `as={motion.span}`, `this={motion.span}` or `{@const C = motion.p}` count.
+ *
+ * Safety rule: a false `true` only costs tree-shaking (the barrel import is
+ * kept), while a false `false` drops an import that is still used and breaks
+ * the page with `motion is not defined`. Every doubtful case therefore counts
+ * as a reference.
+ *
+ * @param code - The partially transformed component source, with the
+ *   original `import { motion … }` statement still present.
+ * @returns `true` when the import must be kept.
+ * @example
+ * ```ts
+ * hasMotionReference(`<script>import { motion } from '@humanspeak/svelte-motion'</script><W as={motion.span} />`)
+ * // => true
+ * ```
+ */
+const hasMotionReference = (code: string): boolean => {
+    const scripts: string[] = []
+    const markup = code
+        .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/g, (_full, body: string) => {
+            scripts.push(body)
+            return ''
+        })
+        // CSS and HTML comments cannot reference a JS binding.
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        // Plain quoted attribute values. A value containing `{` may hold an
+        // expression, so it is kept.
+        .replace(/=\s*(["'])[^{]*?\1/g, '=')
+    const script = scripts
+        .join('\n')
+        .replace(MOTION_IMPORT_RE, '')
+        // Same string stripping as before; JS strings cannot reference it.
+        // Strings first, so a `//` inside a URL string is not a comment.
+        .replace(/['"].*?['"]/g, '')
+        // JS comments cannot reference it either. Without this, a
+        // `// motion.div` comment would now keep the import (the old
+        // whole-file `MOTION_SCRIPT_RE` deletion used to hide it).
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '')
+    return /\bmotion\b/.test(`${script}\n${markup}`)
+}
 
 /**
  * Rewrite `motion.<tag>` member-expression references inside a `<script>`

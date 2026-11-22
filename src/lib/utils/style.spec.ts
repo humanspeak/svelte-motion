@@ -7,8 +7,11 @@ import {
     extractTransform,
     freezeMotionStyle,
     mergeInlineStyles,
+    parseStyleString,
     serializeMotionStyle
 } from './style.js'
+
+const PNG = "url('data:image/png;base64,iVBORw0KGgo=')"
 
 // Records whether code runs inside Svelte's `untrack` (pass-through otherwise).
 const untrackState = vi.hoisted(() => ({ depth: 0 }))
@@ -132,6 +135,35 @@ describe('mergeInlineStyles', () => {
         expect(out).toContain('color: blue')
         expect(out).toContain('opacity: 1')
         expect(out).not.toContain('baddecl')
+    })
+
+    it('preserves a CSS fallback pair when Motion writes nothing', () => {
+        expect(mergeInlineStyles('height: 50px; height: 100dvh', null, null)).toBe(
+            'height: 50px; height: 100dvh'
+        )
+    })
+
+    it('keeps a data URI containing `;` intact alongside a Motion source', () => {
+        expect(mergeInlineStyles(`background-image: ${PNG}`, { opacity: 0 }, null)).toBe(
+            `background-image: ${PNG}; opacity: 0`
+        )
+    })
+
+    it('collapses duplicates of a Motion-written property in place', () => {
+        expect(
+            mergeInlineStyles('opacity: 1; color: red; opacity: 0.5', { opacity: 0 }, null)
+        ).toBe('opacity: 0; color: red')
+    })
+
+    it('removes every transform declaration when the template returns empty', () => {
+        expect(
+            mergeInlineStyles(
+                'transform: rotate(1deg); color: red; transform: scale(2)',
+                { x: 10 },
+                null,
+                () => ''
+            )
+        ).toBe('color: red')
     })
 
     describe('Transform shorthands', () => {
@@ -597,5 +629,54 @@ describe('extractTransform', () => {
 
     it('reads transform from object-form MotionValues', () => {
         expect(extractTransform({ transform: motionValue('scale(1.2)') })).toBe('scale(1.2)')
+    })
+
+    it('ignores a transform inside a comment', () => {
+        expect(extractTransform('/* transform: none; */ transform: scale(2)')).toBe('scale(2)')
+    })
+})
+
+describe('parseStyleString', () => {
+    it('keeps a quoted data URI containing `;`', () => {
+        expect(parseStyleString(`background-image: ${PNG}; color: red`)).toEqual({
+            'background-image': PNG,
+            color: 'red'
+        })
+    })
+
+    it('keeps an unquoted URL containing `;`', () => {
+        expect(
+            parseStyleString('background: url(data:image/svg+xml;utf8,<svg/>); width: 1px')
+        ).toEqual({ background: 'url(data:image/svg+xml;utf8,<svg/>)', width: '1px' })
+    })
+
+    it('keeps `;` inside quoted strings', () => {
+        expect(parseStyleString('content: "a;b"; font-family: \'x;y\', serif')).toEqual({
+            content: '"a;b"',
+            'font-family': "'x;y', serif"
+        })
+    })
+
+    it('drops comments', () => {
+        expect(parseStyleString('color: red; /* width: 1px; */ height: 2px')).toEqual({
+            color: 'red',
+            height: '2px'
+        })
+    })
+
+    it('honours an escaped quote inside a string', () => {
+        expect(parseStyleString('content: "a\\";b"; color: red')).toEqual({
+            content: '"a\\";b"',
+            color: 'red'
+        })
+    })
+
+    it('keeps the last declaration of a repeated property', () => {
+        expect(parseStyleString('height: 50px; height: 100dvh')).toEqual({ height: '100dvh' })
+    })
+
+    it('does not throw on unterminated input', () => {
+        expect(() => parseStyleString("color: red; content: 'oops")).not.toThrow()
+        expect(parseStyleString("color: red; content: 'oops").color).toBe('red')
     })
 })

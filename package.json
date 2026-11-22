@@ -149,6 +149,7 @@
     },
     "dependencies": {
         "acorn": "^8.18.0",
+        "esm-env": "^1.2.2",
         "motion": "14.14.0",
         "motion-dom": "14.14.0"
     },
@@ -176,7 +177,6 @@
         "eslint-plugin-import": "2.32.0",
         "eslint-plugin-svelte": "3.23.0",
         "eslint-plugin-unused-imports": "4.4.1",
-        "esm-env": "^1.2.2",
         "globals": "^17.11.0",
         "html-tags": "^5.1.0",
         "html-void-elements": "^3.0.0",

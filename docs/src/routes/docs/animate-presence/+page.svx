@@ -400,7 +400,7 @@ A snippet reads live state. While the `present` + `child` element is held for it
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `initial` | `boolean` | `true` | When `false`, children skip their enter animation on initial mount |
-| `mode` | `'sync' \| 'wait' \| 'popLayout'` | `'sync'` | How entering and exiting children are coordinated |
+| `mode` | `'sync' \| 'wait' \| 'popLayout'` | `'sync'` | How entering and exiting children are coordinated. Can change at runtime; an exit already running keeps the mode it started with |
 | `custom` | `unknown` | `undefined` | Data passed to exiting children's dynamic variants |
 | `onExitComplete` | `() => void` | `undefined` | Callback invoked once all exit animations complete |
 | `anchorX` | `'left' \| 'right'` | `'left'` | With `mode="popLayout"`, the horizontal edge an exiting element is pinned by |

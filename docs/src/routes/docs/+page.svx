@@ -196,10 +196,12 @@ You can also use lifecycle callbacks:
 ```svelte
 <motion.div
   whileInView={{ opacity: 1 }}
-  onInViewStart={() => console.log('Entered viewport')}
-  onInViewEnd={() => console.log('Left viewport')}
+  onViewportEnter={(entry) => console.log('Entered viewport', entry?.intersectionRatio)}
+  onViewportLeave={() => console.log('Left viewport')}
 />
 ```
+
+`onInViewStart` and `onInViewEnd` still work as aliases.
 
 Configure the underlying IntersectionObserver with the `viewport` prop:
 

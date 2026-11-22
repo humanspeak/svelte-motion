@@ -312,10 +312,10 @@
         <section class="rounded-2xl border border-slate-700 bg-slate-900/60 p-8">
             <h2 class="text-3xl font-black text-white">6 · Reduced-motion policy</h2>
             <p class="mt-2 text-slate-400">
-                <strong class="text-slate-200">Exercises:</strong> the re-homed reduced-motion
-                filter (plan-002 3h) — under <code>always</code>, transform channels are stripped
-                BEFORE the animationState sees them; opacity still animates. This section had the
-                “double-fade” bug we caught frame-by-frame.
+                <strong class="text-slate-200">Exercises:</strong> reduced motion with no target
+                filter — under <code>always</code> the node's <code>shouldReduceMotion</code> makes motion-dom
+                apply transform channels instantly; opacity still animates. This section had the “double-fade”
+                bug we caught frame-by-frame.
             </p>
             <div class="mt-6">
                 <div class="flex gap-4">
@@ -347,7 +347,7 @@
                     <strong class="text-sky-400">REFRESH TEST (first-paint policy):</strong>
                     select <code>always</code>, then hit refresh — the URL keeps
                     <code>?rm=always</code> and the box's ENTER animation itself runs under the
-                    policy. PASS: it fades in exactly where it sits, zero horizontal movement. FAIL:
+                    policy. PASS: it appears at its final position with no slide and fades in. FAIL:
                     any slide on load while the Active-policy label says
                     <code>always</code>.
                 </p>
@@ -368,12 +368,13 @@
             <div class="mt-5 grid gap-3 md:grid-cols-2">
                 <p class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
                     <strong class="text-emerald-400">PASS:</strong> on <code>never</code> the box
-                    slides AND fades. On <code>always</code> it stays put and ONLY fades — exactly one
-                    fade, then rock-solid at full opacity.
+                    slides AND fades. On <code>always</code> it appears at the right at once and ONLY
+                    fades — exactly one fade, then rock-solid at full opacity.
                 </p>
                 <p class="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm">
                     <strong class="text-rose-400">FAIL:</strong> under <code>always</code> the box slides,
-                    or the fade completes and then RE-RUNS from transparent (the double-fade flash).
+                    or stays at the left, or the fade completes and then RE-RUNS from transparent (the
+                    double-fade flash).
                 </p>
             </div>
         </section>

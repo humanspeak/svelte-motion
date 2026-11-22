@@ -133,6 +133,9 @@
         get axis() {
             return axis
         },
+        get detectsAxis() {
+            return axisOverride === undefined
+        },
         // The group's kind is fixed by its entry (`$lib/reorder` or `$lib/m`).
         get kind() {
             return kind

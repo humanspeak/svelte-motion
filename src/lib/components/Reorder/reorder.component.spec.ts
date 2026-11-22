@@ -516,7 +516,7 @@ describe('Reorder.Group / Reorder.Item', () => {
             groupStyle: 'direction: rtl'
         })
         await vi.advanceTimersByTimeAsync(1000)
-        expect(projectionCommit).toHaveBeenCalledWith({
+        expect(projectionCommit.mock.calls.map(([rect]) => rect)).toContainEqual({
             left: 200,
             top: 0,
             width: 100,
@@ -525,15 +525,16 @@ describe('Reorder.Group / Reorder.Item', () => {
         projectionCommit.mockClear()
 
         // A distinct second move in the same mounted session displaces item 2.
-        // Its old x=100 slot must survive the observer effect restart and seed
-        // a new projection animation against its new x=200 layout.
+        // Its old x=100 slot must still seed a new projection animation against
+        // its new x=200 layout (via the observer restart or the
+        // MutationObserver commit).
         await result.rerender({
             axis: 'x',
             values: [1, 2, 0],
             groupStyle: 'direction: rtl'
         })
         await vi.advanceTimersByTimeAsync(1000)
-        expect(projectionCommit).toHaveBeenCalledWith({
+        expect(projectionCommit.mock.calls.map(([rect]) => rect)).toContainEqual({
             left: 100,
             top: 0,
             width: 100,

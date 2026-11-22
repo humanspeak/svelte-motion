@@ -4,7 +4,8 @@ import {
     attachFocusGesture,
     attachHoverGesture,
     attachInViewGesture,
-    attachPressGesture
+    attachPressGesture,
+    createInViewGesture
 } from './gestures.js'
 
 /**
@@ -117,6 +118,31 @@ describe('attachHoverGesture', () => {
 
         element.dispatchEvent(pointer('pointerenter'))
         expect(setActive).not.toHaveBeenCalled()
+    })
+
+    // Upstream `gestures/hover.ts:28-33` @ v14.14.0 calls each callback with the
+    // event and `extractEventInfo(event)`.
+    it('passes (event, { point }) to both callbacks', async () => {
+        const { node } = makeNode({ whileHover: { scale: 1.1 } })
+        const onHoverStart = vi.fn()
+        const onHoverEnd = vi.fn()
+        const stop = attachHoverGesture(element, node, { onHoverStart, onHoverEnd })
+
+        const enter = pointer('pointerenter')
+        element.dispatchEvent(enter)
+        await flushPostRender()
+        expect(onHoverStart).toHaveBeenCalledWith(enter, {
+            point: { x: enter.pageX, y: enter.pageY }
+        })
+
+        const leave = pointer('pointerleave')
+        element.dispatchEvent(leave)
+        await flushPostRender()
+        expect(onHoverEnd).toHaveBeenCalledWith(leave, {
+            point: { x: leave.pageX, y: leave.pageY }
+        })
+
+        stop()
     })
 })
 
@@ -347,6 +373,64 @@ describe('attachPressGesture', () => {
             stop()
         }
     })
+
+    // Upstream `gestures/press.ts:35-52` @ v14.14.0: `onTapStart` gets the press
+    // event, `onTap`/`onTapCancel` the release, each with `extractEventInfo`.
+    it('onTapStart and onTap get their events and points', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTapStart = vi.fn()
+        const onTap = vi.fn()
+        const stop = attachPressGesture(element, node, { onTapStart, onTap })
+
+        const down = pointer('pointerdown')
+        element.dispatchEvent(down)
+        await flushPostRender()
+        expect(onTapStart).toHaveBeenCalledWith(down, {
+            point: { x: down.pageX, y: down.pageY }
+        })
+
+        element.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTap).toHaveBeenCalledTimes(1)
+        const [event, info] = onTap.mock.calls[0] ?? []
+        expect(event?.type).toBe('pointerup')
+        expect(info).toEqual({ point: { x: event?.pageX, y: event?.pageY } })
+
+        stop()
+    })
+
+    it('onTapCancel gets the release event', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTapCancel = vi.fn()
+        const stop = attachPressGesture(element, node, { onTapCancel })
+
+        element.dispatchEvent(pointer('pointerdown'))
+        window.dispatchEvent(pointer('pointerup'))
+        await flushPostRender()
+        expect(onTapCancel).toHaveBeenCalledTimes(1)
+        const [event, info] = onTapCancel.mock.calls[0] ?? []
+        expect(event?.type).toBe('pointerup')
+        expect(info).toHaveProperty('point')
+
+        stop()
+    })
+
+    // Upstream press.ts:47-48: `onRepeat` re-uses the START event.
+    it('a repeat passes the START event to onTap', async () => {
+        const { node } = makeNode({ whileTap: { scale: 0.9 } })
+        const onTap = vi.fn()
+        const stop = attachPressGesture(element, node, { onTap }, { repeat: 0.03 })
+
+        const down = pointer('pointerdown')
+        element.dispatchEvent(down)
+        await wait(120)
+        await flushPostRender()
+        expect(onTap.mock.calls.length).toBeGreaterThanOrEqual(2)
+        expect(onTap.mock.calls.every(([event]) => event === down)).toBe(true)
+
+        element.dispatchEvent(pointer('pointerup'))
+        stop()
+    })
 })
 
 describe('attachFocusGesture', () => {
@@ -461,14 +545,54 @@ describe('attachInViewGesture', () => {
         element.remove()
     })
 
-    /** Drive the most recently created observer. */
+    /** Drive the most recently created observer, returning the entry it reported. */
     const intersect = (isIntersecting: boolean) => {
         const observer = observers.at(-1)
-        observer?.callback(
-            [{ target: element, isIntersecting } as unknown as IntersectionObserverEntry],
-            {} as IntersectionObserver
-        )
+        const entry = { target: element, isIntersecting } as unknown as IntersectionObserverEntry
+        observer?.callback([entry], {} as IntersectionObserver)
+        return entry
     }
+
+    // Upstream `motion/features/viewport/index.ts:57-63` @ v14.14.0 calls the
+    // viewport callbacks synchronously with the entry.
+    it('onViewportEnter / onViewportLeave get the entry, synchronously', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const onViewportEnter = vi.fn()
+        const onViewportLeave = vi.fn()
+        const stop = attachInViewGesture(element, node, undefined, {
+            onViewportEnter,
+            onViewportLeave
+        })
+
+        const enterEntry = intersect(true)
+        expect(onViewportEnter).toHaveBeenCalledWith(enterEntry)
+
+        const leaveEntry = intersect(false)
+        expect(onViewportLeave).toHaveBeenCalledWith(leaveEntry)
+
+        stop()
+    })
+
+    it('the aliases fire with the entry too, right after the upstream name', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const onViewportEnter = vi.fn()
+        const onInViewStart = vi.fn()
+        const stop = attachInViewGesture(element, node, undefined, {
+            onViewportEnter,
+            onInViewStart
+        })
+
+        const entry = intersect(true)
+        expect(onViewportEnter).toHaveBeenCalledTimes(1)
+        expect(onViewportEnter).toHaveBeenCalledWith(entry)
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+        expect(onInViewStart).toHaveBeenCalledWith(entry)
+        expect(onViewportEnter.mock.invocationCallOrder[0]).toBeLessThan(
+            onInViewStart.mock.invocationCallOrder[0] ?? 0
+        )
+
+        stop()
+    })
 
     it('toggles whileInView on enter and leave, firing callbacks', async () => {
         const { node, setActive } = makeNode({ whileInView: { opacity: 1 } })
@@ -524,5 +648,133 @@ describe('attachInViewGesture', () => {
         expect(onInViewStart).toHaveBeenCalledTimes(1)
 
         stop()
+    })
+})
+
+describe('createInViewGesture', () => {
+    let element: HTMLElement
+    let observers: {
+        callback: IntersectionObserverCallback
+        options: IntersectionObserverInit | undefined
+        disconnect: ReturnType<typeof vi.fn>
+        unobserve: ReturnType<typeof vi.fn>
+    }[]
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        element = document.createElement('div')
+        document.body.appendChild(element)
+        observers = []
+        vi.stubGlobal(
+            'IntersectionObserver',
+            class {
+                constructor(
+                    callback: IntersectionObserverCallback,
+                    options?: IntersectionObserverInit
+                ) {
+                    const entry = {
+                        callback,
+                        options,
+                        disconnect: vi.fn(),
+                        unobserve: vi.fn()
+                    }
+                    observers.push(entry)
+                    Object.assign(this, {
+                        observe: vi.fn(),
+                        unobserve: entry.unobserve,
+                        disconnect: entry.disconnect,
+                        takeRecords: vi.fn(() => [])
+                    })
+                }
+            }
+        )
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        element.remove()
+    })
+
+    /** Drive the most recently created observer. */
+    const intersect = (isIntersecting: boolean) => {
+        const observer = observers.at(-1)
+        observer?.callback(
+            [{ target: element, isIntersecting } as unknown as IntersectionObserverEntry],
+            {} as IntersectionObserver
+        )
+    }
+
+    it('keeps its entry state across a restart, so the new report does not re-fire', async () => {
+        const { node, setActive } = makeNode({ whileInView: { opacity: 1 } })
+        const onInViewStart = vi.fn()
+        const gesture = createInViewGesture(element, node, () => undefined, { onInViewStart })
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.startObserver()
+        expect(observers).toHaveLength(2)
+        expect(observers[0].disconnect).toHaveBeenCalled()
+
+        intersect(true)
+        expect(setActive).toHaveBeenCalledTimes(1)
+        expect(setActive).toHaveBeenCalledWith('whileInView', true)
+        await flushPostRender()
+        expect(onInViewStart).toHaveBeenCalledTimes(1)
+
+        gesture.unmount()
+    })
+
+    it('reads getViewport on each start', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        let viewport: { amount: 'some' | 'all' } = { amount: 'some' }
+        const gesture = createInViewGesture(element, node, () => viewport)
+
+        gesture.startObserver()
+        expect(observers[0].options?.threshold).toBe(0)
+
+        viewport = { amount: 'all' }
+        gesture.startObserver()
+        expect(observers[1].options?.threshold).toBe(1)
+
+        gesture.unmount()
+    })
+
+    it('does not reopen a latched `once` gesture on restart', () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const gesture = createInViewGesture(element, node, () => ({ once: true }))
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.startObserver()
+        expect(observers).toHaveLength(1)
+
+        gesture.unmount()
+    })
+
+    it('resets its entry state on unmount, so a remount is a new gesture', async () => {
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const onInViewStart = vi.fn()
+        const gesture = createInViewGesture(element, node, () => undefined, { onInViewStart })
+
+        gesture.startObserver()
+        intersect(true)
+        gesture.unmount()
+        expect(observers[0].disconnect).toHaveBeenCalled()
+
+        gesture.startObserver()
+        intersect(true)
+        await flushPostRender()
+        expect(onInViewStart).toHaveBeenCalledTimes(2)
+
+        gesture.unmount()
+    })
+
+    it('does not throw without IntersectionObserver', () => {
+        vi.stubGlobal('IntersectionObserver', undefined)
+        const { node } = makeNode({ whileInView: { opacity: 1 } })
+        const gesture = createInViewGesture(element, node, () => undefined)
+
+        expect(() => gesture.startObserver()).not.toThrow()
+        expect(() => gesture.unmount()).not.toThrow()
     })
 })

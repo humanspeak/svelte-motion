@@ -203,8 +203,8 @@
         <h2>Owned motion child: interrupted exit</h2>
         <p class="hint">
             Hide, show, then hide again during the one-second fade. The same real node must survive
-            re-entry, and the interrupted first exit must not remove the second exit early.
-            Completion notifications include cancelled exits.
+            re-entry, and the interrupted first exit must not remove the second exit early. A
+            reversed exit fires no completion notification; only an exit that finishes does.
         </p>
         <div class="controls">
             <button

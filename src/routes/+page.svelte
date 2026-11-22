@@ -278,6 +278,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/layout/measure-state') + searchParams}
+                    >
+                        onLayoutMeasure writing $state
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/motion/aspect-ratio') + searchParams}
                     >
                         Aspect Ratio
@@ -329,6 +337,22 @@
                         href={resolve('/tests/motion/tap-options') + searchParams}
                     >
                         Tap options: double tap, long press, repeat
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/gesture-prop-change') + searchParams}
+                    >
+                        Gesture props changed mid-gesture
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/motion/gesture-callback-args') + searchParams}
+                    >
+                        Gesture callback arguments (event, info, entry)
                     </a>
                 </li>
                 <li>
@@ -807,6 +831,14 @@
                         Reorder: Board, drag items between groups (Motion 14.10)
                     </a>
                 </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/reorder/immutable-values') + searchParams}
+                    >
+                        Reorder: replaced value objects stay focusable and reorderable
+                    </a>
+                </li>
             </ul>
         </div>
         <div>
@@ -1156,6 +1188,14 @@
                 <li>
                     <a
                         class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/mode-switch') + searchParams}
+                    >
+                        Runtime mode switch
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
                         href={resolve('/tests/animate-presence/clone-typography') + searchParams}
                     >
                         Exit typography and inheritance
@@ -1184,6 +1224,14 @@
                             searchParams}
                     >
                         Wait exit completion (latest requested key remains)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/animate-presence/key-change-in-place') + searchParams}
+                    >
+                        In-place key change during a key transition
                     </a>
                 </li>
             </ul>
@@ -1647,6 +1695,14 @@
                         href={resolve('/tests/reactive-style') + searchParams}
                     >
                         styleString (Reactive Styles)
+                    </a>
+                </li>
+                <li>
+                    <a
+                        class="text-blue-300 hover:underline"
+                        href={resolve('/tests/style-string-declarations') + searchParams}
+                    >
+                        styleString declarations (data URIs, fallbacks)
                     </a>
                 </li>
                 <li>

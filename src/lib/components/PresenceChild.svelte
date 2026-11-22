@@ -370,13 +370,15 @@
         } else if (!prevPresent && current && currentPhase === 'holding') {
             // Re-entry mid-hold cancels the exit accounting. Replacing the
             // slot invalidates the cycle's `safeToRemove` for any consumer
-            // that captured it.
+            // that captured it. A reversed exit never completed, so
+            // `onExitComplete` must not fire (upstream
+            // `AnimatePresence/index.tsx:131-133 @ v14.12.0` deletes the key).
             cancelWaitEnterBlock()
             exitRegistry.cancel()
             removePop()
             phase = 'idle'
             currentSafeToRemove = noopSafeToRemove
-            animatePresence?.notifyExitComplete()
+            animatePresence?.notifyExitCancel()
         } else if (
             !prevPresent &&
             current &&

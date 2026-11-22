@@ -1,5 +1,4 @@
 import type { AnimationControls, AnimationControlsDefinition } from '$lib/types.js'
-import { SvelteSet } from 'svelte/reactivity'
 
 const mountedError =
     'controls.start() should only be called after a component has mounted. Consider calling within a $effect.'
@@ -51,7 +50,11 @@ export const isAnimationControls = (value: unknown): value is AnimationControls 
  */
 export const animationControls = (): AnimationControls => {
     let hasMounted = false
-    const subscribers = new SvelteSet<Parameters<AnimationControls['subscribe']>[0]>()
+    // A plain Set, as upstream (animation-controls.ts:54 @ v14.12.0): a
+    // reactive set would subscribe any `$effect` that calls `start()` to every
+    // later subscribe and unsubscribe, and replay the animation.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- must not be tracked by callers
+    const subscribers = new Set<Parameters<AnimationControls['subscribe']>[0]>()
 
     const controls: AnimationControls = {
         subscribe(subscriber) {

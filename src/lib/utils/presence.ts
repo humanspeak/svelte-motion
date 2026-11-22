@@ -23,7 +23,7 @@ import {
     visualElementStore,
     type PresenceContextProps
 } from 'motion-dom'
-import { getContext, setContext, tick } from 'svelte'
+import { getContext, setContext, tick, untrack } from 'svelte'
 import { createSubscriber } from 'svelte/reactivity'
 
 /**
@@ -538,6 +538,69 @@ export const suppressScrollAnchoring = (element: HTMLElement): void => {
         requestAnimationFrame(() => requestAnimationFrame(release))
     } else {
         setTimeout(release, 32)
+    }
+}
+
+/** Containing blocks {@link holdContainingBlock} holds, with their own inline value. */
+const containingBlockHolds = new WeakMap<
+    HTMLElement,
+    { count: number; inline: string; priority: string }
+>()
+
+/**
+ * Make `element` the containing block of an absolutely positioned exit
+ * clone for as long as the clone is on screen. A `static` element gets
+ * `position: relative`; an element another clone already holds joins
+ * that hold (it reads `relative` now, because of it). Overlapping holds
+ * share one write, and the element's own inline value and priority come
+ * back when the last one is released, unless the app wrote its own value
+ * in the meantime. Any other element is left alone.
+ *
+ * Upstream never writes an ancestor's style: its `sync` and `wait` exits
+ * keep the element in its slot, and `popLayout` pins the element itself
+ * with a removable `<style>` rule (`PopChild.tsx:159-180,238-243` @
+ * v14.14.0). Only svelte-motion's clone exit needs a containing block, so
+ * the write must not outlive the clone.
+ *
+ * @param element The clone's positioning parent (it generates a box).
+ * @param computedPosition `getComputedStyle(element).position`, read now.
+ * @returns An idempotent release; a no-op when nothing was held.
+ *
+ * @example
+ * ```ts
+ * const release = holdContainingBlock(parent, getComputedStyle(parent).position)
+ * // ... the clone animates out ...
+ * clone.remove()
+ * release()
+ * ```
+ */
+export const holdContainingBlock = (
+    element: HTMLElement,
+    computedPosition: string
+): (() => void) => {
+    const held = containingBlockHolds.get(element)
+    if (held) {
+        held.count += 1
+    } else if (computedPosition === 'static') {
+        containingBlockHolds.set(element, {
+            count: 1,
+            inline: element.style.position,
+            priority: element.style.getPropertyPriority('position')
+        })
+        element.style.position = 'relative'
+    } else {
+        return () => {}
+    }
+    let released = false
+    return () => {
+        if (released) return
+        released = true
+        const hold = containingBlockHolds.get(element)
+        if (!hold || --hold.count > 0) return
+        containingBlockHolds.delete(element)
+        // A value the app wrote during the hold is its own; keep it.
+        if (element.style.position !== 'relative') return
+        element.style.setProperty('position', hold.inline, hold.priority)
     }
 }
 
@@ -1452,6 +1515,14 @@ export type AnimatePresenceContext = {
      * pending enters in mode='wait'. Not intended for direct consumer use.
      */
     notifyExitComplete: () => void
+    /**
+     * @internal Pairs with `notifyExitStart` for an exit that was reversed by
+     * a re-entry. Decrements the in-flight exit counter and unblocks pending
+     * enters in mode='wait', but fires neither `onExitComplete` nor the
+     * LayoutGroup re-render: the exit never completed. Not intended for
+     * direct consumer use.
+     */
+    notifyExitCancel: () => void
 }
 
 /**
@@ -1477,6 +1548,17 @@ export type AnimatePresenceContext = {
 export const createAnimatePresenceContext = (context: {
     initial?: boolean
     mode?: AnimatePresenceMode
+    /**
+     * Reads the boundary's current `mode` (upstream reads it on every
+     * render). Wins over `mode`. Read untracked, so a caller's effect that
+     * reads `context.mode` does not subscribe to it.
+     */
+    getMode?: () => AnimatePresenceMode
+    /**
+     * Calls `listener` after `getMode` starts returning a new value, so
+     * pop data can be seeded before the next exit. Returns an unsubscribe.
+     */
+    subscribeMode?: (listener: () => void) => () => void
     onExitComplete?: () => void
     /**
      * The nearest `<LayoutGroup>`'s `forceRender`, called once every exit
@@ -1500,8 +1582,12 @@ export const createAnimatePresenceContext = (context: {
     // Default initial to true (animate on first mount) unless explicitly false
     const initial = context.initial !== false
 
-    // Default mode to 'sync' if not specified
-    const mode: AnimatePresenceMode = context.mode ?? 'sync'
+    // The current mode. Upstream reads it on every render
+    // (AnimatePresence/index.tsx:52, :177, :263 @ v14.14.0); it is sampled
+    // when an exit starts and when an enter is gated, and an exit in flight
+    // keeps the mode it started with.
+    const readMode = (): AnimatePresenceMode =>
+        (context.getMode ? untrack(context.getMode) : context.mode) ?? 'sync'
     let latestCustom = context.custom
     const customSubscribers = new Set<() => void>()
     const trackCustom = createSubscriber((update) => {
@@ -1611,9 +1697,15 @@ export const createAnimatePresenceContext = (context: {
      */
     const isEnterBlocked = (key?: string): boolean => {
         if (disposed) return false
+        const mode = readMode()
         if (mode !== 'wait') {
-            pwLog('[presence] isEnterBlocked', { blocked: false, mode, inFlightExits, key })
-            return false
+            // An exit that started under `wait` (it raised `enterBlocked`) still
+            // holds the children that were waiting on it, as upstream keeps
+            // rendering only the exiting children until they finish; a mode
+            // change alone does not re-diff (plan 011 Step 3c).
+            const blocked = enterBlocked && inFlightExits > 0
+            pwLog('[presence] isEnterBlocked', { blocked, mode, inFlightExits, key })
+            return blocked
         }
 
         const hasBlockingSibling =
@@ -1683,7 +1775,7 @@ export const createAnimatePresenceContext = (context: {
 
     pwLog('[presence] createContext', {
         initial,
-        mode,
+        mode: readMode(),
         isInitialRenderPhase,
         onExitComplete: !!context.onExitComplete
     })
@@ -1820,8 +1912,42 @@ export const createAnimatePresenceContext = (context: {
         started?: boolean
         /** The completion tail ran. */
         completed?: boolean
+        /** Gives the positioning parent back its own `position` (plan 010). */
+        releaseContainingBlock?: () => void
     }
     const activeExits = new Map<string, ActiveExit>()
+
+    // The mode the pop caches were last set up for.
+    let trackedMode = readMode()
+    /**
+     * Bring the children's popLayout caches in line with a new mode. A clone
+     * exit runs after the element is detached, so it needs a pop snapshot
+     * and resting point recorded while the child was connected.
+     */
+    const syncModeTracking = () => {
+        if (disposed) return
+        const next = readMode()
+        if (next === trackedMode) return
+        const wasPop = trackedMode === 'popLayout'
+        trackedMode = next
+        if (next === 'popLayout' && !wasPop) {
+            for (const child of children.values()) {
+                if (!child.element.isConnected) continue
+                child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(
+                    child.element,
+                    getComputedStyle(child.element)
+                )
+                child.popPointCache ??= createPopLayoutPointCache()
+                child.popPointCache.track(child.element)
+            }
+        } else if (wasPop && next !== 'popLayout') {
+            for (const child of children.values()) {
+                child.popPointCache?.dispose()
+                child.popPointCache = undefined
+            }
+        }
+    }
+    const stopWatchingMode = context.subscribeMode?.(syncModeTracking)
 
     /**
      * Re-snapshot every still-connected child's computed style.
@@ -1845,7 +1971,7 @@ export const createAnimatePresenceContext = (context: {
             // A resting child moves when its siblings change (a toast list
             // growing), so its pop position has to follow, or the #2348
             // correction would also undo those earlier moves.
-            if (mode === 'popLayout') {
+            if (readMode() === 'popLayout') {
                 child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(child.element, style)
             }
         }
@@ -1906,7 +2032,7 @@ export const createAnimatePresenceContext = (context: {
      */
     const startExit = () => {
         if (disposed) return
-        if (mode === 'wait') {
+        if (readMode() === 'wait') {
             enterBlocked = true
         }
         inFlightExits += 1
@@ -1941,7 +2067,10 @@ export const createAnimatePresenceContext = (context: {
         if (inFlightExits === 0) {
             context.forceRender?.()
             scheduleExitComplete()
-            if (mode === 'wait' && enterBlocked) {
+            // An enter held under `wait` is released when the exits end,
+            // whatever the mode is by then (upstream re-diffs on exit
+            // complete, AnimatePresence/index.tsx:244).
+            if (enterBlocked || enterUnblockedCallbacks.size > 0) {
                 enterBlocked = false
                 notifyEnterUnblocked()
             }
@@ -2010,7 +2139,9 @@ export const createAnimatePresenceContext = (context: {
     const cancelExit = () => {
         layoutIdHolds.pop()?.()
         inFlightExits -= 1
-        if (inFlightExits === 0 && mode === 'wait' && enterBlocked) {
+        // An enter held under `wait` is released when the exits end,
+        // whatever the mode is by then (AnimatePresence/index.tsx:244).
+        if (inFlightExits === 0 && (enterBlocked || enterUnblockedCallbacks.size > 0)) {
             enterBlocked = false
             notifyEnterUnblocked()
         }
@@ -2029,6 +2160,7 @@ export const createAnimatePresenceContext = (context: {
         layoutHandOff?: PresenceLayoutHandOff
     ) => {
         if (disposed) return
+        const mode = readMode()
         const wasExited = exitedKeys.has(key)
         if (wasExited) {
             removeExitPlaceholder(key)
@@ -2120,7 +2252,7 @@ export const createAnimatePresenceContext = (context: {
             }
             child.lastScrollSnapshot = captureScrollSnapshot(child.element)
             child.hasScrollableAncestor = child.lastScrollSnapshot.length > 0
-            if (mode === 'popLayout') {
+            if (readMode() === 'popLayout') {
                 child.lastPopLayoutSnapshot = measurePopLayoutSnapshot(child.element, computedStyle)
             }
         }
@@ -2150,6 +2282,7 @@ export const createAnimatePresenceContext = (context: {
      */
     const unregisterChild = (key: string) => {
         if (disposed) return
+        const mode = readMode()
         const child = children.get(key)
         pwLog('[presence] unregisterChild', {
             key,
@@ -2401,12 +2534,14 @@ export const createAnimatePresenceContext = (context: {
         const parentRect =
             popLayoutSnapshot || held ? undefined : positioningParent.getBoundingClientRect()
 
-        if (!popLayoutSnapshot && !held) {
-            const parentPosition = getComputedStyle(positioningParent).position
-            if (parentPosition === 'static') {
-                positioningParent.style.position = 'relative'
-            }
-        }
+        // Released wherever the clone leaves the DOM (plan 010).
+        const releaseContainingBlock =
+            !popLayoutSnapshot && !held
+                ? holdContainingBlock(
+                      positioningParent,
+                      getComputedStyle(positioningParent).position
+                  )
+                : undefined
 
         // Preserve the original display property (especially flex for centered content)
         const originalDisplay = frozenStyle.display ?? ''
@@ -2569,7 +2704,14 @@ export const createAnimatePresenceContext = (context: {
         // No scroll-anchoring adjustment from the swap, as upstream keeps
         // the element (plan 012 A6).
         if (followParent instanceof HTMLElement) suppressScrollAnchoring(followParent)
-        const activeExit: ActiveExit = { clone, child, placeholder, cancelled: false, holds: [] }
+        const activeExit: ActiveExit = {
+            clone,
+            child,
+            placeholder,
+            cancelled: false,
+            holds: [],
+            releaseContainingBlock
+        }
         activeExits.set(key, activeExit)
         if (popLayoutSnapshot) {
             // The "before" point is the element's; the "after" one is the
@@ -2612,6 +2754,7 @@ export const createAnimatePresenceContext = (context: {
                 // ignore
             }
             clone.remove()
+            activeExit.releaseContainingBlock?.()
 
             // Log clone removal and element counts for debugging rapid toggle
             pwLog('[presence] clone REMOVED from DOM', {
@@ -2685,6 +2828,7 @@ export const createAnimatePresenceContext = (context: {
                 }
                 releaseActiveExit()
                 clone.remove()
+                activeExit.releaseContainingBlock?.()
                 removeExitPlaceholder(key, placeholder)
                 const currentChild = children.get(key)
                 if (currentChild && currentChild.element === exitingElement) {
@@ -2813,6 +2957,7 @@ export const createAnimatePresenceContext = (context: {
         // the clone's values (plan 012).
         for (const hold of active.holds) hold.cancel()
         active.clone.remove()
+        active.releaseContainingBlock?.()
         removeExitPlaceholder(key, active.placeholder)
         if (children.get(key) === active.child) {
             children.delete(key)
@@ -2835,6 +2980,7 @@ export const createAnimatePresenceContext = (context: {
     const dispose = (): void => {
         if (disposed) return
         disposed = true
+        stopWatchingMode?.()
         structureObserver?.disconnect()
         if (initialRenderFrame !== undefined) cancelAnimationFrame(initialRenderFrame)
         if (snapshotRefreshFrame !== undefined) cancelAnimationFrame(snapshotRefreshFrame)
@@ -2848,6 +2994,7 @@ export const createAnimatePresenceContext = (context: {
             active.animation?.stop?.()
             for (const hold of active.holds) hold.cancel()
             active.clone.remove()
+            active.releaseContainingBlock?.()
         }
         for (const placeholder of exitPlaceholders.values()) placeholder.remove()
         children.clear()
@@ -2866,7 +3013,9 @@ export const createAnimatePresenceContext = (context: {
 
     return {
         initial,
-        mode,
+        get mode() {
+            return readMode()
+        },
         getPopLayoutOptions,
         get custom() {
             trackCustom()
@@ -2885,7 +3034,11 @@ export const createAnimatePresenceContext = (context: {
         dispose,
         takeExitHandoff,
         notifyExitStart: startExit,
-        notifyExitComplete: finishExit
+        notifyExitComplete: finishExit,
+        notifyExitCancel: () => {
+            // `startExit` is a no-op once disposed, so its cancel must be too.
+            if (!disposed) cancelExit()
+        }
     }
 }
 

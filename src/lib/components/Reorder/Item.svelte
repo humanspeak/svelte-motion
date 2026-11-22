@@ -59,6 +59,19 @@
     const reorderAxis = $derived(context.axis)
 
     /**
+     * In a group that detects its axis (no `axis` prop), a fresh object
+     * whenever the group's order changes (`trackOrder` reads every entry of
+     * `values`), passed to `MotionContainer` so this item re-measures its slot
+     * in the same flush as the reorder. `undefined` in an `axis`-locked group,
+     * matching which items the old accidental dependency restarted.
+     */
+    const layoutRemeasureKey = $derived.by(() => {
+        if (!context.detectsAxis) return undefined
+        context.trackOrder()
+        return {}
+    })
+
+    /**
      * The enclosing `Reorder.Board`, if any. Its groups are identified by
      * their context objects (Motion 14.10.1 `Item.tsx` `board`).
      */
@@ -159,8 +172,37 @@
         element = node
         ref = node
     }
-    // svelte-ignore state_referenced_locally
-    context.elements.set(value, () => element)
+
+    /**
+     * The box this item last measured, kept so a new value object can take
+     * over the slot straight away. Plain `let`: written by the measure
+     * callback, read untracked.
+     */
+    let lastLayout: LayoutMeasurePayload | undefined
+
+    /**
+     * Register this item's element, and its last measured slot, under its
+     * current `value`. Upstream does this on every render
+     * (Motion 14.14.0 `Reorder/Item.tsx:141`, and its re-measure re-registers
+     * the slot). An immutable update under a stable `{#each}` key keeps this
+     * component but changes `value`, and the group prunes the old object, so
+     * re-register here. A pre-effect runs before the group's `checkTabStop`
+     * and prune effects in the same flush, so the tab stop never sees the new
+     * object unregistered. Old entries are left to the group's pruning: the
+     * old object may still be in `values` under another item.
+     */
+    $effect.pre(() => {
+        const current = value
+        untrack(() => {
+            context.elements.set(current, () => element)
+            if (lastLayout) context.registerItem(current, lastLayout)
+        })
+    })
+
+    const handleLayoutMeasure = (box: LayoutMeasurePayload) => {
+        lastLayout = box
+        context.registerItem(value, box)
+    }
 
     $effect(() => {
         return () => {
@@ -304,9 +346,10 @@
     onDragStart={handleDragStart}
     onDrag={handleDrag}
     onDragEnd={handleDragEnd}
-    onLayoutMeasure={(box: LayoutMeasurePayload) => context.registerItem(value, box)}
+    onLayoutMeasure={handleLayoutMeasure}
     {motionValueChild}
     __motionKind={context.kind}
+    __layoutRemeasureKey={layoutRemeasureKey}
     ignoreStrict={context.kind === 'motion'}
 >
     {@render childSnippet?.()}
