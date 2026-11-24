@@ -39,6 +39,27 @@ const readPointerDown = async (handle: Locator): Promise<PointerDownSnapshot> =>
     return JSON.parse(value) as PointerDownSnapshot
 }
 
+/**
+ * Matches `actual` against `expected` key by key: numbers to within
+ * `tolerance` px, everything else exactly. Browsers place boxes on different
+ * sub-pixel grids (Chromium 1/64px, Firefox 1/60px), so a box Chromium reports
+ * at 590 sits at 589.983 in Firefox; a real teleport is tens of pixels.
+ *
+ * @param tolerance Allowed difference for numbers. Pointer coordinates need
+ *     {@link POINTER_TOLERANCE}: Firefox reports them in whole pixels.
+ */
+const expectClose = (actual: object, expected: Record<string, unknown>, tolerance = 0.05) => {
+    const values = actual as Record<string, unknown>
+    for (const [key, value] of Object.entries(expected)) {
+        if (typeof value === 'number')
+            expect(Math.abs((values[key] as number) - value), key).toBeLessThanOrEqual(tolerance)
+        else expect(values[key], key).toBe(value)
+    }
+}
+
+/** Firefox truncates synthetic pointer coordinates to whole pixels. */
+const POINTER_TOLERANCE = 1
+
 const waitForAnimationFrame = async (page: Page) => {
     await page.evaluate(
         () =>
@@ -99,13 +120,9 @@ test.describe('drag/controls', () => {
         if (!h) throw new Error('no h')
 
         expect(page.viewportSize()).toEqual({ width: 1280, height: 720 })
-        expect(s.x).toBe(590)
-        expect(s.y).toBe(235)
-        expect(s.width).toBe(100)
-        expect(s.height).toBe(100)
+        expectClose(s, { x: 590, y: 235, width: 100, height: 100 })
         const handleCenter = { x: h.x + h.width / 2, y: h.y + h.height / 2 }
-        expect(handleCenter.x).toBe(639.9921875)
-        expect(handleCenter.y).toBe(215)
+        expectClose(handleCenter, { x: 640, y: 215 })
         await installControlObservers(handle, el)
 
         // Use mouse API for micro nudge
@@ -119,17 +136,23 @@ test.describe('drag/controls', () => {
         const e = await el.boundingBox()
         if (!e) throw new Error('no e')
         const tinyPointerDown = await readPointerDown(handle)
-        expect(tinyPointerDown).toEqual({
-            clientX: handleCenter.x,
-            clientY: handleCenter.y,
-            pointerType: 'mouse',
-            isPrimary: true,
-            button: 0,
-            buttons: 1
-        })
+        expectClose(
+            tinyPointerDown,
+            {
+                clientX: handleCenter.x,
+                clientY: handleCenter.y,
+                pointerType: 'mouse',
+                isPrimary: true,
+                button: 0,
+                buttons: 1
+            },
+            POINTER_TOLERANCE
+        )
         await expect(el).toHaveAttribute('data-drag-start-count', '0')
-        expect(e.x - s.x).toBe(-0.0078125)
-        expect(e.y - s.y).toBe(0)
+        // The press snaps the box's centre to the pointer, which Firefox
+        // reports in whole pixels, so the box may shift by under a pixel.
+        expect(Math.abs(e.x - s.x)).toBeLessThanOrEqual(POINTER_TOLERANCE)
+        expect(Math.abs(e.y - s.y)).toBeLessThanOrEqual(POINTER_TOLERANCE)
         // The threshold-only snap must not jump across the page.
         expect(e.x - s.x).toBeLessThan(40)
         expect(Math.abs(e.y - s.y)).toBeLessThan(2)
@@ -164,7 +187,7 @@ test.describe('drag/controls', () => {
         const bootHandle = await handle.boundingBox()
         if (!boot) throw new Error('no boot')
         if (!bootHandle) throw new Error('no boot handle')
-        expect(boot).toEqual({ x: 700, y: 477, width: 80, height: 80 })
+        expectClose(boot, { x: 700, y: 477, width: 80, height: 80 })
         expect(bootHandle.width).toBeGreaterThan(0)
         expect(bootHandle.height).toBeGreaterThan(0)
         expect(bootHandle.height).toBe(24)
@@ -172,13 +195,10 @@ test.describe('drag/controls', () => {
         expect(bootHandle.y).toBeGreaterThanOrEqual(0)
         expect(bootHandle.x + bootHandle.width).toBeLessThanOrEqual(1280)
         expect(bootHandle.y + bootHandle.height).toBeLessThanOrEqual(720)
-        expect({
-            x: bootHandle.x + bootHandle.width / 2,
-            y: bootHandle.y + bootHandle.height / 2
-        }).toEqual({
-            x: 640,
-            y: 417
-        })
+        expectClose(
+            { x: bootHandle.x + bootHandle.width / 2, y: bootHandle.y + bootHandle.height / 2 },
+            { x: 640, y: 417 }
+        )
         expect(
             await handle.evaluate(
                 (element, point) => document.elementFromPoint(point.x, point.y) === element,
@@ -189,7 +209,7 @@ test.describe('drag/controls', () => {
             const transform = new DOMMatrixReadOnly(getComputedStyle(node).transform)
             return { x: transform.m41, y: transform.m42 }
         })
-        expect(initialTranslation).toEqual({ x: 100, y: 40 })
+        expectClose(initialTranslation, { x: 100, y: 40 })
         await installControlObservers(handle, el)
 
         const pointerStart = { x: 640, y: 417 }
@@ -246,21 +266,26 @@ test.describe('drag/controls', () => {
         expect(sessions[0].before).toEqual(boot)
         for (const [index, session] of sessions.entries()) {
             expect(session.handle).toEqual(bootHandle)
-            expect(session.pointerDown).toEqual({
-                clientX: pointerStart.x,
-                clientY: pointerStart.y,
-                pointerType: 'mouse',
-                isPrimary: true,
-                button: 0,
-                buttons: 1
-            })
-            expect({
-                x: session.handle.x + session.handle.width / 2,
-                y: session.handle.y + session.handle.height / 2
-            }).toEqual({
-                x: session.pointerDown.clientX,
-                y: session.pointerDown.clientY
-            })
+            expectClose(
+                session.pointerDown,
+                {
+                    clientX: pointerStart.x,
+                    clientY: pointerStart.y,
+                    pointerType: 'mouse',
+                    isPrimary: true,
+                    button: 0,
+                    buttons: 1
+                },
+                POINTER_TOLERANCE
+            )
+            expectClose(
+                {
+                    x: session.handle.x + session.handle.width / 2,
+                    y: session.handle.y + session.handle.height / 2
+                },
+                { x: session.pointerDown.clientX, y: session.pointerDown.clientY },
+                POINTER_TOLERANCE
+            )
             expect(
                 Math.abs(
                     session.snapped.x + session.snapped.width / 2 - session.pointerDown.clientX

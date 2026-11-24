@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { openCdpSession } from './cdp'
 
 /**
  * Painted-frame recording for crossfade and follow checks (plan 012).
@@ -94,7 +95,7 @@ export async function recordPainted(
     probes: Probe[] = [],
     selectors: string[] = []
 ): Promise<PaintedRecording> {
-    const cdp = await page.context().newCDPSession(page)
+    const cdp = await openCdpSession(page, 'Painted-frame capture')
     const shots: ScreencastFrame[] = []
     cdp.on('Page.screencastFrame', (event) => {
         shots.push({ data: event.data, metadata: event.metadata })

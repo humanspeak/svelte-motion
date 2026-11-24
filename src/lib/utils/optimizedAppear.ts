@@ -51,6 +51,22 @@ const getAppearStore = (): SvelteMotionAppearStore | undefined => {
     return window.__SvelteMotionAppear
 }
 
+/**
+ * Animations suspended rather than cancelled by
+ * `MotionCancelOptimisedAnimation(..., true)`, resumed on the next render once
+ * the layout measurement is done (upstream `suspendedAnimations`,
+ * optimized-appear/start.ts:32-43 @ v14.14.0).
+ */
+const suspendedAnimations = new Set<AppearStoreEntry>()
+
+const resumeSuspendedAnimations = (): void => {
+    for (const data of suspendedAnimations) {
+        data.animation.play()
+        data.animation.startTime = data.startTime
+    }
+    suspendedAnimations.clear()
+}
+
 const installAppearGlobals = (): void => {
     if (typeof window === 'undefined') return
     const store = getAppearStore()
@@ -75,7 +91,12 @@ const installAppearGlobals = (): void => {
         return store.complete.get(elementId) === true
     }
 
-    window.MotionCancelOptimisedAnimation = (elementId, valueName, frame) => {
+    // Upstream's `MotionCancelOptimisedAnimation` (optimized-appear/start.ts:
+    // 120-163 @ v14.14.0). A layout measurement passes `canResume`: `false`
+    // for a `layout` node, whose leftover WAAPI transform would override the
+    // projection's inline one, so it goes now; `true` for an ancestor that is
+    // only measured, so it pauses and resumes on the next render.
+    window.MotionCancelOptimisedAnimation = (elementId, valueName, frame, canResume) => {
         if (!elementId || !valueName) return
         const animationId = appearStoreId(elementId, valueName)
         const data = store.animations.get(animationId)
@@ -85,12 +106,17 @@ const installAppearGlobals = (): void => {
         // place until the runtime animation has resolved and rendered its first
         // frame. Cancelling synchronously can expose the SSR initial style for a
         // frame between the two animation owners.
-        if (frame) {
+        if (frame && canResume === undefined) {
             frame.postRender(() => {
                 frame.postRender(() => data.animation.cancel())
             })
         } else {
             data.animation.cancel()
+        }
+        if (frame && canResume) {
+            suspendedAnimations.add(data)
+            frame.render(resumeSuspendedAnimations)
+            return
         }
         store.animations.delete(animationId)
         if (!store.animations.size) {
@@ -332,6 +358,10 @@ export const createOptimizedAppearData = (
  * Create the inline SSR bootstrap that starts appear animations before Svelte
  * hydrates the component tree.
  *
+ * The animations wait for one shared ready animation's `ready` promise. When
+ * that resolves after Motion has mounted (`window.MotionIsMounted`, as can
+ * happen in Firefox), they are skipped: Motion already animates the element.
+ *
  * @param appearId Stable optimized-appear id attached to the motion element.
  * @param entries WAAPI animation entries to start.
  * @returns A script tag string, or an empty string when no entries exist.
@@ -349,7 +379,7 @@ export const createOptimizedAppearScript = (
 ): string => {
     if (!appearId || entries.length === 0) return ''
     const payload = JSON.stringify({ id: appearId, entries }).replace(/</g, '\\u003c')
-    return `<script>(()=>{const p=${payload},w=window;if(w.MotionIsMounted)return;const q=String(p.id).replace(/["\\\\]/g,"\\\\$&");const e=document.querySelector('[${optimizedAppearDataAttribute}="'+q+'"]');if(!e||!e.animate)return;const s=w.__SvelteMotionAppear||(w.__SvelteMotionAppear={animations:new Map,complete:new Map,started:[]});const k=(id,n)=>id+": "+(n==="transform"?"transform":n);w.MotionHasOptimisedAnimation=w.MotionHasOptimisedAnimation||((id,n)=>id?n?s.animations.has(k(id,n)):s.complete.has(id):false);w.MotionHandoffMarkAsComplete=w.MotionHandoffMarkAsComplete||((id)=>{if(s.complete.has(id))s.complete.set(id,true)});w.MotionHandoffIsComplete=w.MotionHandoffIsComplete||((id)=>s.complete.get(id)===true);w.MotionCancelOptimisedAnimation=w.MotionCancelOptimisedAnimation||((id,n)=>{const key=k(id,n),d=s.animations.get(key);if(!d)return;d.animation.cancel();s.animations.delete(key);if(!s.animations.size)w.MotionCancelOptimisedAnimation=undefined});s.complete.set(p.id,false);for(const a of p.entries){const key=k(p.id,a.name);if(!s.readyAnimation){s.readyAnimation=e.animate({[a.name]:[a.keyframes[0],a.keyframes[0]]},{duration:1e4,easing:"linear",fill:"both"});s.animations.set(key,{animation:s.readyAnimation,startTime:null})}const start=()=>{s.readyAnimation.cancel();let t=s.startFrameTime;if(t===undefined){t=performance.now();s.startFrameTime=t}const anim=e.animate({[a.name]:a.keyframes},a.options);anim.startTime=t;s.animations.set(key,{animation:anim,startTime:t});s.started.push({id:p.id,name:a.name})};const r=s.readyAnimation;r.ready?r.ready.then(start).catch(()=>{}):start()}})();</script>`
+    return `<script>(()=>{const p=${payload},w=window;if(w.MotionIsMounted)return;const q=String(p.id).replace(/["\\\\]/g,"\\\\$&");const e=document.querySelector('[${optimizedAppearDataAttribute}="'+q+'"]');if(!e||!e.animate)return;const s=w.__SvelteMotionAppear||(w.__SvelteMotionAppear={animations:new Map,complete:new Map,started:[]});const k=(id,n)=>id+": "+(n==="transform"?"transform":n);w.MotionHasOptimisedAnimation=w.MotionHasOptimisedAnimation||((id,n)=>id?n?s.animations.has(k(id,n)):s.complete.has(id):false);w.MotionHandoffMarkAsComplete=w.MotionHandoffMarkAsComplete||((id)=>{if(s.complete.has(id))s.complete.set(id,true)});w.MotionHandoffIsComplete=w.MotionHandoffIsComplete||((id)=>s.complete.get(id)===true);w.MotionCancelOptimisedAnimation=w.MotionCancelOptimisedAnimation||((id,n)=>{const key=k(id,n),d=s.animations.get(key);if(!d)return;d.animation.cancel();s.animations.delete(key);if(!s.animations.size)w.MotionCancelOptimisedAnimation=undefined});s.complete.set(p.id,false);for(const a of p.entries){const key=k(p.id,a.name);if(!s.readyAnimation){s.readyAnimation=e.animate({[a.name]:[a.keyframes[0],a.keyframes[0]]},{duration:1e4,easing:"linear",fill:"both"});s.animations.set(key,{animation:s.readyAnimation,startTime:null})}const start=()=>{s.readyAnimation.cancel();if(w.MotionIsMounted)return;let t=s.startFrameTime;if(t===undefined){t=performance.now();s.startFrameTime=t}const anim=e.animate({[a.name]:a.keyframes},a.options);anim.startTime=t;s.animations.set(key,{animation:anim,startTime:t});s.started.push({id:p.id,name:a.name})};const r=s.readyAnimation;r.ready?r.ready.then(start).catch(()=>{}):start()}})();</script>`
 }
 
 /**
@@ -399,6 +429,11 @@ export const startOptimizedAppearAnimation = (
 
     const startAnimation = () => {
         store.readyAnimation?.cancel()
+        // The ready gate can resolve after Motion has mounted (Firefox does).
+        // An appear animation started then is never handed off: it finishes
+        // with `fill: both` and overrides every later inline transform, so
+        // layout animations snap. Motion already owns the element: skip it.
+        if (window.MotionIsMounted) return
         store.startFrameTime ??= performance.now()
         const animation = startWaapiAnimation(element, name, keyframes, options as never)
         animation.startTime = store.startFrameTime

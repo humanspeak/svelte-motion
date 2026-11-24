@@ -102,6 +102,10 @@ test.describe('drag/axis-handoff', () => {
         await card.waitFor({ state: 'visible' })
         // drag={true} → inline `touch-action: none` (use-props.ts:69-72 @ v14.5.0).
         await expectAuthoredCardFixture(card, 'none')
+        // The card sits near the bottom of the viewport; centre it so the
+        // downward fling stays inside. Firefox drops synthetic pointer events
+        // outside the viewport, so the release would be lost.
+        await card.evaluate((el) => el.scrollIntoView({ block: 'center' }))
 
         const box = await card.boundingBox()
         if (!box) throw new Error('no bbox')

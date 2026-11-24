@@ -1,5 +1,19 @@
 <script lang="ts">
+    /**
+     * `dragControls` fixtures: each box is dragged from its button, never from
+     * the box itself (`dragListener={false}`).
+     *
+     * - Red, "Start Drag": `drag="x"` with `snapToCursor`.
+     * - Blue, "Start Initial Drag": both axes with `snapToCursor`, starting at
+     *   `initial={{ x: 100, y: 40 }}`.
+     * - Green, "Start Immediate Drag": `immediate`, so a press with no move
+     *   still starts and ends a drag.
+     *
+     * Driven by `e2e/drag/controls.spec.ts`, which pins the pixel layout of the
+     * red and blue sections: keep the button labels and box sizes as they are.
+     */
     import { motion, createDragControls } from '$lib'
+    import TesterPanel, { type TesterStep } from '../../layout/_parity/TesterPanel.svelte'
     const controls = createDragControls()
     const initialControls = createDragControls()
     const immediateControls = createDragControls()
@@ -22,7 +36,38 @@
     function startImmediate(e: PointerEvent) {
         immediateControls.start(e, { immediate: true })
     }
+
+    const steps: TesterStep[] = [
+        {
+            text: 'Press Start Drag near its left edge and hold.',
+            expected:
+                "On press the red box slides left so its centre lines up with the pointer's x. snapToCursor snaps when the press starts, before any move, as upstream does. It moves on x only, so it stays below the button."
+        },
+        {
+            text: 'Still holding, move about 2px and let go.',
+            expected:
+                'Nothing more happens and Red drags stays at 0: 2px is under the 3px drag threshold, so no drag starts.'
+        },
+        {
+            text: 'Press Start Drag again and drag right, then up and down.',
+            expected:
+                'Once you pass 3px Red drags goes up by 1 and the box follows the pointer left and right. Moving up or down does not move it.'
+        },
+        {
+            text: 'Press Start Initial Drag (above the blue box), drag anywhere and let go. Repeat a few times.',
+            expected:
+                'The blue box starts offset 100px right and 40px down. On each press it jumps so its centre is under the pointer on both axes (up onto the button), then follows. It never lands a little further off each time.'
+        },
+        {
+            text: 'Press and release Start Immediate Drag (bottom left) without moving.',
+            expected: 'The green box stays put, and starts and ends each go up by 1.'
+        }
+    ]
 </script>
+
+<svelte:head>
+    <title>Drag controls</title>
+</svelte:head>
 
 <div style="height: 360px; display: grid; place-items: center; gap: 24px;">
     <section style="display: grid; place-items: center; gap: 8px;">
@@ -86,3 +131,23 @@
         <span data-testid="immediate-end">{immediateEnds}</span>
     </p>
 </section>
+
+<TesterPanel
+    eyebrow="e2e/drag/controls.spec.ts"
+    title="Drag controls"
+    {steps}
+    status="Covered by e2e/drag/controls.spec.ts."
+>
+    {#snippet checks()}
+        <p>
+            Each box is dragged only from its button: <code>dragControls.start(event)</code> with
+            <code>dragListener=&#123;false&#125;</code>. <code>snapToCursor</code> centres the box
+            under the pointer as soon as you press, before the drag threshold;
+            <code>immediate</code> starts it on press, without waiting for a move.
+        </p>
+    {/snippet}
+    {#snippet summary()}
+        Red drags: <b>{dragStarts}</b> · Blue drags: <b>{initialDragStarts}</b> · Green:
+        <b>{immediateStarts}/{immediateEnds}</b>
+    {/snippet}
+</TesterPanel>

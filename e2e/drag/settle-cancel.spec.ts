@@ -89,7 +89,9 @@ test.describe('drag/settle-cancel', () => {
         // launches a visible elastic-clamp settle animation.
         await page.mouse.move(cx, cy)
         await page.mouse.down()
-        await page.mouse.move(cx + 400, cy, { steps: 6 })
+        // 380px keeps the pointer inside the 1280px viewport: Firefox drops
+        // synthetic pointer events outside it, so the release would be lost.
+        await page.mouse.move(cx + 380, cy, { steps: 6 })
         await page.mouse.up()
 
         // Mid-settle (~120 ms in): translateX is somewhere between the
@@ -139,7 +141,8 @@ test.describe('drag/settle-cancel', () => {
 
         await page.mouse.move(cx, cy)
         await page.mouse.down()
-        await page.mouse.move(cx + 400, cy, { steps: 8 })
+        // 380px keeps the pointer inside the viewport (see above).
+        await page.mouse.move(cx + 380, cy, { steps: 8 })
         await page.mouse.up()
 
         await expect

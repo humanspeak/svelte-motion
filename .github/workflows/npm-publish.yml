@@ -393,12 +393,54 @@ jobs:
 
             # Removed dependency caching to reduce cache-poisoning risk
 
-    playwright-tests:
-        needs: [check-if-merged, debug-check, prepare]
+    playwright-version:
+        needs: [check-if-merged, prepare]
         if: needs.prepare.outputs.ready == 'true' && needs.check-if-merged.outputs.should_run == 'true' && needs.check-if-merged.outputs.has_skip_label != 'true'
-        timeout-minutes: 60
-        runs-on: ubuntu-latest
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        timeout-minutes: 5
+        outputs:
+            playwright: ${{ steps.resolve.outputs.playwright }}
+        steps:
+            - uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses]
+              with:
+                  ref: ${{ needs.prepare.outputs.checkout_sha }}
+                  persist-credentials: false
+                  sparse-checkout: package.json
+                  sparse-checkout-cone-mode: false
+
+            # The container image must match the installed @playwright/test exactly.
+            - name: Resolve Playwright version
+              id: resolve
+              run: |
+                  version=$(jq -r '.devDependencies["@playwright/test"]' package.json)
+                  if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "::error::@playwright/test must be pinned to an exact version, got '$version'"
+                    exit 1
+                  fi
+                  echo "playwright=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Verify the Playwright image exists
+              env:
+                  VERSION: ${{ steps.resolve.outputs.playwright }}
+              run: docker manifest inspect "mcr.microsoft.com/playwright:v${VERSION}-noble" > /dev/null
+
+    playwright-tests:
+        name: playwright-tests (${{ matrix.browser }} ${{ matrix.shard }}/3)
+        needs: [check-if-merged, debug-check, prepare, playwright-version]
+        if: needs.prepare.outputs.ready == 'true' && needs.check-if-merged.outputs.should_run == 'true' && needs.check-if-merged.outputs.has_skip_label != 'true'
+        timeout-minutes: 30
+        runs-on: blacksmith-4vcpu-ubuntu-2404
         environment: ci
+        # Browsers and their system libraries are baked into the image, so the
+        # release never waits on apt mirrors.
+        container:
+            image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.playwright }}-noble
+            options: --user 1001
+        strategy:
+            fail-fast: false
+            matrix:
+                browser: [chromium, firefox]
+                shard: [1, 2, 3]
         steps:
             - uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses]
               with:
@@ -415,11 +457,12 @@ jobs:
             - name: Install dependencies
               run: pnpm install --filter . --prefer-offline --frozen-lockfile --ignore-scripts --config.engine-strict=false
 
-            - name: Install Playwright Browsers
-              run: pnpm exec playwright install --with-deps
-
             - name: Run Playwright tests
-              run: pnpm run test:e2e
+              env:
+                  CI: true
+              run: >-
+                  pnpm exec playwright test --project=${{ matrix.browser }}
+                  --shard=${{ matrix.shard }}/3
 
             - name: Upload Playwright Results
               if: always()
@@ -435,7 +478,7 @@ jobs:
             - uses: actions/upload-artifact@v7 # zizmor: ignore[unpinned-uses]
               if: always()
               with:
-                  name: playwright-results
+                  name: playwright-results-${{ matrix.browser }}-${{ matrix.shard }}-3
                   path: test-results/
                   retention-days: 10
 

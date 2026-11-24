@@ -50,15 +50,35 @@ test.describe('transformTemplate — optimized appear suppression page', () => {
         await expect.poll(readStyle(page, 'appear-blue'), settle).toContain('opacity: 1')
     })
 
-    test('counts exactly one optimized-appear transform animation on full load', async ({
+    test('runs at most one optimized-appear transform animation, never the templated one', async ({
         page
     }) => {
         await page.goto(URL)
 
         // The store only populates on a full server render (the SSR bootstrap script).
         await expect(page.getByTestId('appear-fully-loaded')).toHaveText('yes')
-        // Blue baseline is the only accelerated transform; slate is suppressed.
-        await expect(page.getByTestId('appear-transform-count')).toContainText('1 (expect 1')
+        // The appear animations wait for the browser's paint-ready signal and are
+        // skipped once Motion has mounted, so whether blue's runs depends on the
+        // browser (Chromium: yes; Firefox: usually Motion mounts first). Either
+        // way the templated slate box never runs one: only blue's id may appear.
+        await page.waitForTimeout(500)
+        const { blueId, transformIds } = await page.evaluate(() => ({
+            blueId: document
+                .querySelector('[data-testid="appear-blue"]')
+                ?.getAttribute('data-framer-appear-id'),
+            transformIds: (
+                (
+                    window as unknown as {
+                        __SvelteMotionAppear?: { started: Array<{ id: string; name: string }> }
+                    }
+                ).__SvelteMotionAppear?.started ?? []
+            )
+                .filter((entry) => entry.name === 'transform')
+                .map((entry) => entry.id)
+        }))
+        expect(blueId).toBeTruthy()
+        expect(transformIds.length).toBeLessThanOrEqual(1)
+        for (const id of transformIds) expect(id).toBe(blueId)
     })
 
     test('is linked from the root test index', async ({ page }) => {

@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
     unit-tests:
-        runs-on: ubuntu-latest
+        runs-on: blacksmith-4vcpu-ubuntu-2404
         timeout-minutes: 10
         steps:
             - name: Checkout
@@ -104,18 +104,55 @@ jobs:
                   if-no-files-found: ignore
                   retention-days: 7
 
+    playwright-version:
+        name: Resolve Playwright version
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        timeout-minutes: 5
+        outputs:
+            playwright: ${{ steps.resolve.outputs.playwright }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses]
+              with:
+                  persist-credentials: false
+                  sparse-checkout: package.json
+                  sparse-checkout-cone-mode: false
+
+            # The container image must match the installed @playwright/test exactly,
+            # so read it from package.json instead of hardcoding a second copy.
+            - name: Resolve Playwright version
+              id: resolve
+              run: |
+                  version=$(jq -r '.devDependencies["@playwright/test"]' package.json)
+                  if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "::error::@playwright/test must be pinned to an exact version, got '$version'"
+                    exit 1
+                  fi
+                  echo "playwright=$version" >> "$GITHUB_OUTPUT"
+
+            # Fail here, with a clear message, if the image for this version is
+            # not published yet.
+            - name: Verify the Playwright image exists
+              env:
+                  VERSION: ${{ steps.resolve.outputs.playwright }}
+              run: docker manifest inspect "mcr.microsoft.com/playwright:v${VERSION}-noble" > /dev/null
+
     e2e-tests:
-        needs: unit-tests
-        runs-on: ubuntu-latest
+        name: e2e-tests (${{ matrix.browser }} ${{ matrix.shard }}/3)
+        needs: [unit-tests, playwright-version]
+        runs-on: blacksmith-4vcpu-ubuntu-2404
         timeout-minutes: 25
+        # Browsers and their system libraries are baked into the image, so the job
+        # never downloads browsers or runs apt (the Ubuntu mirrors are flaky: one
+        # shard spent its whole 25 minutes fetching apt packages at 95 kB/s).
+        container:
+            image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.playwright }}-noble
+            options: --user 1001
         strategy:
             fail-fast: false
             matrix:
-                include:
-                    - shard: 1/2
-                      shard_name: 1-2
-                    - shard: 2/2
-                      shard_name: 2-2
+                browser: [chromium, firefox]
+                shard: [1, 2, 3]
         steps:
             - name: Checkout
               uses: actions/checkout@v7 # zizmor: ignore[unpinned-uses]
@@ -133,30 +170,18 @@ jobs:
             - name: Install dependencies
               run: pnpm install --filter . --frozen-lockfile --config.engine-strict=false
 
-            - name: Cache Playwright browsers
-              uses: actions/cache@v6 # zizmor: ignore[unpinned-uses]
-              with:
-                  path: ~/.cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-                  restore-keys: |
-                      ${{ runner.os }}-playwright-
-
-            - name: Install Playwright browsers
-              run: pnpm exec playwright install --with-deps
-
-            - name: Sanity check - list discovered tests
-              run: pnpm exec playwright test --list | head -n 50 | cat
-
             - name: Run e2e tests (sharded)
               env:
                   CI: true
-              run: pnpm exec playwright test --config=playwright.config.ts --shard=${{ matrix.shard }} --reporter=line
+              run: >-
+                  pnpm exec playwright test --config=playwright.config.ts
+                  --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/3 --reporter=line
 
             - name: Upload Playwright artifacts
               if: always()
               uses: actions/upload-artifact@v7 # zizmor: ignore[unpinned-uses]
               with:
-                  name: playwright-artifacts-${{ matrix.shard_name }}
+                  name: playwright-artifacts-${{ matrix.browser }}-${{ matrix.shard }}-3
                   path: |
                       playwright-report/**
                       test-results/**

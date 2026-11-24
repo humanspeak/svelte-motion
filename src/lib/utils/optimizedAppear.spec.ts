@@ -1,3 +1,4 @@
+import { runInThisContext } from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
     completeOptimizedAppearHandoff,
@@ -229,6 +230,156 @@ describe('optimizedAppear', () => {
         postRenderCallbacks.shift()?.()
         postRenderCallbacks.shift()?.()
         expect(cancel).toHaveBeenCalledOnce()
+    })
+
+    /**
+     * The real animations wait for the shared ready animation's `ready`
+     * promise. Firefox can resolve it after Motion has mounted, and an appear
+     * animation started then is never handed off: it finishes with
+     * `fill: both` and overrides every later inline transform, so the
+     * element's layout animations snap. Once Motion is mounted, none start.
+     */
+    describe('an appear animation whose ready gate resolves after Motion mounts', () => {
+        const pendingReady = () => {
+            let resolve!: () => void
+            const ready = new Promise<void>((done) => (resolve = done))
+            return { ready, resolve }
+        }
+        const fakeAnimation = (ready?: Promise<void>) =>
+            ({ cancel: vi.fn(), startTime: null, ready }) as unknown as Animation
+
+        it('does not start from the SSR bootstrap script', async () => {
+            const element = document.createElement('div')
+            element.setAttribute(optimizedAppearDataAttribute, 'appear-late')
+            document.body.appendChild(element)
+            const gate = pendingReady()
+            const animate = vi.fn(() => fakeAnimation(gate.ready))
+            element.animate = animate
+            const script = createOptimizedAppearScript('appear-late', [
+                { name: 'transform', keyframes: ['scale(0)', 'none'], options: { duration: 300 } }
+            ])
+            runInThisContext(script.replace(/^<script>|<\/script>$/g, ''))
+            expect(animate).toHaveBeenCalledOnce()
+
+            window.MotionIsMounted = true
+            gate.resolve()
+            await gate.ready
+            await Promise.resolve()
+
+            expect(animate).toHaveBeenCalledOnce()
+            expect(window.MotionHasOptimisedAnimation?.('appear-late', 'transform')).toBe(true)
+            element.remove()
+        })
+
+        it('does not start from startOptimizedAppearAnimation', async () => {
+            const element = document.createElement('div')
+            element.dataset.framerAppearId = 'appear-late-runtime'
+            const gate = pendingReady()
+            const animateSpy = vi.fn(() => fakeAnimation(gate.ready))
+            element.animate = animateSpy
+
+            startOptimizedAppearAnimation(element, 'transform', ['scale(0)', 'none'], {
+                duration: 0.3
+            })
+            expect(animateSpy).toHaveBeenCalledOnce()
+
+            window.MotionIsMounted = true
+            gate.resolve()
+            await gate.ready
+            await Promise.resolve()
+
+            expect(animateSpy).toHaveBeenCalledOnce()
+            expect(window.__SvelteMotionAppear?.started).toEqual([])
+        })
+    })
+
+    /**
+     * Upstream `MotionCancelOptimisedAnimation(id, name, frame, canResume)`
+     * (optimized-appear/start.ts:120-163 @ v14.14.0): with no `canResume` it
+     * waits two frames, `false` cancels now for good, `true` suspends and
+     * resumes the animation at its own start time on the next render.
+     */
+    describe('MotionCancelOptimisedAnimation canResume', () => {
+        const startTransform = () => {
+            const element = document.createElement('div')
+            element.dataset.framerAppearId = 'appear-resume'
+            const cancel = vi.fn()
+            const play = vi.fn()
+            const ready = { cancel: vi.fn(), startTime: null } as unknown as Animation
+            const animation = { cancel, play, startTime: null } as unknown as Animation
+            element.animate = vi
+                .fn()
+                .mockReturnValueOnce(ready)
+                .mockReturnValueOnce(animation) as never
+            startOptimizedAppearAnimation(element, 'transform', ['scale(0)', 'none'], {
+                duration: 0.3
+            })
+            return { animation, cancel, play }
+        }
+        const createFrame = () => {
+            const postRender: Array<() => void> = []
+            const render: Array<() => void> = []
+            return {
+                postRender,
+                render,
+                batcher: {
+                    postRender: vi.fn((callback: () => void) => postRender.push(callback)),
+                    render: vi.fn((callback: () => void) => render.push(callback))
+                }
+            }
+        }
+
+        it('false cancels at once and forgets the animation', () => {
+            const { cancel } = startTransform()
+            const frame = createFrame()
+
+            window.MotionCancelOptimisedAnimation?.(
+                'appear-resume',
+                'transform',
+                frame.batcher as never,
+                false
+            )
+
+            expect(cancel).toHaveBeenCalledOnce()
+            expect(frame.postRender).toHaveLength(0)
+            expect(window.MotionHasOptimisedAnimation?.('appear-resume', 'transform')).toBe(false)
+        })
+
+        it('true suspends it, then resumes it at its start time on the next render', () => {
+            const { animation, cancel, play } = startTransform()
+            const startTime = animation.startTime
+            const frame = createFrame()
+
+            window.MotionCancelOptimisedAnimation?.(
+                'appear-resume',
+                'transform',
+                frame.batcher as never,
+                true
+            )
+
+            expect(cancel).toHaveBeenCalledOnce()
+            expect(window.MotionHasOptimisedAnimation?.('appear-resume', 'transform')).toBe(true)
+            expect(frame.render).toHaveLength(1)
+            frame.render[0]()
+            expect(play).toHaveBeenCalledOnce()
+            expect(animation.startTime).toBe(startTime)
+        })
+
+        it('undefined waits two frames before cancelling', () => {
+            const { cancel } = startTransform()
+            const frame = createFrame()
+
+            window.MotionCancelOptimisedAnimation?.(
+                'appear-resume',
+                'transform',
+                frame.batcher as never
+            )
+
+            expect(cancel).not.toHaveBeenCalled()
+            frame.postRender.shift()?.()
+            frame.postRender.shift()?.()
+            expect(cancel).toHaveBeenCalledOnce()
+        })
     })
 
     it('creates an SSR bootstrap script with one shared ready animation gate', () => {

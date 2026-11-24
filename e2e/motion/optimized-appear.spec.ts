@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { skipUnlessAppearStartsBeforeMount } from '../_helpers/appear'
 
 test.describe('optimized appear animations', () => {
     test('starts SSR appear animations before hydration handoff', async ({ page }) => {
+        skipUnlessAppearStartsBeforeMount(page)
         await page.addInitScript(() => {
             const samples: number[] = []
             const ids: string[] = []
@@ -69,6 +71,7 @@ test.describe('optimized appear animations', () => {
     })
 
     test('starts a WAAPI appear for non-transform CSS properties like filter', async ({ page }) => {
+        skipUnlessAppearStartsBeforeMount(page)
         await page.goto('/tests/optimized-appear?@isPlaywright=true')
 
         const blur = page.getByTestId('optimized-appear-blur')
@@ -103,6 +106,7 @@ test.describe('optimized appear animations', () => {
     test('filter appear animates through intermediate blurs and settles clean', async ({
         page
     }) => {
+        skipUnlessAppearStartsBeforeMount(page)
         await page.addInitScript(() => {
             const blurSamples: number[] = []
             const filterKeyframes: string[][] = []

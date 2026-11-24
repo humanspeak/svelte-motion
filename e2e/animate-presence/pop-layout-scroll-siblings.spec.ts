@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { openCdpSession } from '../_helpers/cdp'
 
 /**
  * Plan 015a: layout siblings around an exit in a scrolled container (#2348).
@@ -128,7 +129,7 @@ const remove = (page: Page) =>
  * hit-tested blue top and green bottom.
  */
 async function record(page: Page, action: () => Promise<unknown>, ms: number): Promise<Recording> {
-    const cdp = await page.context().newCDPSession(page)
+    const cdp = await openCdpSession(page, 'Painted-frame capture')
     const shots: ScreencastFrame[] = []
     cdp.on('Page.screencastFrame', (event) => {
         shots.push({ data: event.data, metadata: event.metadata })

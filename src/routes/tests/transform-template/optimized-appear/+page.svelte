@@ -40,9 +40,12 @@
     }
 
     onMount(() => {
-        // The optimized-appear store only populates on a full server render (the SSR
-        // <script> bootstrap). It is empty after client-side (SPA) navigation.
-        fullyLoaded = (window.__SvelteMotionAppear?.started?.length ?? 0) > 0
+        // The SSR <script> bootstrap registers every element it schedules in the
+        // store, so a non-empty `complete` map means a full server render. It is
+        // empty after client-side (SPA) navigation. (`started` can't tell: the
+        // animations wait for the browser's paint-ready signal, and when Motion
+        // mounts first, as Firefox can, none of them start.)
+        fullyLoaded = (window.__SvelteMotionAppear?.complete?.size ?? 0) > 0
 
         let raf = 0
         const tick = () => {
@@ -142,7 +145,8 @@
         <dd data-testid="appear-fully-loaded">{fullyLoaded ? 'yes' : 'no (SPA nav — reload)'}</dd>
         <dt>Optimized-appear <em>transform</em> animations</dt>
         <dd data-testid="appear-transform-count" class:good={transformAppearCount === 1}>
-            {transformAppearCount} (expect 1 — blue baseline only; slate suppressed)
+            {transformAppearCount} (1 — the blue baseline — or 0 when Motion mounted before the browser
+            was ready to paint; never the slate box)
         </dd>
         <dt>Optimized-appear <em>opacity</em> animations</dt>
         <dd data-testid="appear-opacity-count">{opacityAppearCount}</dd>

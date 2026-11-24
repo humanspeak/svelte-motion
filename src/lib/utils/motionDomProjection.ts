@@ -4,6 +4,7 @@ import {
     copyBoxInto,
     createBox,
     frame,
+    getOptimisedAppearId,
     hasTransform,
     microtask,
     rootProjectionNode,
@@ -41,6 +42,34 @@ type ProjectionVisualElement = VisualElement & {
 type ProjectionTreeNode<Instance = unknown> = IProjectionNode<Instance>
 
 type LayoutOption = boolean | string | undefined
+
+/**
+ * Cancel the optimized-appear transform animations of `node` and its
+ * ancestors before a layout snapshot, as upstream's `willUpdate()` does
+ * (`cancelTreeOptimisedTransformAnimations`, create-projection-node.ts:152-178
+ * and 877-882 @ v14.14.0). A WAAPI transform left on an element, such as an
+ * appear animation that started after hydration, overrides the projection's
+ * inline transform, so its layout animation never shows. A `layout` /
+ * `layoutId` node's animation is cancelled for good; any other ancestor's is
+ * suspended for the measurement and resumed on the next render.
+ *
+ * Each node is checked once (`hasCheckedOptimisedAppear`).
+ *
+ * @param node The node about to be snapshotted.
+ */
+const cancelTreeOptimisedTransformAnimations = (node: IProjectionNode): void => {
+    node.hasCheckedOptimisedAppear = true
+    if (node.root === node) return
+    const { visualElement } = node.options
+    if (!visualElement) return
+    const appearId = getOptimisedAppearId(visualElement)
+    if (window.MotionHasOptimisedAnimation?.(appearId, 'transform')) {
+        const { layout, layoutId } = node.options
+        window.MotionCancelOptimisedAnimation?.(appearId, 'transform', frame, !(layout || layoutId))
+    }
+    const { parent } = node
+    if (parent && !parent.hasCheckedOptimisedAppear) cancelTreeOptimisedTransformAnimations(parent)
+}
 type AnimationType = 'position' | 'x' | 'y' | 'size' | 'both' | 'preserve-aspect'
 type RectLike = { left: number; top: number; width: number; height: number }
 type Box = ReturnType<typeof createBox>
@@ -2855,6 +2884,15 @@ export class MotionDomProjectionAdapter {
     }
 
     private prepareSnapshotPath<Instance>(projection: ProjectionTreeNode<Instance>): void {
+        // Seeding a snapshot is this port's `willUpdate()`, which cancels the
+        // optimized-appear transforms the measurement would see first.
+        if (
+            typeof window !== 'undefined' &&
+            window.MotionCancelOptimisedAnimation &&
+            !projection.hasCheckedOptimisedAppear
+        ) {
+            cancelTreeOptimisedTransformAnimations(projection as IProjectionNode)
+        }
         projection.root!.hasTreeAnimated = true
 
         for (const node of projection.path) {

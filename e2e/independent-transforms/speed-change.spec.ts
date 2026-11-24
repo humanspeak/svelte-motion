@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { openCdpSession } from '../_helpers/cdp'
 
 /**
  * Changing the speed of an accelerated transform animation, or pausing and
@@ -214,7 +215,7 @@ type ScreencastFrame = { data: string; metadata: { deviceWidth: number; timestam
  * or -1 where no box-coloured pixel was found on its row.
  */
 async function screencastSpeedChange(page: Page, id: string): Promise<number[]> {
-    const cdp = await page.context().newCDPSession(page)
+    const cdp = await openCdpSession(page, 'Painted-frame capture')
     const shots: ScreencastFrame[] = []
     cdp.on('Page.screencastFrame', (event) => {
         shots.push({ data: event.data, metadata: event.metadata })
