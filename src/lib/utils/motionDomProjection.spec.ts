@@ -1116,6 +1116,91 @@ describe('MotionDomProjectionAdapter observed commits across node groups', () =>
 })
 
 /**
+ * Upstream's `willUpdate()` cancels optimized-appear transform animations on
+ * the node and its ancestors before the snapshot, since a leftover WAAPI
+ * transform would override the projection's inline transform
+ * (`cancelTreeOptimisedTransformAnimations`, create-projection-node.ts:152-178,
+ * 877-882 @ v14.14.0). The observed commit seeds snapshots without
+ * `willUpdate()`, so it must run the same check. Layout nodes cancel for good
+ * (`canResume` false); other ancestors are suspended and resumed.
+ */
+describe('MotionDomProjectionAdapter cancels optimized appear transforms before a commit', () => {
+    const rects = new Map<HTMLElement, DOMRect>()
+    const place = (element: HTMLElement, top: number) =>
+        rects.set(element, new DOMRect(10, top, 100, 50))
+    const mount = (adapter: MotionDomProjectionAdapter, top: number, layout = true) => {
+        const element = document.createElement('div')
+        document.body.appendChild(element)
+        place(element, top)
+        vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => rects.get(element)!)
+        adapter.updateOptions({ layout })
+        adapter.mount(element)
+        return element
+    }
+    const setAppearId = (adapter: MotionDomProjectionAdapter, id: string) => {
+        ;(adapter.visualElement.props as Record<string, unknown>)['data-framer-appear-id'] = id
+    }
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    const rect = (top: number) => ({ left: 10, top, width: 100, height: 50 })
+
+    beforeEach(() => {
+        vi.useRealTimers()
+        document.documentElement.scrollTop = 0
+        rects.clear()
+        window.MotionHasOptimisedAnimation = (id, name) =>
+            name === 'transform' && (id === 'appear-child' || id === 'appear-parent')
+        window.MotionCancelOptimisedAnimation = vi.fn()
+    })
+
+    afterEach(() => {
+        window.MotionHasOptimisedAnimation = undefined
+        window.MotionCancelOptimisedAnimation = undefined
+    })
+
+    it('cancels the layout node for good and suspends a non-layout ancestor, once', async () => {
+        const parent = new MotionDomProjectionAdapter()
+        const child = new MotionDomProjectionAdapter({ parent })
+        mount(parent, 0, false)
+        const childElement = mount(child, 100)
+        setAppearId(parent, 'appear-parent')
+        setAppearId(child, 'appear-child')
+
+        place(childElement, 160)
+        child.commitObservedLayoutChange(rect(100))
+
+        const cancel = vi.mocked(window.MotionCancelOptimisedAnimation!)
+        expect(cancel).toHaveBeenCalledWith('appear-child', 'transform', frame, false)
+        expect(cancel).toHaveBeenCalledWith('appear-parent', 'transform', frame, true)
+        expect(cancel).toHaveBeenCalledTimes(2)
+
+        // Upstream checks each node once (`hasCheckedOptimisedAppear`).
+        place(childElement, 220)
+        child.commitObservedLayoutChange(rect(160))
+        expect(cancel).toHaveBeenCalledTimes(2)
+
+        await flush()
+        child.unmount()
+        parent.unmount()
+    })
+
+    it('does nothing once every optimized animation is gone', async () => {
+        window.MotionCancelOptimisedAnimation = undefined
+        const hasOptimised = vi.fn(() => true)
+        window.MotionHasOptimisedAnimation = hasOptimised
+        const adapter = new MotionDomProjectionAdapter()
+        const element = mount(adapter, 100)
+        setAppearId(adapter, 'appear-child')
+
+        place(element, 160)
+        adapter.commitObservedLayoutChange(rect(100))
+
+        expect(hasOptimised).not.toHaveBeenCalled()
+        await flush()
+        adapter.unmount()
+    })
+})
+
+/**
  * Plan 007 Step 4b: the four checkpoint gaps.
  */
 describe('MotionDomProjectionAdapter node-group gaps (plan 007 Step 4b)', () => {

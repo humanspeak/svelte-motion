@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { skipUnlessAppearStartsBeforeMount } from '../_helpers/appear'
 
 /**
  * The SSR optimized appear animation follows initial's `transition.out`, else
@@ -109,6 +110,7 @@ test.describe('optimized appear follows the mount transition (#1725)', () => {
     }
 
     test('the appear animation ran for both boxes', async ({ page }) => {
+        skipUnlessAppearStartsBeforeMount(page)
         await page.goto(URL)
         await page.getByTestId(BOXES[0]).waitFor()
 
