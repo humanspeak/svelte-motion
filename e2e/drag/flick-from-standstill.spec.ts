@@ -19,6 +19,7 @@
  * with the motion-dom bump.
  */
 import { expect, test, type CDPSession, type Page } from '@playwright/test'
+import { openCdpSession } from '../_helpers/cdp'
 
 type Input = 'mouse' | 'touch'
 
@@ -96,7 +97,7 @@ async function flick(page: Page, cdp: CDPSession | null, steps: number, dist: nu
 async function setup(page: Page, input: Input) {
     await page.goto('/tests/drag/flick-from-standstill?@isPlaywright=true')
     await expect(page.getByTestId('box')).toBeVisible()
-    const cdp = input === 'touch' ? await page.context().newCDPSession(page) : null
+    const cdp = input === 'touch' ? await openCdpSession(page, 'Touch input') : null
     // Let the frameloop go fully idle
     await page.waitForTimeout(500)
     return cdp

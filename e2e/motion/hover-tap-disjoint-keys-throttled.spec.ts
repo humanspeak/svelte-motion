@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { openCdpSession } from '../_helpers/cdp'
 
 /**
  * CI-runner regression: the tap-release orphaned-key restore computed its
@@ -15,7 +16,7 @@ test.describe('Hover/tap disjoint-key release under CPU throttle', () => {
         box.evaluate((el) => Number.parseFloat(getComputedStyle(el).opacity))
 
     test('restores the non-owned opacity key to rest on a slow runner', async ({ page }) => {
-        const cdp = await page.context().newCDPSession(page)
+        const cdp = await openCdpSession(page, 'CPU throttling')
         await page.goto('/tests/motion/hover-tap-disjoint-keys?@isPlaywright=true')
 
         const box = page.getByTestId('motion-disjoint-keys')

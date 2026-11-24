@@ -34,25 +34,37 @@ const LISTENING_SCALE_FLOOR = 28
  */
 const IS_CI = !!process.env.CI
 
+const CHROMIUM_ARGS = [
+    // GPU flags only where a GPU exists: in headless CI they can stall frame
+    // production entirely (observed 0 rAF ticks in 2s).
+    ...(IS_CI
+        ? []
+        : [
+              '--enable-gpu',
+              '--enable-gpu-rasterization',
+              '--ignore-gpu-blocklist',
+              '--use-angle=metal'
+          ]),
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows'
+]
+
+// Real Chrome and the Chromium flags apply to the Chromium project only. The
+// Firefox project keeps its own browser and default launch options.
 test.use({
-    ...(IS_CI ? {} : { channel: 'chrome' }),
-    launchOptions: {
-        args: [
-            // GPU flags only where a GPU exists: in headless CI they can
-            // stall frame production entirely (observed 0 rAF ticks in 2s).
-            ...(IS_CI
-                ? []
-                : [
-                      '--enable-gpu',
-                      '--enable-gpu-rasterization',
-                      '--ignore-gpu-blocklist',
-                      '--use-angle=metal'
-                  ]),
-            '--disable-background-timer-throttling',
-            '--disable-renderer-backgrounding',
-            '--disable-backgrounding-occluded-windows'
-        ]
-    }
+    channel: [
+        async ({ browserName }, use) => {
+            await use(browserName === 'chromium' && !IS_CI ? 'chrome' : undefined)
+        },
+        { scope: 'worker' }
+    ],
+    launchOptions: [
+        async ({ browserName }, use) => {
+            await use(browserName === 'chromium' ? { args: CHROMIUM_ARGS } : {})
+        },
+        { scope: 'worker' }
+    ]
 })
 
 const P95_BUDGET_MS = IS_CI ? 60 : 25
