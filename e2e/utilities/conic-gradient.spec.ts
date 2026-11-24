@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 
 /**
  * Regression coverage for issue #418: the compute form of `useTransform` must
@@ -15,6 +15,22 @@ import { expect, test } from '@playwright/test'
 const pivot = (bg: string | null): string => {
     const match = bg?.match(/at\s+([\d.]+)%\s+([\d.]+)%/)
     return match ? `${match[1]} ${match[2]}` : ''
+}
+
+/**
+ * Waits until the pivot sits within 1 percentage point of (x, y). Pointer-driven
+ * pivots can't be matched exactly: Firefox reports pointer coordinates in whole
+ * pixels, so a pointer at 20% of the swatch reads back as e.g. 19.92%.
+ */
+const expectPivotNear = async (box: Locator, x: number, y: number) => {
+    await expect
+        .poll(async () => {
+            const [px, py] = pivot(await box.getAttribute('data-bg'))
+                .split(' ')
+                .map(Number)
+            return Math.max(Math.abs(px - x), Math.abs(py - y))
+        })
+        .toBeLessThanOrEqual(1)
 }
 
 test.describe('useTransform compute form (conic gradient)', () => {
@@ -54,11 +70,11 @@ test.describe('useTransform compute form (conic gradient)', () => {
         if (!rect) throw new Error('swatch not found')
 
         await page.mouse.move(rect.x + rect.width * 0.2, rect.y + rect.height * 0.2)
-        await expect(box).toHaveAttribute('data-bg', /at\s+20%\s+20%/)
+        await expectPivotNear(box, 20, 20)
         const bgA = await box.getAttribute('data-bg')
 
         await page.mouse.move(rect.x + rect.width * 0.8, rect.y + rect.height * 0.8)
-        await expect(box).toHaveAttribute('data-bg', /at\s+80%\s+80%/)
+        await expectPivotNear(box, 80, 80)
         const bgB = await box.getAttribute('data-bg')
 
         expect(pivot(bgA)).not.toBe(pivot(bgB))

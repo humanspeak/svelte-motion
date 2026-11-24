@@ -25,7 +25,9 @@ const dragBox = async (page: Page) => {
     await page.waitForTimeout(100)
     const moved = (await box.boundingBox())!
 
-    await page.mouse.move(x + 600, y + 600, { steps: 10 })
+    // Past the 300px constraints yet inside the viewport: Firefox drops
+    // synthetic pointer events outside it, so the drag would stop short.
+    await page.mouse.move(x + 400, y + 400, { steps: 10 })
     await page.waitForTimeout(100)
     const end = (await box.boundingBox())!
     await page.mouse.up()

@@ -29,6 +29,28 @@ const disableRotate = async (page: import('@playwright/test').Page) => {
     if (await rotateToggle.isChecked()) await rotateToggle.click()
 }
 
+/**
+ * Drags from (x, y) in 20 equal pointer moves of up to (stepX, stepY) each,
+ * shortening the steps so the path ends at least 8px inside the viewport.
+ * Firefox drops synthetic pointer events outside the viewport, so a path that
+ * leaves it never delivers the release and the drag never ends.
+ */
+const fling = async (
+    page: import('@playwright/test').Page,
+    x: number,
+    y: number,
+    stepX: number,
+    stepY: number
+) => {
+    const { width, height } = page.viewportSize()!
+    const room = (from: number, step: number, size: number) =>
+        step === 0 ? Infinity : (step > 0 ? size - 8 - from : from - 8) / Math.abs(step * 20)
+    const scale = Math.min(1, room(x, stepX, width), room(y, stepY, height))
+    for (let i = 1; i <= 20; i++) {
+        await page.mouse.move(x + i * stepX * scale, y + i * stepY * scale, { steps: 1 })
+    }
+}
+
 test.describe('drag/brutalist-stage', () => {
     test('rotated card follows the pointer during active drag', async ({ page }) => {
         await page.goto(STAGE_PATH)
@@ -163,9 +185,7 @@ test.describe('drag/brutalist-stage', () => {
         await page.mouse.move(cx, cy)
         await page.mouse.down()
         // Drag well past the (-200, +120) corner with velocity
-        for (let i = 1; i <= 20; i++) {
-            await page.mouse.move(cx - i * 40, cy + i * 8, { steps: 1 })
-        }
+        await fling(page, cx, cy, -40, 8)
         await page.mouse.up()
 
         // Let the dragTransition spring fully settle. The probe in
@@ -195,9 +215,7 @@ test.describe('drag/brutalist-stage', () => {
 
         await page.mouse.move(cx, cy)
         await page.mouse.down()
-        for (let i = 1; i <= 20; i++) {
-            await page.mouse.move(cx + i * 40, cy - i * 8, { steps: 1 })
-        }
+        await fling(page, cx, cy, 40, -8)
         await page.mouse.up()
 
         await page.waitForTimeout(1500)
@@ -232,9 +250,7 @@ test.describe('drag/brutalist-stage', () => {
         const cy1 = start.y + start.height / 2
         await page.mouse.move(cx1, cy1)
         await page.mouse.down()
-        for (let i = 1; i <= 20; i++) {
-            await page.mouse.move(cx1 + i * 40, cy1, { steps: 1 })
-        }
+        await fling(page, cx1, cy1, 40, 0)
         await page.mouse.up()
         await page.waitForTimeout(1500)
 
@@ -253,9 +269,7 @@ test.describe('drag/brutalist-stage', () => {
         const cy2 = next.y + next.height / 2
         await page.mouse.move(cx2, cy2)
         await page.mouse.down()
-        for (let i = 1; i <= 20; i++) {
-            await page.mouse.move(cx2 + i * 40, cy2, { steps: 1 })
-        }
+        await fling(page, cx2, cy2, 40, 0)
         await page.mouse.up()
         await page.waitForTimeout(1500)
 
@@ -287,9 +301,7 @@ test.describe('drag/brutalist-stage', () => {
 
         await page.mouse.move(cx, cy)
         await page.mouse.down()
-        for (let i = 1; i <= 20; i++) {
-            await page.mouse.move(cx - i * 40, cy, { steps: 1 })
-        }
+        await fling(page, cx, cy, -40, 0)
 
         // Confirm that the rendered drag has reached the overdrag region
         // before releasing; pointer events and rendering run on separate clocks.
